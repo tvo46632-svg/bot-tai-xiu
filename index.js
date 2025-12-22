@@ -24,7 +24,7 @@ const client = new Client({
 });
 
 const PREFIX = "!";
-const EMOJIS_BAUCUA = ["🦀", "🐟", "🐸", "🐔", "🐴", "🐯"];
+const EMOJIS_BAUCUA = ["🦀", "🐟", "🫎", "🦐", "🐔", "🍐"];
 
 function randomInt(min, max) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
