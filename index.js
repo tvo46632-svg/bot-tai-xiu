@@ -192,19 +192,24 @@ async function cmdDoixu(message, args) {
 }
 
 // =====================
-//         TUNG XU
+//         TUNG XU (v2)
 // =====================
 async function cmdTungxu(message, args) {
-
-    if (args.length < 1) {
-        message.reply("❗ Cách dùng: !tungxu <số_xu>");
+    if (args.length < 2) {
+        message.reply("❗ Cách dùng: !tungxu <số_xu> <ngửa/sấp>");
         return;
     }
 
     const betXu = parseInt(args[0]);
+    const userChoice = args[1].toLowerCase(); // ngửa hoặc sấp
 
     if (isNaN(betXu) || betXu <= 0) {
         message.reply("❌ Số xu không hợp lệ!");
+        return;
+    }
+
+    if (!["ngửa", "sấp"].includes(userChoice)) {
+        message.reply("❌ Chọn: ngửa / sấp");
         return;
     }
 
@@ -217,16 +222,17 @@ async function cmdTungxu(message, args) {
 
     await subXu(message.author.id, betXu);
 
-    await delay(2000);
+    await delay(1000);
 
-    const isWin = Math.random() < 0.5;
+    // Quay xu
+    const result = Math.random() < 0.5 ? "ngửa" : "sấp";
 
-    if (isWin) {
+    if (result === userChoice) {
         const rewardXu = betXu * 2;
         await addXu(message.author.id, rewardXu);
-        message.reply(`🪙 Kết quả: Thắng! Bạn nhận ${rewardXu} xu.`);
+        message.reply(`🪙 Kết quả: ${result.toUpperCase()}! Bạn thắng và nhận ${rewardXu} xu.`);
     } else {
-        message.reply(`❌ Kết quả: Thua! Bạn mất ${betXu} xu.`);
+        message.reply(`🪙 Kết quả: ${result.toUpperCase()}! Bạn thua và mất ${betXu} xu.`);
     }
 }
 
