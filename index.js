@@ -1,6 +1,6 @@
 // ================================================
 //                  DISCORD CASINO BOT
-//        FULL VERSION — ~820+ LINES OF CODE
+//        FULL VERSION — ~840+ LINES OF CODE
 // ================================================
 
 // ---------------- IMPORT MODULES ----------------
@@ -98,6 +98,35 @@ async function subXu(userId, amount) {
     if (user.xu < 0) user.xu = 0;
     await db.write();
 }
+// Lấy số xu hiện tại
+async function getUserCoins(userId) {
+    await db.read();
+    db.data.users[userId] ||= { money: 0, xu: 0, debt: 0 };
+    return db.data.users[userId].xu || 0;
+}
+
+// Set số xu
+async function setUserCoins(userId, amount) {
+    await db.read();
+    db.data.users[userId] ||= { money: 0, xu: 0, debt: 0 };
+    db.data.users[userId].xu = amount;
+    await db.write();
+}
+
+// Lấy nợ (debt)
+async function getUserDebt(userId) {
+    await db.read();
+    db.data.users[userId] ||= { money: 0, xu: 0, debt: 0 };
+    return db.data.users[userId].debt || 0;
+}
+
+// Set nợ (debt)
+async function setUserDebt(userId, amount) {
+    await db.read();
+    db.data.users[userId] ||= { money: 0, xu: 0, debt: 0 };
+    db.data.users[userId].debt = amount;
+    await db.write();
+}
 
 // ===================== COMMANDS =====================
 
@@ -135,16 +164,19 @@ async function cmdDiemdanh(message) {
 }
 
 // =====================
-//         XEM TIỀN
+//         XEM TIỀN + NỢ 
 // =====================
 async function cmdTien(message) {
+    const userId = message.author.id;
+    let currentCoins = await getUserCoins(userId) || 0;
+    let userDebt = await getUserDebt(userId) || 0;
 
-    const user = await getUser(message.author.id);
+    let replyText = `💰 Hiện tại bạn có **${currentCoins} xu**.`;
+    if (userDebt > 0) {
+        replyText += `\n⚠️ Bạn đang nợ bot **${userDebt} xu**.`;
+    }
 
-    message.reply(
-        `💰 **Tiền của bạn:** ${user.money}\n` +
-        `🪙 **Xu của bạn:** ${user.xu}`
-    );
+    message.reply(replyText);
 }
 
 // =====================
@@ -710,7 +742,92 @@ async function cmdAnxin(message) {
 
     message.reply(`🪙 Bạn xin được ${reward} xu từ bot! Lượt còn lại hôm nay: ${info.count}`);
 }
+// =====================
+//        VAY XU
+// =====================
+async function cmdVay(message, args) {
+    const userId = message.author.id;
+    let currentCoins = await getUserCoins(userId) || 0;
+    let userDebt = await getUserDebt(userId) || 0;
 
+    // Kiểm tra nợ trước khi cho vay
+    if (userDebt > 0) {
+        return message.reply(
+            `❌ Bạn vẫn đang nợ bot **${userDebt} xu**, bạn phải trả hết mới có thể vay tiếp!`
+        );
+    }
+
+    const maxLoan = 10000; // số xu vay tối đa
+    const interest = 0.1; // lãi 10%
+
+    // Người dùng có thể nhập số xu muốn vay, tối đa 10k
+    let loanAmount = args[0] ? parseInt(args[0]) : maxLoan;
+
+    if (isNaN(loanAmount) || loanAmount <= 0) {
+        return message.reply("❌ Vui lòng nhập số xu hợp lệ để vay!");
+    }
+
+    if (loanAmount > maxLoan) loanAmount = maxLoan;
+
+    const totalOwed = Math.floor(loanAmount * (1 + interest));
+
+    // Cập nhật tiền và nợ
+    currentCoins += loanAmount;
+    userDebt = totalOwed;
+
+    await setUserCoins(userId, currentCoins);
+    await setUserDebt(userId, userDebt);
+
+    message.reply(
+        `✅ Bạn đã vay **${loanAmount} xu**.\n` +
+        `💰 Bạn sẽ phải trả lại **${totalOwed} xu** (bao gồm 10% lãi).\n` +
+        `Hiện tại bạn có **${currentCoins} xu**, nợ hiện tại: **${userDebt} xu**.`
+    );
+    // =====================
+//        TRẢ LÃI + NỢ
+// =====================
+    async function cmdTralai(message, args) {
+    const userId = message.author.id;
+    let currentCoins = await getUserCoins(userId) || 0;
+    let userDebt = await getUserDebt(userId) || 0;
+
+    if (userDebt <= 0) {
+        return message.reply("✅ Bạn không còn nợ bot nữa!");
+    }
+
+    if (!args[0]) {
+        return message.reply("❌ Vui lòng nhập số xu muốn trả!");
+    }
+
+    let payAmount = parseInt(args[0]);
+    if (isNaN(payAmount) || payAmount <= 0) {
+        return message.reply("❌ Vui lòng nhập số xu hợp lệ để trả!");
+    }
+
+    if (payAmount > currentCoins) {
+        return message.reply(`❌ Bạn không đủ xu để trả! Hiện tại bạn có ${currentCoins} xu.`);
+    }
+
+    if (payAmount > userDebt) payAmount = userDebt; // không trả quá nợ
+
+    // Trừ xu và nợ
+    currentCoins -= payAmount;
+    userDebt -= payAmount;
+
+    await setUserCoins(userId, currentCoins);
+    await setUserDebt(userId, userDebt);
+
+    let replyText = `✅ Bạn đã trả **${payAmount} xu**.\n` +
+                    `💰 Hiện tại bạn còn **${currentCoins} xu**.`;
+
+    if (userDebt > 0) {
+        replyText += `\n⚠️ Nợ còn lại: **${userDebt} xu**.`;
+    } else {
+        replyText += `\n🎉 Bạn đã trả hết nợ!`;
+    }
+
+    message.reply(replyText);
+}
 
 // =====================
 //      HELP (FULL + BẢNG GIÁ)
@@ -773,6 +890,11 @@ async function cmdHelp(message) {
 50% 600+
 50% 600-
 giới hạn từ 1-1000
+━━━━━━━━━━━━━━━━━━
+💸💸 **Vay Tiền**
+• !vay (xu)
+• mỗi lần vay sẽ lãi 10%
+• tối đa có thể vay 10k xu
 
 ━━━━━━━━━━━━━━━━━━
 ⚠️ Một số game có delay xử lý
@@ -809,6 +931,8 @@ client.on("messageCreate", async (message) => {
         case "chuyenxu": await cmdChuyenxu(message,args); break;
         case "xidach": await cmdXidach(message,args); break;
         case "anxin": await cmdAnxin(message); break;
+        case "vay": await cmdVay(message, args); break;
+        case "tralai": await cmdTralai(message, args); break;
         case "help": await cmdHelp(message); break;
         default: message.reply("❌ Lệnh không hợp lệ!");
     }
