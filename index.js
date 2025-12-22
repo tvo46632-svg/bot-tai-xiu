@@ -358,7 +358,7 @@ async function cmdTaixiu(message, args) {
 
 let baucuaSession = null;
 let userBetAmounts = {}; // Lưu số tiền cược từng người
-const BAUCUA_EMOJIS = ["🦀", "🐟", "🫎", "🦐", "🐔", "🍐"];
+const BAUCUA_EMOJIS = ["🦀", "🐟", "🫎", "🦐", "🐔", "🍐"]; // Các con trong game
 
 function delay(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
@@ -431,12 +431,26 @@ async function cmdBaucua(message, args) {
         for (const userId in baucuaSession.bets) {
             const bets = baucuaSession.bets[userId];
             let totalWin = 0;
+            let totalBet = 0;
+            let matchedConCount = 0;
 
+            // Tính tổng tiền cược và số con trúng
             for (const [emoji, amount] of Object.entries(bets)) {
+                totalBet += amount;
                 const count = results.filter(r => r === emoji).length;
-                if (count === 1) totalWin += amount * 2;
-                else if (count === 2) totalWin += amount * 3;
-                else if (count === 3) totalWin += amount * 4;
+                if (count > 0) {
+                    matchedConCount += count;
+                    totalWin += amount * count; // Cộng tiền thắng cho mỗi con trúng
+                }
+            }
+
+            // Tính tiền thắng cho từng người chơi
+            if (matchedConCount === 1) {
+                totalWin += totalBet; // Nếu chỉ có 1 con trúng, trả lại toàn bộ tiền đã đặt
+            } else if (matchedConCount === 2) {
+                totalWin += totalBet * 2; // Nếu 2 con trúng, nhân x3
+            } else if (matchedConCount === 3) {
+                totalWin += totalBet * 3; // Nếu 3 con trúng, nhân x4
             }
 
             summary[userId] = totalWin;
