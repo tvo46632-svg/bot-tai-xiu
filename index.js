@@ -354,9 +354,8 @@ async function cmdBoctham(message) {
 }
 
 // Lệnh help
-if (command === 'help') {
-    if(content === '!help') {
-        return msg.reply(`
+async function cmdHelp(message) {
+  await message.reply(`
 📖 **HƯỚNG DẪN BOT CASINO**  
 
 ━━━━━━━━━━━━━━━━━━
@@ -388,7 +387,7 @@ if (command === 'help') {
 
 ━━━━━━━━━━━━━━━━━━
 🦀🐟🍐 **BẦU – CUA – TÔM – CÁ – NGỰA (CHUNG BÀN)**
-• !bc <tiền> <bau/cua/tom/ca/ngua>
+• !baucua <tiền> <bau/cua/tom/ca/ngua>
 • Mỗi người đặt 1 lần / ván
 • Mở bàn 15 giây
 • Xổ 3 con
@@ -423,7 +422,6 @@ if (command === 'help') {
 ⏳ **LƯU Ý**
 • Một số lệnh có cooldown
 `);
-    }
 }
 // Main
 client.on("ready", async () => {
