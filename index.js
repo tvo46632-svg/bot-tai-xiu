@@ -354,6 +354,69 @@ async function cmdTaixiu(message, args) {
 // =====================
 //         BAU CUA SOC DIA + HOAT ANH + TIEN CUOC
 // =====================
+async function cmdTaixiu(message, args) {
+
+    if (args.length < 2) {
+        message.reply("❗ Cách dùng: !taixiu <tiền> <chẵn/lẻ/tài/xỉu>");
+        return;
+    }
+
+    const betMoney = parseInt(args[0]);
+    const userChoice = args[1].toLowerCase();
+
+    if (isNaN(betMoney) || betMoney <= 0) {
+        message.reply("❌ Số tiền cược không hợp lệ!");
+        return;
+    }
+
+    if (!["chẵn", "lẻ", "tài", "xỉu"].includes(userChoice)) {
+        message.reply("❌ Chọn: chẵn / lẻ / tài / xỉu");
+        return;
+    }
+
+    const user = await getUser(message.author.id);
+
+    if (user.money < betMoney) {
+        message.reply("❌ Bạn không đủ tiền!");
+        return;
+    }
+
+    await subMoney(message.author.id, betMoney);
+
+    await delay(2000);
+
+    const values = [
+        randomInt(1, 6),
+        randomInt(1, 6),
+        randomInt(1, 6),
+    ];
+
+    const sum = values[0] + values[1] + values[2];
+
+    let didWin = false;
+
+    if (userChoice === "chẵn" && sum % 2 === 0) didWin = true;
+    if (userChoice === "lẻ" && sum % 2 === 1) didWin = true;
+    if (userChoice === "tài" && sum >= 11) didWin = true;
+    if (userChoice === "xỉu" && sum <= 10) didWin = true;
+
+    if (didWin) {
+        const moneyGain = betMoney * 2;
+        await addMoney(message.author.id, moneyGain);
+        message.reply(
+            `🎲 Kết quả: ${values.join(" | ")} (Tổng: ${sum})\n` +
+            `✅ Bạn thắng và nhận ${moneyGain} tiền!`
+        );
+    } else {
+        message.reply(
+            `🎲 Kết quả: ${values.join(" | ")} (Tổng: ${sum})\n` +
+            `❌ Bạn thua và mất ${betMoney} tiền!`
+        );
+    }
+}
+// =====================
+//         BAU CUA SOC DIA + HOAT ANH + TIEN CUOC
+// =====================
 let baucuaSession = null;
 let userBetAmounts = {};  // Lưu số tiền cược từng người
 let userBets = {};        // Lưu các con cược của từng người chơi
