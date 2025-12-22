@@ -453,85 +453,136 @@ async function cmdBoctham(message) {
 
     message.reply(`🎁 Bạn bốc thăm được ${reward} tiền. Lượt còn lại: ${info.count}`);
 }
-
-// =====================
-//      XÌ DÁCH (BLACKJACK)
-// =====================
-
-let blackjackSession = {};
-
-async function cmdXidach(message, args) {
-
-    if (args.length < 1) {
-        message.reply("Cách dùng: !xidach <số tiền>");
+// ===================== CHUYỂN TIỀN =====================
+async function cmdChuyentien(message, args) {
+    if (args.length < 2) {
+        message.reply("❗ Cách dùng: !chuyentien @user <số tiền>");
         return;
     }
 
-    const bet = parseInt(args[0]);
-    if (isNaN(bet) || bet <= 0) {
-        message.reply("Số tiền không hợp lệ!");
-        return;
-    }
+    const target = message.mentions.users.first();
+    if (!target) return message.reply("❌ Bạn phải tag người nhận!");
 
-    const user = await getUser(message.author.id);
-    if (user.money < bet) {
-        message.reply("Bạn không đủ tiền!");
-        return;
-    }
+    const amount = parseInt(args[1]);
+    if (isNaN(amount) || amount <= 0) return message.reply("❌ Số tiền không hợp lệ!");
+    if (target.id === message.author.id) return message.reply("❌ Không thể tự chuyển tiền cho chính mình!");
 
-    await subMoney(message.author.id, bet);
+    const sender = await getUser(message.author.id);
+    if (sender.money < amount) return message.reply("❌ Bạn không đủ tiền!");
 
-    const session = blackjackSession[message.channel.id] || { users: {}, msg: null };
-    session.users[message.author.id] = { hand: [], bet };
-
-    function dealCard() {
-        const values = ["A","2","3","4","5","6","7","8","9","10","J","Q","K"];
-        const suits = ["♠","♥","♦","♣"];
-        return values[randomInt(0, values.length-1)] + suits[randomInt(0, suits.length-1)];
-    }
-
-    session.users[message.author.id].hand.push(dealCard());
-    session.users[message.author.id].hand.push(dealCard());
-
-    const hitButton = new ButtonBuilder().setCustomId("hit_"+message.author.id).setLabel("Rút").setStyle(ButtonStyle.Success);
-    const standButton = new ButtonBuilder().setCustomId("stand_"+message.author.id).setLabel("Dừng").setStyle(ButtonStyle.Danger);
-    const row = new ActionRowBuilder().addComponents(hitButton, standButton);
-
-    if (!session.msg) {
-        session.msg = await message.channel.send({ content: "🃏 Xì Dách bắt đầu!", components: [row] });
-    } else {
-        await session.msg.edit({ components: [row] });
-    }
-
-    blackjackSession[message.channel.id] = session;
+    await subMoney(message.author.id, amount);
+    await addMoney(target.id, amount);
+    message.reply(`💸 Bạn đã chuyển **${amount} tiền** cho **${target.username}**`);
 }
 
-client.on("interactionCreate", async (interaction) => {
+// ===================== CHUYỂN XU =====================
+async function cmdChuyenxu(message, args) {
+    if (args.length < 2) {
+        message.reply("❗ Cách dùng: !chuyenxu @user <số xu>");
+        return;
+    }
 
-    if (!interaction.isButton()) return;
+    const target = message.mentions.users.first();
+    if (!target) return message.reply("❌ Bạn phải tag người nhận!");
 
-    const [action, userId] = interaction.customId.split("_");
-    const channelId = interaction.channelId;
+    const amount = parseInt(args[1]);
+    if (isNaN(amount) || amount <= 0) return message.reply("❌ Số xu không hợp lệ!");
+    if (target.id === message.author.id) return message.reply("❌ Không thể tự chuyển xu cho chính mình!");
+
+    const sender = await getUser(message.author.id);
+    if (sender.xu < amount) return message.reply("❌ Bạn không đủ xu!");
+
+    await subXu(message.author.id, amount);
+    await addXu(target.id, amount);
+    message.reply(`🔁 Bạn đã chuyển **${amount} xu** cho **${target.username}**`);
+}
+
+// =====================
+// ===================== XÌ DÁCH (BLACKJACK KIỂU MỚI) =====================
+let blackjackSession = {};
+function calcPoint(hand) {
+    let total=0, ace=0;
+    for(const card of hand){
+        const v = card.slice(0,-1);
+        if(["J","Q","K"].includes(v)) total+=10;
+        else if(v==="A"){ total+=11; ace++;}
+        else total+=parseInt(v);
+    }
+    while(total>21 && ace>0){ total-=10; ace--;}
+    return total;
+}
+
+async function cmdXidach(message, args) {
+    if(args.length<1){ message.reply("Cách dùng: !xidach <số tiền>"); return;}
+    const bet = parseInt(args[0]);
+    if(isNaN(bet)||bet<=0){ message.reply("Số tiền không hợp lệ!"); return;}
+
+    const user = await getUser(message.author.id);
+    if(user.money<bet){ message.reply("Bạn không đủ tiền!"); return;}
+    await subMoney(message.author.id, bet);
+
+    function dealCard(){ 
+        const values=["A","2","3","4","5","6","7","8","9","10","J","Q","K"];
+        const suits=["♠","♥","♦","♣"];
+        return values[randomInt(0,values.length-1)]+suits[randomInt(0,suits.length-1)];
+    }
+
+    const session = blackjackSession[message.channel.id]||{ users:{}, dealer:[], msg:null };
+    session.users[message.author.id]={ hand:[dealCard(), dealCard()], bet };
+    if(session.dealer.length===0) session.dealer=[dealCard(), dealCard()];
+
+    const hitButton = new ButtonBuilder().setCustomId("hit_"+message.author.id).setEmoji("🃏").setStyle(ButtonStyle.Success);
+    const standButton = new ButtonBuilder().setCustomId("stand_"+message.author.id).setEmoji("❌").setStyle(ButtonStyle.Danger);
+    const row = new ActionRowBuilder().addComponents(hitButton, standButton);
+
+    const playerHand = session.users[message.author.id].hand;
+    const dealerHand = session.dealer;
+    const text = `🃏 **XÌ DÁCH**\n👤 Bạn: ${playerHand.join(" ")} (${calcPoint(playerHand)})\n🤖 Nhà cái: 🂠 ${dealerHand[1]}`;
+    
+    if(!session.msg) session.msg = await message.channel.send({content:text, components:[row]});
+    else await session.msg.edit({content:text, components:[row]});
+
+    blackjackSession[message.channel.id]=session;
+}
+
+client.on("interactionCreate", async (interaction)=>{
+    if(!interaction.isButton()) return;
+    const [action,userId]=interaction.customId.split("_");
+    const channelId=interaction.channel.id;
+    if(!blackjackSession[channelId]) return;
+    if(userId!==interaction.user.id.toString()){ interaction.reply({content:"Không phải phiên của bạn!",ephemeral:true}); return;}
+
     const session = blackjackSession[channelId];
-    if (!session || !session.users[userId]) return;
-
     const player = session.users[userId];
-
-    if (action === "hit") {
-        function dealCard() {
-            const values = ["A","2","3","4","5","6","7","8","9","10","J","Q","K"];
-            const suits = ["♠","♥","♦","♣"];
-            return values[randomInt(0, values.length-1)] + suits[randomInt(0, suits.length-1)];
+    if(action==="hit"){
+        player.hand.push([ "A","2","3","4","5","6","7","8","9","10","J","Q","K" ][randomInt(0,12)] + ["♠","♥","♦","♣"][randomInt(0,3)]);
+        const total = calcPoint(player.hand);
+        if(total>21){
+            await interaction.update({content:`👤 Bạn: ${player.hand.join(" ")} (${total})\n❌ Quá 21! Bạn thua ${player.bet} tiền!`,components:[]});
+            blackjackSession[channelId]=null;
+            return;
         }
-        player.hand.push(dealCard());
-        await interaction.reply(`Rút 1 lá: ${player.hand.join(" ")}`);
+        await interaction.update({content:`👤 Bạn: ${player.hand.join(" ")} (${total})\n🤖 Nhà cái: 🂠 ${session.dealer[1]}`,components:interaction.message.components});
     }
+    if(action==="stand"){
+        let dealerHand=session.dealer;
+        while(calcPoint(dealerHand)<17){
+            dealerHand.push([ "A","2","3","4","5","6","7","8","9","10","J","Q","K" ][randomInt(0,12)] + ["♠","♥","♦","♣"][randomInt(0,3)]);
+        }
+        const playerTotal = calcPoint(player.hand);
+        const dealerTotal = calcPoint(dealerHand);
+        let resultText=`👤 Bạn: ${player.hand.join(" ")} (${playerTotal})\n🤖 Nhà cái: ${dealerHand.join(" ")} (${dealerTotal})\n`;
+        if(dealerTotal>21 || playerTotal>dealerTotal){
+            await addMoney(userId,player.bet*2);
+            resultText+=`✅ Bạn thắng ${player.bet*2} tiền!`;
+        } else if(playerTotal===dealerTotal) {
+            await addMoney(userId,player.bet);
+            resultText+=`⚖️ Hòa! Bạn được trả lại ${player.bet} tiền.`;
+        } else resultText+=`❌ Bạn thua ${player.bet} tiền!`;
 
-    if (action === "stand") {
-        await interaction.reply(`Dừng lại với: ${player.hand.join(" ")}`);
-        session.users[userId] = undefined;
+        await interaction.update({content:resultText,components:[]});
+        blackjackSession[channelId]=null;
     }
-
 });
 
 // =====================
@@ -540,7 +591,7 @@ client.on("interactionCreate", async (interaction) => {
 
 async function cmdHelp(message) {
     const helpText = `
-📖 **HƯỚNG DẪN BOT CASINO CHI TIẾT**
+🎮 **Các lệnh Casino Bot**
 
 ━━━━━━━━━━━━━━━━━━
 💰 **TIỀN & XU**
@@ -585,6 +636,10 @@ async function cmdHelp(message) {
 🃏 **XÌ DÁCH**
 • !xidach <số tiền> — tham gia game xì dách
 • Bấm nút Rút / Dừng
+━━━━━━━━━━━━━━━━━━
+🔄 **CHUYỂN TIỀN**
+• !chuyentien @user <số tiền>
+• !chuyenxu @user <số xu>
 
 ━━━━━━━━━━━━━━━━━━
 ⚠️ Một số game có delay xử lý
@@ -612,15 +667,16 @@ client.on("messageCreate", async (message) => {
     switch (cmd) {
         case "diemdanh": await cmdDiemdanh(message); break;
         case "tien": await cmdTien(message); break;
-        case "doixu": await cmdDoixu(message, args); break;
-        case "tungxu": await cmdTungxu(message, args); break;
-        case "taixiu": await cmdTaixiu(message, args); break;
+        case "doixu": await cmdDoixu(message,args); break;
+        case "tungxu": await cmdTungxu(message,args); break;
+        case "taixiu": await cmdTaixiu(message,args); break;
         case "baucua": await cmdBaucua(message); break;
         case "boctham": await cmdBoctham(message); break;
-        case "xidach": await cmdXidach(message, args); break;
+        case "chuyentien": await cmdChuyentien(message,args); break;
+        case "chuyenxu": await cmdChuyenxu(message,args); break;
+        case "xidach": await cmdXidach(message,args); break;
         case "help": await cmdHelp(message); break;
-        default:
-            message.reply("Lệnh không tồn tại! Gõ !help để xem hướng dẫn.");
+        default: message.reply("❌ Lệnh không hợp lệ!");
     }
 });
 
