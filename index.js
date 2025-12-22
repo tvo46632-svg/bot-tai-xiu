@@ -352,10 +352,6 @@ async function cmdTaixiu(message, args) {
     }
 }
 
-// =====================
-// BẦU CUA CÓ HIỆU ỨNG "SỐC DĨA" + TUỲ Ý TIỀN
-// =====================
-
 let baucuaSession = null;
 let userBetAmounts = {}; // Lưu số tiền cược từng người
 let userBets = {}; // Lưu thông tin người chơi cược những con nào
@@ -494,6 +490,39 @@ client.on("messageCreate", async (message) => {
         message.reply("❌ Số tiền không hợp lệ!");
         return;
     }
+
+    // Kiểm tra xem người chơi đã đặt tối đa 2 con chưa
+    const userBetsList = userBets[message.author.id] || [];
+    if (userBetsList.length >= 2) {
+        message.reply("❌ Bạn chỉ có thể đặt tối đa 2 con mỗi lần!");
+        return;
+    }
+
+    // Kiểm tra xem con người chơi đặt có hợp lệ không
+    const emoji = args[0];
+    if (!BAUCUA_EMOJIS.includes(emoji)) {
+        message.reply("❌ Con cược không hợp lệ!");
+        return;
+    }
+
+    const userDb = await getUser(message.author.id);
+    if (userDb.money < amount) {
+        message.reply(`❌ Bạn không đủ tiền để đặt ${amount} tiền!`);
+        return;
+    }
+
+    // Cập nhật cược cho người chơi
+    userBetsList.push(emoji);
+    userBetAmounts[message.author.id] = (userBetAmounts[message.author.id] || 0) + amount;
+
+    // Lưu thông tin cược của người chơi
+    userBets[message.author.id] = userBetsList;
+
+    message.reply(`✅ Bạn đã đặt ${amount} tiền cho con ${emoji}.`);
+
+    // Cập nhật session bầu cua
+    baucuaSession.bets[message.author.id] = userBetsList;
+});
 
     // Kiểm tra xem người chơi đã đặt tối đa 2 con chưa
     const userBets = userBets[message.author.id] || [];
