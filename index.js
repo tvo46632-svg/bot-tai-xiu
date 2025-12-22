@@ -377,31 +377,37 @@ async function cmdBaucua(message, args) {
         for (let i = 0; i < 3; i++)
             results.push(BAUCUA_EMOJIS[randomInt(0, BAUCUA_EMOJIS.length - 1)]);
 
-        const summary = {};
+        // Tính tiền thắng theo luật x2/x3/x4
+        const summary = {}; // userId: tổng tiền thắng
         for (const userId in baucuaSession.bets) {
             const bets = baucuaSession.bets[userId];
-            let winAmount = 0;
+            let totalWin = 0;
+
             for (const [emoji, amount] of Object.entries(bets)) {
                 const count = results.filter(r => r === emoji).length;
-                if (count > 0) winAmount += amount * count;
+                if (count === 1) totalWin += amount * 2;
+                else if (count === 2) totalWin += amount * 3;
+                else if (count === 3) totalWin += amount * 4;
             }
-            summary[userId] = winAmount;
+
+            summary[userId] = totalWin;
         }
 
+        // Cập nhật tiền cho người thắng
         for (const userId in summary) {
-            const value = summary[userId];
-            if (value > 0) await addMoney(userId, value);
+            const winAmount = summary[userId];
+            if (winAmount > 0) await addMoney(userId, winAmount);
         }
 
+        // Tạo kết quả hiển thị
         let resultText = `🎉 **Kết quả bầu cua:** ${results.join(" ")}\n\n`;
         for (const userId in summary) {
             const u = await client.users.fetch(userId);
             const bets = baucuaSession.bets[userId];
             const totalBet = Object.values(bets).reduce((a,b)=>a+b,0);
             const gain = summary[userId];
-            resultText += gain > 0
-                ? `✅ ${u.username} thắng ${gain} tiền (đặt ${totalBet})\n`
-                : `❌ ${u.username} thua ${totalBet} tiền\n`;
+            if (gain > 0) resultText += `✅ ${u.username} thắng ${gain} tiền (đặt ${totalBet})\n`;
+            else resultText += `❌ ${u.username} thua ${totalBet} tiền\n`;
         }
 
         await betMessage.edit(resultText);
@@ -479,7 +485,7 @@ client.on("messageReactionAdd", async (reaction, user) => {
     user.send(`✅ Bạn đã cược ${betAmount} tiền vào ${emoji}`);
 });
 
-// Trong messageCreate gắn command !baucua
+// Gắn command !baucua
 client.on("messageCreate", async message => {
     if (message.author.bot) return;
     if (!message.content.startsWith("!baucua")) return;
