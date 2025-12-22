@@ -355,9 +355,8 @@ async function cmdBoctham(message) {
 
 // Lệnh help
 if (command === 'help') {
-   if(content === '!help') {
-    return msg.reply(`
-📖 **HƯỚNG DẪN BOT CASINO**  
+    if(content === '!help') {
+        return msg.reply(`📖 **HƯỚNG DẪN BOT CASINO**  
 
 ━━━━━━━━━━━━━━━━━━
 💰 **TIỀN & CƠ BẢN**
@@ -387,7 +386,7 @@ if (command === 'help') {
 • Thua: - tiền đặt
 
 ━━━━━━━━━━━━━━━━━━
-🦀🐟🐴 **BẦU – CUA – TÔM – CÁ – NGỰA (CHUNG BÀN)**
+🦀🐟🍐 **BẦU – CUA – TÔM – CÁ – NGỰA (CHUNG BÀN)**
 • !bc <tiền> <bau/cua/tom/ca/ngua>
 • Mỗi người đặt 1 lần / ván
 • Mở bàn 15 giây
@@ -422,7 +421,9 @@ if (command === 'help') {
 
 ⏳ **LƯU Ý**
 • Một số lệnh có cooldown
-`
+`);
+    }
+}
 // Main
 client.on("ready", async () => {
   await initDB();
