@@ -708,6 +708,12 @@ async function cmdHelp(message) {
 🔄 **CHUYỂN TIỀN**
 • !chuyentien @user <số tiền>
 • !chuyenxu @user <số xu>
+━━━━━━━━━━━━━━━━━━
+🥺 **ĂN XIN**
+• !anxin (xu từ bot)
+50% 600+
+50% 600-
+giới hạn từ 1-1000
 
 ━━━━━━━━━━━━━━━━━━
 ⚠️ Một số game có delay xử lý
