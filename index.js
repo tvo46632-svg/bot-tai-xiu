@@ -467,20 +467,32 @@ async function cmdBaucua(message, args) {
         for (const emoji of BAUCUA_EMOJIS) await betMessage.react(emoji);
         baucuaSession.msg = betMessage;
 
+        // Kiểm tra xem `baucuaSession.bets` có tồn tại và có ít nhất 1 người tham gia
+        if (!baucuaSession.bets || Object.keys(baucuaSession.bets).length === 0) {
+            throw new Error("Không có người chơi tham gia cược bầu cua.");
+        }
+
         // Animation "sốc dĩa" 10 giây
         const start = Date.now();
         while (Date.now() - start < 10000) {
             const tempResults = [];
-            for (let i = 0; i < 3; i++)
+            for (let i = 0; i < 3; i++) {
                 tempResults.push(BAUCUA_EMOJIS[randomInt(0, BAUCUA_EMOJIS.length - 1)]);
+            }
             await betMessage.edit(`🎲 **Bầu cua đang lắc dĩa!**\n${tempResults.join(" ")}`);
             await delay(700);
         }
 
         // Quay kết quả thật
         const results = [];
-        for (let i = 0; i < 3; i++)
+        for (let i = 0; i < 3; i++) {
             results.push(BAUCUA_EMOJIS[randomInt(0, BAUCUA_EMOJIS.length - 1)]);
+        }
+
+        // Kiểm tra xem baucuaSession.bets có được khởi tạo chưa
+        if (!baucuaSession.bets || Object.keys(baucuaSession.bets).length === 0) {
+            throw new Error("Không có người chơi tham gia cược bầu cua.");
+        }
 
         // Tính tiền thắng theo luật x2/x3/x4
         const summary = {}; // userId: tổng tiền thắng
