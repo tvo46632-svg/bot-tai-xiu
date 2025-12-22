@@ -355,22 +355,74 @@ async function cmdBoctham(message) {
 
 // Lệnh help
 if (command === 'help') {
-  const embed = new EmbedBuilder()
-    .setColor('#00bfff')
-    .setTitle('📖 Danh sách lệnh bot')
-    .setDescription('Dưới đây là các lệnh bạn có thể sử dụng:')
-    .addFields(
-      { name: '!diemdanh', value: 'Điểm danh nhận xu hàng ngày', inline: false },
-      { name: '!tien', value: 'Xem số xu hiện có', inline: false },
-      { name: '!chuyentien @user sốxu', value: 'Chuyển xu cho người khác', inline: false },
-      { name: '!tungxu sốxu', value: 'Tung đồng xu may rủi', inline: false },
-      { name: '!baucua sốxu', value: 'Chơi bầu cua', inline: false }
-    )
-    .setFooter({ text: 'Bot game vui nhộn' })
-    .setTimestamp();
+   if(content === '!help') {
+    return msg.reply(
+`📖 **HƯỚNG DẪN BOT CASINO**  
 
-  message.channel.send({ embeds: [embed] });
-}
+━━━━━━━━━━━━━━━━━━
+💰 **TIỀN & CƠ BẢN**
+• !tien – Xem số xu hiện có
+• !diemdanh – Điểm danh (reset mỗi ngày lúc **06:00 sáng**)
+• !chuyentien @user <tiền> – Chuyển xu cho người khác
+
+🎁 **TỶ LỆ ĐIỂM DANH**
+• 50% → +1000 xu
+• 25% → +2000 xu
+• 15% → +2500 xu
+• 8%  → +3000 xu
+• 2%  → +3200 xu
+
+━━━━━━━━━━━━━━━━━━
+🪙 **TUNG XU**
+• !xu <tiền> <ngua/sap>
+• Thắng: + tiền đặt
+• Thua: - tiền đặt
+• Cooldown: 10 giây
+
+━━━━━━━━━━━━━━━━━━
+🎲 **TÀI XỈU**
+• !taixiu <tiền> <tai/xiu>
+• Tỷ lệ: 50 / 50
+• Thắng: + tiền đặt
+• Thua: - tiền đặt
+
+━━━━━━━━━━━━━━━━━━
+🦀🐟🐴 **BẦU – CUA – TÔM – CÁ – NGỰA (CHUNG BÀN)**
+• !bc <tiền> <bau/cua/tom/ca/ngua>
+• Mỗi người đặt 1 lần / ván
+• Mở bàn 15 giây
+• Xổ 3 con
+• Trúng 1 con → ăn x1 tiền
+• Trúng 2–3 con → ăn x2 / x3
+• Trật → mất tiền đặt
+
+━━━━━━━━━━━━━━━━━━
+⚪⚫ **TRẮNG – ĐEN (PVP)**
+• !trangden <tiền> <trang/den>
+• Nhiều người cùng chơi
+• Sau 10 giây mở kết quả
+• BÊN THUA → tiền CHUYỂN cho bên thắng
+• Bot không ăn tiền
+
+🃏 **XÌ DÁCH (BLACKJACK)**
+• !xidach <tiền> – Bắt đầu ván
+• !hit – Rút thêm bài
+• !stand – Dừng & so bài
+• Thắng: + tiền cược
+• Thua: - tiền cược
+• Không chơi 2 ván cùng lúc
+
+🎁 **BỐC THĂM TRÚNG THƯỞNG**
+• !boctham
+• 40% + 50 hoặc - 100
+• 30% +300 hoặc -100
+• 20% +600 hoặc + 300
+• 8% -1000 hoặc + 1500
+• 2% còn lại thì +4000
+
+⏳ **LƯU Ý**
+• Một số lệnh có cooldown
+`
 // Main
 client.on("ready", async () => {
   await initDB();
