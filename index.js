@@ -431,6 +431,7 @@ async function cmdBaucua(message, args) {
             return;
         }
 
+        // Khởi tạo phiên bầu cua
         baucuaSession = {
             channelId: message.channel.id,
             bets: {}, // { userId: { emoji: amount } }
@@ -456,6 +457,7 @@ async function cmdBaucua(message, args) {
 
         userBetAmounts[message.author.id] = starterBet;
 
+        // Gửi thông báo bắt đầu phiên
         const betMessage = await message.channel.send(
             `🎯 **Bầu cua bắt đầu!**\n` +
             `1️⃣ ${message.author.username} đã đặt ${starterBet} tiền sẵn.\n` +
@@ -464,12 +466,22 @@ async function cmdBaucua(message, args) {
             `${BAUCUA_EMOJIS.join(" ")}`
         );
 
+        // React với các emoji
         for (const emoji of BAUCUA_EMOJIS) await betMessage.react(emoji);
         baucuaSession.msg = betMessage;
 
-        // Kiểm tra xem `baucuaSession.bets` có tồn tại và có ít nhất 1 người tham gia
-        if (!baucuaSession.bets || Object.keys(baucuaSession.bets).length === 0) {
-            throw new Error("Không có người chơi tham gia cược bầu cua.");
+        // Chờ người chơi tham gia, kiểm tra mỗi 1 giây
+        const startTime = Date.now();
+        while (Date.now() - startTime < 10000) {
+            if (Object.keys(baucuaSession.bets).length > 0) break;
+            await delay(500);
+        }
+
+        // Kiểm tra nếu không có ai tham gia cược
+        if (Object.keys(baucuaSession.bets).length === 0) {
+            message.reply("❌ Không có người chơi tham gia cược bầu cua.");
+            baucuaSession = null;
+            return;
         }
 
         // Animation "sốc dĩa" 10 giây
@@ -487,11 +499,6 @@ async function cmdBaucua(message, args) {
         const results = [];
         for (let i = 0; i < 3; i++) {
             results.push(BAUCUA_EMOJIS[randomInt(0, BAUCUA_EMOJIS.length - 1)]);
-        }
-
-        // Kiểm tra xem baucuaSession.bets có được khởi tạo chưa
-        if (!baucuaSession.bets || Object.keys(baucuaSession.bets).length === 0) {
-            throw new Error("Không có người chơi tham gia cược bầu cua.");
         }
 
         // Tính tiền thắng theo luật x2/x3/x4
@@ -529,6 +536,7 @@ async function cmdBaucua(message, args) {
 
         await betMessage.edit(resultText);
 
+        // Reset phiên bầu cua
         baucuaSession = null;
         userBetAmounts = {};
 
