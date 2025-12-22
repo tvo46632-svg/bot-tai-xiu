@@ -182,8 +182,7 @@ async function cmdTien(message) {
         replyText += `\n⚠️ Bạn đang nợ bot **${userDebt} xu**.`;
     }
 
-    message.reply(replyText);
-    message.reply(replyText);
+    message.reply(replyText); // Chỉ gọi 1 lần
 }
 
 // =====================
