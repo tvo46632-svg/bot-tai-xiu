@@ -49,7 +49,7 @@ const client = new Client({
 // ---------------- GLOBAL VARIABLES ----------------
 
 const PREFIX = "!"; // command prefix
-const EMOJIS_BAUCUA = ["🦀", "🐟", "🫎", "🦐", "🐔", "🍐"];
+const EMOJIS_BAUCUA = ["🐟","🦀","🐘","🐒","🐓","🦞"];
 
 // Utility functions
 function randomInt(min, max) {
@@ -309,7 +309,7 @@ async function cmdTaixiu(message, args) {
 
 let baucuaSession = null;
 let userBetAmounts = {}; // Lưu số tiền cược từng người
-const BAUCUA_EMOJIS = ["🐟","🦀","🐘","🐒","🐓","🦞"];
+const BAUCUA_EMOJIS = ["🦀", "🐟", "🫎", "🦐", "🐔", "🍐"];
 
 function delay(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
