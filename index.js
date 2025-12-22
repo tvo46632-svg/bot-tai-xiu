@@ -414,6 +414,7 @@ async function cmdTaixiu(message, args) {
         );
     }
 }
+
 // =====================
 //         BAU CUA SOC DIA + HOAT ANH + TIEN CUOC
 // =====================
@@ -423,15 +424,6 @@ let userBets = {};        // Lưu các con cược của từng người chơi
 
 const BAUCUA_EMOJIS = ["🦀", "🐟", "🫎", "🦐", "🐔", "🍐"]; // Các con trong game
 
-function delay(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-function randomInt(min, max) {
-    return Math.floor(Math.random() * (max - min + 1)) + min;
-}
-
-// Command !baucua <số tiền>
 async function cmdBaucua(message, args) {
     try {
         if (baucuaSession) {
