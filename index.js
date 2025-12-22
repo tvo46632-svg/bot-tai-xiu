@@ -356,7 +356,8 @@ async function cmdBoctham(message) {
 // Lệnh help
 if (command === 'help') {
     if(content === '!help') {
-        return msg.reply(`📖 **HƯỚNG DẪN BOT CASINO**  
+        return msg.reply(`
+📖 **HƯỚNG DẪN BOT CASINO**  
 
 ━━━━━━━━━━━━━━━━━━
 💰 **TIỀN & CƠ BẢN**
