@@ -354,22 +354,23 @@ async function cmdBoctham(message) {
 }
 
 // Lệnh help
-async function cmdHelp(message) {
-  const helpMsg = `
-Lệnh Bot:
-!diemdanh - Điểm danh nhận xu (theo tỷ lệ)
-!tien - Xem số dư tiền và xu
-!chuyentien @user số_tiền - Chuyển tiền
-!tungxu số_xu_cược - Tung xu (ngửa/sấp)
-!taixiu số_tiền cược (chẵn/lẻ/tài/xỉu) - Chơi tài xỉu
-!baucua - Chơi bầu cua (reaction)
-!boctham - Bốc thăm trúng thưởng (3 lượt/ngày, mỗi lần 200 tiền)
-!help - Xem lệnh này
-(Những game khác bạn có thể tự phát triển thêm)
-  `;
-  message.reply(helpMsg);
-}
+if (command === 'help') {
+  const embed = new EmbedBuilder()
+    .setColor('#00bfff')
+    .setTitle('📖 Danh sách lệnh bot')
+    .setDescription('Dưới đây là các lệnh bạn có thể sử dụng:')
+    .addFields(
+      { name: '!diemdanh', value: 'Điểm danh nhận xu hàng ngày', inline: false },
+      { name: '!tien', value: 'Xem số xu hiện có', inline: false },
+      { name: '!chuyentien @user sốxu', value: 'Chuyển xu cho người khác', inline: false },
+      { name: '!tungxu sốxu', value: 'Tung đồng xu may rủi', inline: false },
+      { name: '!baucua sốxu', value: 'Chơi bầu cua', inline: false }
+    )
+    .setFooter({ text: 'Bot game vui nhộn' })
+    .setTimestamp();
 
+  message.channel.send({ embeds: [embed] });
+}
 // Main
 client.on("ready", async () => {
   await initDB();
