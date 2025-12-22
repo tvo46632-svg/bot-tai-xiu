@@ -362,6 +362,7 @@ const BAUCUA_EMOJIS = ["🦀", "🐟", "🫎", "🦐", "🐔", "🍐"]; // Các 
 
 async function cmdBaucua(message, args) {
     try {
+        // Kiểm tra nếu đang có phiên bầu cua
         if (baucuaSession) {
             message.reply("⚠️ Đang có phiên bầu cua khác. Vui lòng đợi!");
             return;
@@ -377,13 +378,14 @@ async function cmdBaucua(message, args) {
         userBetAmounts = {}; // Reset cược và tiền cược của người chơi
         userBets = {}; // Reset các con cược của người chơi
 
-        // Xử lý số tiền khởi tạo
+        // Xử lý số tiền khởi tạo, mặc định là 200
         let starterBet = 200;
         if (args.length > 0) {
             const bet = parseInt(args[0]);
             if (!isNaN(bet) && bet > 0) starterBet = bet;
         }
 
+        // Kiểm tra người chơi có đủ tiền không
         const starterUserDb = await getUser(message.author.id);
         if (starterUserDb.money < starterBet) {
             message.reply(`❌ Bạn không đủ tiền để đặt ${starterBet} tiền!`);
@@ -391,6 +393,7 @@ async function cmdBaucua(message, args) {
             return;
         }
 
+        // Đặt cược cho người khởi tạo
         userBetAmounts[message.author.id] = starterBet;
 
         // Gửi thông báo bắt đầu phiên
@@ -472,7 +475,6 @@ async function cmdBaucua(message, args) {
 
         await betMessage.edit(resultText);
 
-        // Reset phiên bầu cua
         baucuaSession = null;
         userBetAmounts = {};
 
