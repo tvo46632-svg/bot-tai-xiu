@@ -625,4 +625,4 @@ client.on("messageCreate", async (message) => {
 });
 
 // -------------------- BOT LOGIN --------------------
-client.login("TOKEN_CUA_BAN");
+client.login(process.env.TOKEN);
