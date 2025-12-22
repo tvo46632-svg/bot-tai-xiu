@@ -168,14 +168,21 @@ async function cmdDiemdanh(message) {
 // =====================
 async function cmdTien(message) {
     const userId = message.author.id;
-    let currentCoins = await getUserCoins(userId) || 0;
-    let userDebt = await getUserDebt(userId) || 0;
+    await db.read(); // Đọc dữ liệu từ DB
+    db.data.users[userId] ||= { money: 0, xu: 0, debt: 0 }; // Khởi tạo nếu chưa có dữ liệu người dùng
 
-    let replyText = `💰 Hiện tại bạn có **${currentCoins} xu**.`;
+    const user = db.data.users[userId];
+    const currentMoney = user.money || 0; // Tiền
+    const currentXu = user.xu || 0;       // Xu
+    const userDebt = user.debt || 0;       // Nợ
+
+    // Trả về số tiền và xu hiện tại của người dùng
+    let replyText = `💰 Hiện tại bạn có **${currentMoney} tiền** và **${currentXu} xu**.`;
     if (userDebt > 0) {
         replyText += `\n⚠️ Bạn đang nợ bot **${userDebt} xu**.`;
     }
 
+    message.reply(replyText);
     message.reply(replyText);
 }
 
@@ -224,7 +231,7 @@ async function cmdDoixu(message, args) {
 }
 
 // =====================
-// TUNG XU (v2 cải tiến)
+// TUNG XU (v2 cải tiến) với hoạt ảnh
 // =====================
 async function cmdTungxu(message, args) {
     if (args.length < 2) {
@@ -258,11 +265,22 @@ async function cmdTungxu(message, args) {
 
     await subXu(message.author.id, betXu);
 
-    await delay(1000);
+    // Gửi thông báo cho người chơi về việc "tung xu"
+    const loadingMessage = await message.reply("🪙 Đang tung xu...");
+
+    // Hiệu ứng "tung xu" - thay đổi emoji liên tục
+    const emojis = ["🪙", "🎰", "🎲", "🪙", "🎰"];
+    for (let i = 0; i < 5; i++) {
+        await delay(500); // Delay để tạo hiệu ứng chuyển động
+        const randomEmoji = emojis[randomInt(0, emojis.length - 1)];
+        await loadingMessage.edit(`🪙 Đang tung xu... ${randomEmoji}`);
+    }
 
     // Quay xu
+    await delay(1000); // Thêm chút delay trước khi công bố kết quả
     const result = Math.random() < 0.5 ? "ngửa" : "sấp";
 
+    // Xử lý kết quả
     if (result === userChoice) {
         const rewardXu = betXu * 2;
         await addXu(message.author.id, rewardXu);
