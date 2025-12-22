@@ -312,7 +312,6 @@ async function cmdTaixiu(message, args) {
 let baucuaSession = null;
 let userBetAmounts = {}; // Lưu số tiền cược từng người
 
-const EMOJIS_BAUCUA = ["🐟","🦀","🐘","🐒","🐓","🦞"]; // Ví dụ emoji
 
 function delay(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
