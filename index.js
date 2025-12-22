@@ -750,17 +750,14 @@ async function cmdVay(message, args) {
     let currentCoins = await getUserCoins(userId) || 0;
     let userDebt = await getUserDebt(userId) || 0;
 
-    // Kiểm tra nợ trước khi cho vay
     if (userDebt > 0) {
         return message.reply(
             `❌ Bạn vẫn đang nợ bot **${userDebt} xu**, bạn phải trả hết mới có thể vay tiếp!`
         );
     }
 
-    const maxLoan = 10000; // số xu vay tối đa
-    const interest = 0.1; // lãi 10%
-
-    // Người dùng có thể nhập số xu muốn vay, tối đa 10k
+    const maxLoan = 10000;
+    const interest = 0.1;
     let loanAmount = args[0] ? parseInt(args[0]) : maxLoan;
 
     if (isNaN(loanAmount) || loanAmount <= 0) {
@@ -771,7 +768,6 @@ async function cmdVay(message, args) {
 
     const totalOwed = Math.floor(loanAmount * (1 + interest));
 
-    // Cập nhật tiền và nợ
     currentCoins += loanAmount;
     userDebt = totalOwed;
 
@@ -783,10 +779,12 @@ async function cmdVay(message, args) {
         `💰 Bạn sẽ phải trả lại **${totalOwed} xu** (bao gồm 10% lãi).\n` +
         `Hiện tại bạn có **${currentCoins} xu**, nợ hiện tại: **${userDebt} xu**.`
     );
-    // =====================
+} // <- Đóng cmdVay ở đây
+
+// =====================
 //        TRẢ LÃI + NỢ
 // =====================
-    async function cmdTralai(message, args) {
+async function cmdTralai(message, args) {
     const userId = message.author.id;
     let currentCoins = await getUserCoins(userId) || 0;
     let userDebt = await getUserDebt(userId) || 0;
@@ -808,17 +806,15 @@ async function cmdVay(message, args) {
         return message.reply(`❌ Bạn không đủ xu để trả! Hiện tại bạn có ${currentCoins} xu.`);
     }
 
-    if (payAmount > userDebt) payAmount = userDebt; // không trả quá nợ
+    if (payAmount > userDebt) payAmount = userDebt;
 
-    // Trừ xu và nợ
     currentCoins -= payAmount;
     userDebt -= payAmount;
 
     await setUserCoins(userId, currentCoins);
     await setUserDebt(userId, userDebt);
 
-    let replyText = `✅ Bạn đã trả **${payAmount} xu**.\n` +
-                    `💰 Hiện tại bạn còn **${currentCoins} xu**.`;
+    let replyText = `✅ Bạn đã trả **${payAmount} xu**.\n💰 Hiện tại bạn còn **${currentCoins} xu**.`;
 
     if (userDebt > 0) {
         replyText += `\n⚠️ Nợ còn lại: **${userDebt} xu**.`;
@@ -827,7 +823,7 @@ async function cmdVay(message, args) {
     }
 
     message.reply(replyText);
-}
+} // <- Đóng cmdTralai
 
 // =====================
 //      HELP (FULL + BẢNG GIÁ)
