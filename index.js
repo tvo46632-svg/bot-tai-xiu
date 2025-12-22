@@ -618,7 +618,7 @@ async function cmdHelp(message) {
 
 ━━━━━━━━━━━━━━━━━━
 🪙 **TUNG XU**
-• !tungxu <số_xu>
+• !tungxu <số_xu> ngửa / sấp
 • 50% thắng nhận x2
 • 50% thua mất xu
 
