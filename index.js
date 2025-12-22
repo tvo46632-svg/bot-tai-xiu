@@ -423,7 +423,6 @@ async function cmdBaucua(message, args) {
         }
 
         // Quay kết quả thật
-        await db.read();
         const results = [];
         for (let i = 0; i < 3; i++)
             results.push(BAUCUA_EMOJIS[randomInt(0, BAUCUA_EMOJIS.length - 1)]);
@@ -473,76 +472,6 @@ async function cmdBaucua(message, args) {
         userBetAmounts = {};
     }
 }
-
-// DM bot để đặt số tiền
-client.on("messageCreate", async (message) => {
-    if (message.author.bot) return;
-    if (!message.content.startsWith("!datcu")) return;
-    if (!baucuaSession) {
-        message.reply("❌ Hiện không có phiên Bầu Cua nào!");
-        return;
-    }
-
-    const args = message.content.trim().split(/ +/);
-    if (args.length < 2) {
-        message.reply("❗ Cách dùng: !datcu <số tiền>");
-        return;
-    }
-
-    const amount = parseInt(args[1]);
-    if (isNaN(amount) || amount <= 0) {
-        message.reply("❌ Số tiền không hợp lệ!");
-        return;
-    }
-
-    const userDb = await getUser(message.author.id);
-    if (userDb.money < amount) {
-        message.reply(`❌ Bạn không đủ tiền để đặt ${amount} tiền!`);
-        return;
-    }
-
-    userBetAmounts[message.author.id] = amount;
-    message.reply(`✅ Bạn đã đặt ${amount} tiền cho phiên Bầu Cua. React để chọn con muốn cược!`);
-});
-
-client.on("messageReactionAdd", async (reaction, user) => {
-    if (user.bot) return;
-    if (!baucuaSession) return;
-    if (reaction.message.id !== baucuaSession.msg.id) return;
-
-    const emoji = reaction.emoji.name;
-    if (!BAUCUA_EMOJIS.includes(emoji)) return;
-
-    await db.read();
-
-    const betAmount = userBetAmounts[user.id] || 200;
-    const userDb = await getUser(user.id);
-
-    if (userDb.money < betAmount) {
-        reaction.users.remove(user.id);
-        user.send(`❌ Bạn không đủ tiền để đặt cược ${betAmount} tiền!`);
-        return;
-    }
-
-    await subMoney(user.id, betAmount);
-
-    const userBets = baucuaSession.bets[user.id] || {};
-    userBets[emoji] = (userBets[emoji] || 0) + betAmount;
-    baucuaSession.bets[user.id] = userBets;
-
-    await db.write();
-
-    user.send(`✅ Bạn đã cược ${betAmount} tiền vào ${emoji}`);
-});
-
-// Gắn command !baucua
-client.on("messageCreate", async message => {
-    if (message.author.bot) return;
-    if (!message.content.startsWith("!baucua")) return;
-
-    const args = message.content.trim().split(/ +/).slice(1);
-    await cmdBaucua(message, args);
-});
 // =====================
 //       BỐC THĂM
 // =====================
