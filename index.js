@@ -1,4 +1,4 @@
-const { Client, GatewayIntentBits, Partials, MessageEmbed } = require("discord.js");
+const { Client, GatewayIntentBits, Partials, EmbedBuilder } = require("discord.js");
 const { Low, JSONFile } = require("lowdb");
 const path = require("path");
 
@@ -80,7 +80,11 @@ async function cmdDiemdanh(message) {
   const today = new Date().toISOString().slice(0, 10);
 
   if (db.data.daily[userId] === today) {
-    message.reply("Bạn đã điểm danh hôm nay rồi!");
+    const embed = new EmbedBuilder()
+      .setColor("#ff0000")
+      .setTitle("⚠️ Điểm danh thất bại")
+      .setDescription("Bạn đã điểm danh hôm nay rồi!");
+    message.reply({ embeds: [embed] });
     return;
   }
 
@@ -97,99 +101,175 @@ async function cmdDiemdanh(message) {
   await addXu(userId, xu);
   await db.write();
 
-  message.reply(`Điểm danh thành công! Bạn nhận được ${xu} xu.`);
+  const embed = new EmbedBuilder()
+    .setColor("#00ff00")
+    .setTitle("✅ Điểm danh thành công")
+    .setDescription(`Bạn nhận được **${xu.toLocaleString()} xu** ngày hôm nay!`)
+    .setFooter({ text: "Chúc bạn may mắn!" })
+    .setTimestamp();
+  message.reply({ embeds: [embed] });
 }
 
 async function cmdTien(message) {
   const user = await getUser(message.author.id);
-  message.reply(`Bạn có ${user.money} tiền và ${user.xu} xu.`);
+  const embed = new EmbedBuilder()
+    .setColor("#00bfff")
+    .setTitle(`💰 Số dư của ${message.author.username}`)
+    .addFields(
+      { name: "Tiền", value: user.money.toLocaleString(), inline: true },
+      { name: "Xu", value: user.xu.toLocaleString(), inline: true }
+    )
+    .setTimestamp();
+  message.reply({ embeds: [embed] });
 }
 
 async function cmdChuyentien(message, args) {
   if (args.length < 2) {
-    message.reply("Cách dùng: !chuyentien @user số_tiền");
+    const embed = new EmbedBuilder()
+      .setColor("#ff4500")
+      .setTitle("❌ Lỗi cú pháp")
+      .setDescription("Cách dùng: `!chuyentien @user số_tiền`");
+    message.reply({ embeds: [embed] });
     return;
   }
   const target = message.mentions.users.first();
   if (!target) {
-    message.reply("Bạn phải tag người nhận tiền!");
+    const embed = new EmbedBuilder()
+      .setColor("#ff4500")
+      .setTitle("❌ Lỗi")
+      .setDescription("Bạn phải tag người nhận tiền!");
+    message.reply({ embeds: [embed] });
     return;
   }
   const amount = parseInt(args[1]);
   if (isNaN(amount) || amount <= 0) {
-    message.reply("Số tiền không hợp lệ!");
+    const embed = new EmbedBuilder()
+      .setColor("#ff4500")
+      .setTitle("❌ Lỗi")
+      .setDescription("Số tiền không hợp lệ!");
+    message.reply({ embeds: [embed] });
     return;
   }
 
   const sender = await getUser(message.author.id);
   if (sender.money < amount) {
-    message.reply("Bạn không đủ tiền để chuyển!");
+    const embed = new EmbedBuilder()
+      .setColor("#ff4500")
+      .setTitle("❌ Lỗi")
+      .setDescription("Bạn không đủ tiền để chuyển!");
+    message.reply({ embeds: [embed] });
     return;
   }
 
   await subMoney(message.author.id, amount);
   await addMoney(target.id, amount);
-  message.reply(`Bạn đã chuyển ${amount} tiền cho ${target.username}.`);
+
+  const embed = new EmbedBuilder()
+    .setColor("#00ff00")
+    .setTitle("✅ Chuyển tiền thành công")
+    .setDescription(`Bạn đã chuyển **${amount.toLocaleString()} tiền** cho ${target.username}.`)
+    .setTimestamp();
+
+  message.reply({ embeds: [embed] });
 }
 
 async function cmdTungxu(message, args) {
   if (args.length < 1) {
-    message.reply("Cách dùng: !tungxu số_xu_cược");
+    const embed = new EmbedBuilder()
+      .setColor("#ff4500")
+      .setTitle("❌ Lỗi cú pháp")
+      .setDescription("Cách dùng: `!tungxu số_xu_cược`");
+    message.reply({ embeds: [embed] });
     return;
   }
   const bet = parseInt(args[0]);
   if (isNaN(bet) || bet <= 0) {
-    message.reply("Số xu cược không hợp lệ!");
+    const embed = new EmbedBuilder()
+      .setColor("#ff4500")
+      .setTitle("❌ Lỗi")
+      .setDescription("Số xu cược không hợp lệ!");
+    message.reply({ embeds: [embed] });
     return;
   }
   const user = await getUser(message.author.id);
   if (user.xu < bet) {
-    message.reply("Bạn không đủ xu để cược!");
+    const embed = new EmbedBuilder()
+      .setColor("#ff4500")
+      .setTitle("❌ Lỗi")
+      .setDescription("Bạn không đủ xu để cược!");
+    message.reply({ embeds: [embed] });
     return;
   }
   await subXu(message.author.id, bet);
   await delay(2000);
 
   const result = Math.random() < 0.5 ? "ngửa" : "sấp";
-  // Bot random tung xu
   const win = Math.random() < 0.5;
   if (win) {
     const winAmount = bet * 2;
     await addXu(message.author.id, winAmount);
-    message.reply(`Kết quả: ${result}. Bạn thắng và nhận ${winAmount} xu!`);
+
+    const embed = new EmbedBuilder()
+      .setColor("#00ff00")
+      .setTitle("🎉 Bạn thắng tung xu!")
+      .setDescription(`Kết quả: **${result}**\nBạn nhận được **${winAmount.toLocaleString()} xu**!`)
+      .setTimestamp();
+
+    message.reply({ embeds: [embed] });
   } else {
-    message.reply(`Kết quả: ${result}. Bạn thua mất ${bet} xu.`);
+    const embed = new EmbedBuilder()
+      .setColor("#ff0000")
+      .setTitle("😞 Bạn thua tung xu")
+      .setDescription(`Kết quả: **${result}**\nBạn mất **${bet.toLocaleString()} xu**.`)
+      .setTimestamp();
+
+    message.reply({ embeds: [embed] });
   }
 }
 
 async function cmdTaixiu(message, args) {
   if (args.length < 2) {
-    message.reply("Cách dùng: !taixiu số_tiền cược [chẵn/lẻ/tài/xỉu]");
+    const embed = new EmbedBuilder()
+      .setColor("#ff4500")
+      .setTitle("❌ Lỗi cú pháp")
+      .setDescription("Cách dùng: `!taixiu số_tiền cược [chẵn/lẻ/tài/xỉu]`");
+    message.reply({ embeds: [embed] });
     return;
   }
   const bet = parseInt(args[0]);
   const choice = args[1].toLowerCase();
   if (isNaN(bet) || bet <= 0) {
-    message.reply("Số tiền cược không hợp lệ!");
+    const embed = new EmbedBuilder()
+      .setColor("#ff4500")
+      .setTitle("❌ Lỗi")
+      .setDescription("Số tiền cược không hợp lệ!");
+    message.reply({ embeds: [embed] });
     return;
   }
   if (!["chẵn", "lẻ", "tài", "xỉu"].includes(choice)) {
-    message.reply("Lựa chọn phải là chẵn, lẻ, tài hoặc xỉu!");
+    const embed = new EmbedBuilder()
+      .setColor("#ff4500")
+      .setTitle("❌ Lỗi")
+      .setDescription("Lựa chọn phải là chẵn, lẻ, tài hoặc xỉu!");
+    message.reply({ embeds: [embed] });
     return;
   }
 
   const user = await getUser(message.author.id);
   if (user.money < bet) {
-    message.reply("Bạn không đủ tiền để cược!");
+    const embed = new EmbedBuilder()
+      .setColor("#ff4500")
+      .setTitle("❌ Lỗi")
+      .setDescription("Bạn không đủ tiền để cược!");
+    message.reply({ embeds: [embed] });
     return;
   }
   await subMoney(message.author.id, bet);
   await delay(2000);
 
-  // Xí ngầu 3 viên 1-6
   const dice = [randomInt(1, 6), randomInt(1, 6), randomInt(1, 6)];
   const sum = dice.reduce((a, b) => a + b, 0);
-  let resultStr = `Kết quả xí ngầu: ${dice.join(", ")} (Tổng: ${sum})\n`;
+  let resultStr = `🎲 Kết quả xí ngầu: **${dice.join(", ")}** (Tổng: ${sum})\n`;
 
   let win = false;
   if (choice === "chẵn" && sum % 2 === 0) win = true;
@@ -200,9 +280,22 @@ async function cmdTaixiu(message, args) {
   if (win) {
     const winAmount = bet * 2;
     await addMoney(message.author.id, winAmount);
-    message.reply(resultStr + `Bạn thắng và nhận ${winAmount} tiền!`);
+
+    const embed = new EmbedBuilder()
+      .setColor("#00ff00")
+      .setTitle("🎉 Bạn thắng Tài Xỉu!")
+      .setDescription(resultStr + `Bạn nhận được **${winAmount.toLocaleString()} tiền**!`)
+      .setTimestamp();
+
+    message.reply({ embeds: [embed] });
   } else {
-    message.reply(resultStr + `Bạn thua mất ${bet} tiền.`);
+    const embed = new EmbedBuilder()
+      .setColor("#ff0000")
+      .setTitle("😞 Bạn thua Tài Xỉu")
+      .setDescription(resultStr + `Bạn mất **${bet.toLocaleString()} tiền**.`)
+      .setTimestamp();
+
+    message.reply({ embeds: [embed] });
   }
 }
 
@@ -210,7 +303,11 @@ let baucuaSession = null;
 
 async function cmdBaucua(message) {
   if (baucuaSession) {
-    message.reply("Đang có phiên bầu cua khác, vui lòng đợi.");
+    const embed = new EmbedBuilder()
+      .setColor("#ff4500")
+      .setTitle("⚠️ Đang có phiên Bầu Cua khác")
+      .setDescription("Vui lòng đợi phiên hiện tại kết thúc!");
+    message.reply({ embeds: [embed] });
     return;
   }
   baucuaSession = {
@@ -218,64 +315,62 @@ async function cmdBaucua(message) {
     bets: {}, // userId: { emoji: tiền }
     timeout: null,
   };
-  message.channel.send(
-    `Bầu cua bắt đầu! React vào icon bên dưới để đặt cược.\n${EMOJIS_BAUCUA
-      .map((e) => e)
-      .join(" ")}\nBạn có 10 giây để đặt cược!`
-  ).then(async (msg) => {
-    for (const emoji of EMOJIS_BAUCUA) {
-      await msg.react(emoji);
+  const msg = await message.channel.send({
+    content: `🎲 Bầu cua bắt đầu! React vào icon bên dưới để đặt cược.\n${EMOJIS_BAUCUA.join(" ")}\n⏳ Bạn có 10 giây để đặt cược!`,
+  });
+
+  for (const emoji of EMOJIS_BAUCUA) {
+    await msg.react(emoji);
+  }
+
+  baucuaSession.msg = msg;
+  baucuaSession.timeout = setTimeout(async () => {
+    await db.read();
+    const results = [];
+    for (let i = 0; i < 3; i++) {
+      results.push(EMOJIS_BAUCUA[randomInt(0, EMOJIS_BAUCUA.length - 1)]);
     }
 
-    baucuaSession.msg = msg;
-    baucuaSession.timeout = setTimeout(async () => {
-      await db.read();
-      // Tính kết quả
-      const results = [];
-      for (let i = 0; i < 3; i++) {
-        results.push(EMOJIS_BAUCUA[randomInt(0, EMOJIS_BAUCUA.length - 1)]);
-      }
-
-      // Tính tiền thắng thua
-      const summary = {};
-      for (const userId in baucuaSession.bets) {
-        const bets = baucuaSession.bets[userId];
-        let winCount = 0;
-        let totalBet = 0;
-        for (const [emoji, amount] of Object.entries(bets)) {
-          totalBet += amount;
-          if (results.includes(emoji)) {
-            const count = results.filter((r) => r === emoji).length;
-            winCount += count;
-            if (!summary[userId]) summary[userId] = 0;
-            summary[userId] += amount * count;
-          } else {
-            if (!summary[userId]) summary[userId] = 0;
-            summary[userId] -= amount;
-          }
-        }
-      }
-
-      // Cập nhật tiền
-      for (const userId in summary) {
-        if (summary[userId] > 0) await addMoney(userId, summary[userId]);
-        else await subMoney(userId, -summary[userId]);
-      }
-
-      let resultText = `Kết quả bầu cua: ${results.join(" ")}\n\n`;
-      for (const userId in summary) {
-        const user = await client.users.fetch(userId);
-        if (summary[userId] > 0) {
-          resultText += `${user.username} thắng ${summary[userId]} tiền\n`;
+    const summary = {};
+    for (const userId in baucuaSession.bets) {
+      const bets = baucuaSession.bets[userId];
+      let totalWin = 0;
+      let totalLost = 0;
+      for (const [emoji, amount] of Object.entries(bets)) {
+        if (results.includes(emoji)) {
+          const count = results.filter((r) => r === emoji).length;
+          totalWin += amount * count;
         } else {
-          resultText += `${user.username} thua ${-summary[userId]} tiền\n`;
+          totalLost += amount;
         }
       }
+      summary[userId] = totalWin - totalLost;
+    }
 
-      await baucuaSession.msg.reply(resultText);
-      baucuaSession = null;
-    }, 10_000);
-  });
+    for (const userId in summary) {
+      if (summary[userId] > 0) await addMoney(userId, summary[userId]);
+      else await subMoney(userId, -summary[userId]);
+    }
+
+    let resultText = `🎉 Kết quả bầu cua: ${results.join(" ")}\n\n`;
+    for (const userId in summary) {
+      const user = await client.users.fetch(userId);
+      if (summary[userId] > 0) {
+        resultText += `✅ **${user.username}** thắng **${summary[userId].toLocaleString()} tiền**\n`;
+      } else {
+        resultText += `❌ **${user.username}** thua **${(-summary[userId]).toLocaleString()} tiền**\n`;
+      }
+    }
+
+    const embed = new EmbedBuilder()
+      .setColor("#00ff00")
+      .setTitle("🎲 Kết quả Bầu Cua")
+      .setDescription(resultText)
+      .setTimestamp();
+
+    await baucuaSession.msg.reply({ embeds: [embed] });
+    baucuaSession = null;
+  }, 10_000);
 }
 
 // Xử lý vote bầu cua
@@ -293,7 +388,9 @@ client.on("messageReactionAdd", async (reaction, user) => {
 
   if (userDb.money < betAmount) {
     reaction.users.remove(user.id);
-    user.send("Bạn không đủ tiền để đặt cược 500 tiền!");
+    try {
+      await user.send("⚠️ Bạn không đủ tiền để đặt cược 500 tiền!");
+    } catch {}
     return;
   }
 
@@ -304,20 +401,17 @@ client.on("messageReactionAdd", async (reaction, user) => {
   baucuaSession.bets[user.id] = userData;
   await db.write();
 
-  user.send(`Bạn đã đặt cược ${betAmount} tiền vào ${emoji}`);
+  try {
+    await user.send(`✅ Bạn đã đặt cược **${betAmount.toLocaleString()} tiền** vào ${emoji}`);
+  } catch {}
 });
-
-// Đơn giản phần xì dách và solo chỉ làm mẫu
-// Bạn có thể tự phát triển thêm
 
 // Bốc thăm trúng thưởng
 async function cmdBoctham(message) {
   await db.read();
   const userId = message.author.id;
-  const now = Date.now();
 
-  db.data.boctham[userId] ||= { lastDate: 0, count: 0, money: 0 };
-
+  db.data.boctham[userId] ||= { lastDate: "", count: 0, money: 0 };
   const userBoctham = db.data.boctham[userId];
   const today = new Date().toISOString().slice(0, 10);
 
@@ -325,19 +419,28 @@ async function cmdBoctham(message) {
     userBoctham.count = 3;
     userBoctham.lastDate = today;
   }
+
   if (userBoctham.count <= 0) {
-    message.reply("Bạn đã hết lượt bốc thăm hôm nay!");
+    const embed = new EmbedBuilder()
+      .setColor("#ff0000")
+      .setTitle("❌ Hết lượt bốc thăm")
+      .setDescription("Bạn đã hết lượt bốc thăm hôm nay!");
+    message.reply({ embeds: [embed] });
     return;
   }
 
   const user = await getUser(userId);
   if (user.money < 200) {
-    message.reply("Bạn cần 200 tiền để bốc thăm!");
+    const embed = new EmbedBuilder()
+      .setColor("#ff0000")
+      .setTitle("❌ Tiền không đủ")
+      .setDescription("Bạn cần ít nhất 200 tiền để bốc thăm!");
+    message.reply({ embeds: [embed] });
     return;
   }
+
   await subMoney(userId, 200);
 
-  // Xác suất trúng thưởng
   const rand = Math.random() * 100;
   let reward = 0;
   if (rand <= 40) reward = 50 - 100;
@@ -350,19 +453,25 @@ async function cmdBoctham(message) {
   userBoctham.count--;
   await db.write();
 
-  message.reply(`Bạn bốc thăm được ${reward} tiền. Lượt còn lại: ${userBoctham.count}`);
+  const embed = new EmbedBuilder()
+    .setColor("#00ff00")
+    .setTitle("🎉 Bốc thăm trúng thưởng")
+    .setDescription(`Bạn nhận được **${reward.toLocaleString()} tiền**.\nLượt còn lại: **${userBoctham.count}**`)
+    .setTimestamp();
+
+  message.reply({ embeds: [embed] });
 }
 
 // Lệnh help
 async function cmdHelp(message) {
-  await message.reply(`
-📖 **HƯỚNG DẪN BOT CASINO**  
-
-━━━━━━━━━━━━━━━━━━
+  const embed = new EmbedBuilder()
+    .setColor("#1e90ff")
+    .setTitle("📖 HƯỚNG DẪN BOT CASINO")
+    .setDescription(`
 💰 **TIỀN & CƠ BẢN**
-• !tien – Xem số xu hiện có
-• !diemdanh – Điểm danh (reset mỗi ngày lúc **06:00 sáng**)
-• !chuyentien @user <tiền> – Chuyển xu cho người khác
+• \`!tien\` – Xem số xu hiện có
+• \`!diemdanh\` – Điểm danh (reset mỗi ngày lúc **06:00 sáng**)
+• \`!chuyentien @user <tiền>\` – Chuyển xu cho người khác
 
 🎁 **TỶ LỆ ĐIỂM DANH**
 • 50% → +1000 xu
@@ -371,48 +480,28 @@ async function cmdHelp(message) {
 • 8%  → +3000 xu
 • 2%  → +3200 xu
 
-━━━━━━━━━━━━━━━━━━
 🪙 **TUNG XU**
-• !xu <tiền> <ngua/sap>
+• \`!tungxu <tiền>\` (ngửa/sấp)
 • Thắng: + tiền đặt
 • Thua: - tiền đặt
 • Cooldown: 10 giây
 
-━━━━━━━━━━━━━━━━━━
 🎲 **TÀI XỈU**
-• !taixiu <tiền> <tai/xiu>
+• \`!taixiu <tiền> <tai/xiu>\`
 • Tỷ lệ: 50 / 50
 • Thắng: + tiền đặt
 • Thua: - tiền đặt
 
-━━━━━━━━━━━━━━━━━━
 🦀🐟🍐 **BẦU – CUA – TÔM – CÁ – NGỰA (CHUNG BÀN)**
-• !baucua <tiền> <bau/cua/tom/ca/ngua>
-• Mỗi người đặt 1 lần / ván
-• Mở bàn 15 giây
+• \`!baucua\`
+• Mở bàn 15 giây, cược 500 tiền/react
 • Xổ 3 con
 • Trúng 1 con → ăn x1 tiền
 • Trúng 2–3 con → ăn x2 / x3
 • Trật → mất tiền đặt
 
-━━━━━━━━━━━━━━━━━━
-⚪⚫ **TRẮNG – ĐEN (PVP)**
-• !trangden <tiền> <trang/den>
-• Nhiều người cùng chơi
-• Sau 10 giây mở kết quả
-• BÊN THUA → tiền CHUYỂN cho bên thắng
-• Bot không ăn tiền
-
-🃏 **XÌ DÁCH (BLACKJACK)**
-• !xidach <tiền> – Bắt đầu ván
-• !hit – Rút thêm bài
-• !stand – Dừng & so bài
-• Thắng: + tiền cược
-• Thua: - tiền cược
-• Không chơi 2 ván cùng lúc
-
 🎁 **BỐC THĂM TRÚNG THƯỞNG**
-• !boctham
+• \`!boctham\`
 • 40% + 50 hoặc - 100
 • 30% +300 hoặc -100
 • 20% +600 hoặc + 300
@@ -422,7 +511,10 @@ async function cmdHelp(message) {
 ⏳ **LƯU Ý**
 • Một số lệnh có cooldown
 `);
+
+  message.reply({ embeds: [embed] });
 }
+
 // Main
 client.on("ready", async () => {
   await initDB();
@@ -462,7 +554,13 @@ client.on("messageCreate", async (message) => {
       await cmdHelp(message);
       break;
     default:
-      message.reply("Lệnh không tồn tại! Dùng !help để xem danh sách lệnh.");
+      {
+        const embed = new EmbedBuilder()
+          .setColor("#ff0000")
+          .setTitle("❌ Lệnh không tồn tại")
+          .setDescription("Dùng `!help` để xem danh sách lệnh.");
+        message.reply({ embeds: [embed] });
+      }
   }
 });
 
