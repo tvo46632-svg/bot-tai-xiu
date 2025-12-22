@@ -627,31 +627,46 @@ client.on("interactionCreate", async (interaction)=>{
     }
 });
 // =====================
-//      ĂN XIN BOT
+//      ĂN XIN BOT (GIỚI HẠN 2 LẦN / NGÀY)
 // =====================
 async function cmdAnxin(message) {
     const userId = message.author.id;
     await db.read();
 
-    const user = await getUser(userId);
+    // Khởi tạo data ăn xin nếu chưa có
+    db.data.anxin ||= {};
+    db.data.anxin[userId] ||= { lastDate: "", count: 0 };
 
-    // Xác suất
-    const rand = Math.random(); // 0 → 1
-    let reward = 0;
+    const info = db.data.anxin[userId];
+    const today = new Date().toISOString().slice(0, 10);
 
-    if (rand < 0.5) {
-        // 50% ra 600 xu
-        reward = 600;
-    } else {
-        // 50% còn lại: từ 200 → 599
-        reward = Math.floor(Math.random() * (599 - 200 + 1)) + 200;
+    // Nếu ngày khác hôm trước, reset lượt
+    if (info.lastDate !== today) {
+        info.lastDate = today;
+        info.count = 2;
     }
 
+    if (info.count <= 0) {
+        message.reply("❌ Bạn đã dùng hết 2 lần ăn xin hôm nay!");
+        return;
+    }
+
+    const user = await getUser(userId);
+
+    // Xác suất: 50% → 600 xu, 50% → 200-599 xu
+    const rand = Math.random();
+    let reward = 0;
+    if (rand < 0.5) reward = 600;
+    else reward = Math.floor(Math.random() * (599 - 200 + 1)) + 200;
+
     await addXu(userId, reward);
+
+    info.count--;
     await db.write();
 
-    message.reply(`🪙 Bạn xin được ${reward} xu từ bot!`);
+    message.reply(`🪙 Bạn xin được ${reward} xu từ bot! Lượt còn lại hôm nay: ${info.count}`);
 }
+
 
 // =====================
 //      HELP (FULL + BẢNG GIÁ)
