@@ -301,30 +301,31 @@ async function cmdTaixiu(message, args) {
 }
 
 // =====================
-//         BẦU CUA
+// =====================
+//       BẦU CUA FIXED + TUỲ Ý TIỀN (DEFAULT 200)
 // =====================
 
 let baucuaSession = null;
+let userBetAmounts = {}; // Lưu tiền cược từng người
 
 async function cmdBaucua(message) {
-
     if (baucuaSession) {
-        message.reply(
-            "⚠️ Đang có phiên bầu cua khác. Vui lòng đợi!"
-        );
+        message.reply("⚠️ Đang có phiên bầu cua khác. Vui lòng đợi!");
         return;
     }
 
     baucuaSession = {
         channelId: message.channel.id,
-        bets: {},
+        bets: {}, // { userId: { emoji: amount } }
         timeout: null,
         msg: null
     };
+    userBetAmounts = {};
 
     const betMessage = await message.channel.send(
         `🎯 **Bầu cua bắt đầu!**\n` +
-        `React để đặt cược trong 10 giây!\n` +
+        `1️⃣ Gửi DM cho bot: !datcu <số tiền> để đặt cược (nếu không đặt, mặc định 200 tiền)\n` +
+        `2️⃣ React vào con muốn cược trong 10 giây:\n` +
         `${EMOJIS_BAUCUA.join(" ")}`
     );
 
@@ -334,57 +335,89 @@ async function cmdBaucua(message) {
 
     baucuaSession.msg = betMessage;
 
+    // Kết thúc cược sau 10 giây
     baucuaSession.timeout = setTimeout(async () => {
-
         await db.read();
 
+        // Quay bầu cua 3 con
         const results = [];
-
         for (let i = 0; i < 3; i++)
             results.push(
                 EMOJIS_BAUCUA[randomInt(0, EMOJIS_BAUCUA.length - 1)]
             );
 
-// … (Due to response length limits, part of bầu cua settlement, xì dách and boctham continues …)
-        // xử lý bầu cua sau khi hết thời gian cược
+        // Tính tiền thắng/thua
         const summary = {};
         for (const userId in baucuaSession.bets) {
             const bets = baucuaSession.bets[userId];
             let winAmount = 0;
+
             for (const [emoji, amount] of Object.entries(bets)) {
                 const count = results.filter(r => r === emoji).length;
                 if (count > 0) {
-                    winAmount += amount * count;
-                } else {
-                    winAmount -= amount;
+                    winAmount += amount * count; // cộng tiền thắng
                 }
             }
             summary[userId] = winAmount;
         }
 
-        // cập nhật tiền cho người chơi
+        // Cập nhật tiền cho người chơi
         for (const userId in summary) {
             const value = summary[userId];
             if (value > 0) await addMoney(userId, value);
-            else await subMoney(userId, -value);
         }
 
-        // build text kết quả
+        // Tạo kết quả
         let resultText = `🎉 Kết quả bầu cua: ${results.join(" ")}\n\n`;
         for (const userId in summary) {
             const u = await client.users.fetch(userId);
-            const v = summary[userId];
-            if (v > 0) resultText += `✅ ${u.username} thắng ${v} tiền\n`;
-            else resultText += `❌ ${u.username} thua ${-v} tiền\n`;
+            const bets = baucuaSession.bets[userId];
+            const totalBet = Object.values(bets).reduce((a,b)=>a+b,0);
+            const gain = summary[userId];
+            if (gain > 0) resultText += `✅ ${u.username} thắng ${gain} tiền (đặt ${totalBet})\n`;
+            else resultText += `❌ ${u.username} thua ${totalBet} tiền\n`;
         }
 
         await baucuaSession.msg.reply(resultText);
+
+        // reset session
         baucuaSession = null;
-
-    }, 10000); // hết 10 giây
-
+        userBetAmounts = {};
+    }, 10000);
 }
 
+// DM bot để đặt số tiền
+client.on("messageCreate", async (message) => {
+    if (message.author.bot) return;
+    if (!message.content.startsWith("!datcu")) return;
+    if (!baucuaSession) {
+        message.reply("❌ Hiện không có phiên Bầu Cua nào!");
+        return;
+    }
+
+    const args = message.content.trim().split(/ +/);
+    if (args.length < 2) {
+        message.reply("❗ Cách dùng: !datcu <số tiền>");
+        return;
+    }
+
+    const amount = parseInt(args[1]);
+    if (isNaN(amount) || amount <= 0) {
+        message.reply("❌ Số tiền không hợp lệ!");
+        return;
+    }
+
+    const userDb = await getUser(message.author.id);
+    if (userDb.money < amount) {
+        message.reply(`❌ Bạn không đủ tiền để đặt ${amount} tiền!`);
+        return;
+    }
+
+    userBetAmounts[message.author.id] = amount;
+    message.reply(`✅ Bạn đã đặt ${amount} tiền cho phiên Bầu Cua. React để chọn con muốn cược!`);
+});
+
+// Khi người chơi react
 client.on("messageReactionAdd", async (reaction, user) => {
     if (user.bot) return;
     if (!baucuaSession) return;
@@ -394,12 +427,14 @@ client.on("messageReactionAdd", async (reaction, user) => {
     if (!EMOJIS_BAUCUA.includes(emoji)) return;
 
     await db.read();
-    const betAmount = 500;
+
+    // Nếu người chơi chưa đặt DM, mặc định 200
+    const betAmount = userBetAmounts[user.id] || 200;
     const userDb = await getUser(user.id);
 
     if (userDb.money < betAmount) {
         reaction.users.remove(user.id);
-        user.send("Bạn không đủ tiền để đặt cược 500 tiền!");
+        user.send(`Bạn không đủ tiền để đặt cược ${betAmount} tiền!`);
         return;
     }
 
@@ -408,9 +443,10 @@ client.on("messageReactionAdd", async (reaction, user) => {
     const userBets = baucuaSession.bets[user.id] || {};
     userBets[emoji] = (userBets[emoji] || 0) + betAmount;
     baucuaSession.bets[user.id] = userBets;
+
     await db.write();
 
-    user.send(`Bạn đã đặt cược 500 tiền vào ${emoji}`);
+    user.send(`Bạn đã cược ${betAmount} tiền vào ${emoji}`);
 });
 
 // =====================
@@ -590,6 +626,32 @@ client.on("interactionCreate", async (interaction)=>{
         blackjackSession[channelId]=null;
     }
 });
+// =====================
+//      ĂN XIN BOT
+// =====================
+async function cmdAnxin(message) {
+    const userId = message.author.id;
+    await db.read();
+
+    const user = await getUser(userId);
+
+    // Xác suất
+    const rand = Math.random(); // 0 → 1
+    let reward = 0;
+
+    if (rand < 0.5) {
+        // 50% ra 600 xu
+        reward = 600;
+    } else {
+        // 50% còn lại: từ 200 → 599
+        reward = Math.floor(Math.random() * (599 - 200 + 1)) + 200;
+    }
+
+    await addXu(userId, reward);
+    await db.write();
+
+    message.reply(`🪙 Bạn xin được ${reward} xu từ bot!`);
+}
 
 // =====================
 //      HELP (FULL + BẢNG GIÁ)
@@ -681,6 +743,7 @@ client.on("messageCreate", async (message) => {
         case "chuyentien": await cmdChuyentien(message,args); break;
         case "chuyenxu": await cmdChuyenxu(message,args); break;
         case "xidach": await cmdXidach(message,args); break;
+        case "anxin": await cmdAnxin(message); break;
         case "help": await cmdHelp(message); break;
         default: message.reply("❌ Lệnh không hợp lệ!");
     }
