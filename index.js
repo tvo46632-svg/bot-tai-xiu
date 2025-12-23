@@ -190,27 +190,27 @@ async function cmdTien(message) {
 // =====================
 async function cmdDoi(message, args) {
     try {
-        // Debug: In ra các đối số nhận được
-        console.log('Arguments:', args);
+        // In ra các đối số nhận được từ người dùng để debug
+        console.log('Arguments received:', args);
 
-        // Kiểm tra nếu không có đủ 2 đối số
         if (args.length < 2) {
             message.reply("❗ Cách dùng: !doi <số_xu> xu hoặc !doi <số_tiền> tien");
             return;
         }
 
-        const amount = parseInt(args[0]);  // Số tiền hoặc xu
-        const unit = args[1].toLowerCase();  // Đơn vị xu/tien hoặc x/t
+        // Lấy số lượng và đơn vị (xu hoặc tien)
+        const amount = parseInt(args[0]);
+        const unit = args[1].toLowerCase();  // Đảm bảo chữ thường để tránh sai cú pháp
 
-        console.log('Amount:', amount);
-        console.log('Unit:', unit);
+        console.log('Amount:', amount);  // Debug: kiểm tra số lượng nhận được
+        console.log('Unit:', unit);      // Debug: kiểm tra đơn vị nhận được
 
-        // Kiểm tra nếu amount không phải là một số hợp lệ
         if (isNaN(amount) || amount <= 0) {
             message.reply("❌ Số lượng không hợp lệ!");
             return;
         }
 
+        // Lấy thông tin người dùng
         const user = await getUser(message.author.id);
 
         // Kiểm tra cooldown (Tránh spam)
@@ -224,10 +224,10 @@ async function cmdDoi(message, args) {
         // Cập nhật thời gian của lần đổi gần nhất
         await updateUserLastExchange(message.author.id, now);
 
-        // Hiển thị hoạt ảnh đang đổi (3 chấm hoặc biểu tượng)
+        // Hiển thị thông báo hoạt ảnh đang đổi
         const exchangeMessage = await message.reply("🔄 Đang đổi... vui lòng đợi 4 giây...");
 
-        // Kiểm tra đơn vị và xử lý đổi xu ra tiền
+        // Kiểm tra nếu người dùng muốn đổi xu ra tiền
         if (unit === 'xu' || unit === 'x') {
             console.log('Đang xử lý đổi xu ra tiền...');
             // Đổi xu ra tiền
@@ -291,7 +291,6 @@ async function cmdDoi(message, args) {
             return;
         }
 
-        // Nếu không phải xu hoặc tiền, thông báo cách dùng
         message.reply("❗ Cách dùng: !doi <số_xu> xu hoặc !doi <số_tiền> tien");
     } catch (error) {
         console.error("Lỗi khi xử lý lệnh !doi:", error);
