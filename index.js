@@ -350,62 +350,61 @@ client.on("interactionCreate", async (interaction) => {
     }
 });
 // =====================
-// TUNG XU (v2 cải tiến) với hoạt ảnh
+// =====================
+// TUNG XU (v4 - Búng xu cao cấp)
 // =====================
 async function cmdTungxu(message, args) {
     if (args.length < 2) {
-        message.reply("❗ Cách dùng: !tungxu <số_xu> <ngửa/sấp>");
-        return;
+        return message.reply("❗ Cách dùng: `!tungxu <số_xu> <mặt/không>`");
     }
 
     const betXu = parseInt(args[0]);
-    let userChoice = args[1].toLowerCase(); // ngửa hoặc sấp
+    let userChoice = args[1].toLowerCase();
 
-    // Chuyển viết tắt sang đầy đủ
-    if (userChoice === "n") userChoice = "ngửa";
-    if (userChoice === "s") userChoice = "sấp";
+    // Chuẩn hóa lựa chọn
+    if (userChoice === "m") userChoice = "mặt";
+    if (userChoice === "k") userChoice = "không";
 
-    if (isNaN(betXu) || betXu <= 0) {
-        message.reply("❌ Số xu không hợp lệ!");
-        return;
-    }
-
-    if (!["ngửa", "sấp"].includes(userChoice)) {
-        message.reply("❌ Chọn: ngửa / sấp (hoặc n / s)");
-        return;
-    }
+    if (isNaN(betXu) || betXu <= 0) return message.reply("❌ Số xu không hợp lệ!");
+    if (!["mặt", "không"].includes(userChoice)) return message.reply("❌ Bạn phải chọn: `mặt` (có hình) hoặc `không` (vàng óng)!");
 
     const user = await getUser(message.author.id);
-
-    if (user.xu < betXu) {
-        message.reply("❌ Bạn không đủ xu để cược!");
-        return;
-    }
+    if (user.xu < betXu) return message.reply("❌ Bạn không đủ xu!");
 
     await subXu(message.author.id, betXu);
 
-    // Gửi thông báo cho người chơi về việc "tung xu"
-    const loadingMessage = await message.reply("🪙 Đang tung xu...");
+    // Cấu hình Emoji (Bạn có thể thay ID emote server bạn vào đây)
+    const EMOTE_MAT = "🏛️"; // Mặt có hình thư viện
+    const EMOTE_KHONG = "🟡"; // Mặt vàng óng ánh
+    const EMOTE_XOAY = "🔄";
 
-    // Hiệu ứng "tung xu" - thay đổi emoji liên tục
-    const emojis = ["🪙", "🎰", "🎲", "🪙", "🎰"];
-    for (let i = 0; i < 5; i++) {
-        await delay(500); // Delay để tạo hiệu ứng chuyển động
-        const randomEmoji = emojis[randomInt(0, emojis.length - 1)];
-        await loadingMessage.edit(`🪙 Đang tung xu... ${randomEmoji}`);
+    // 1. Gửi tin nhắn khởi đầu
+    const msg = await message.reply(`🪙 **Vút...** ${message.author.username} đã búng một đồng xu vàng lên không trung!`);
+
+    // 2. Hiệu ứng búng xu (Animation nhảy số và xoay)
+    const spinFrames = ["🟡", "➖", "🏛️", "➖", "🟡", "➖", "🏛️"]; 
+    
+    for (let i = 0; i < spinFrames.length; i++) {
+        await new Promise(res => setTimeout(res, 350)); // Tốc độ xoay
+        await msg.edit(`✨ **ĐANG XOAY...** ✨\n>        ${spinFrames[i]}        \n[ ▒▒▒▒▒▒▒▒▒▒ ]`);
     }
 
-    // Quay xu
-    await delay(1000); // Thêm chút delay trước khi công bố kết quả
-    const result = Math.random() < 0.5 ? "ngửa" : "sấp";
+    // 3. Tính toán kết quả ngẫu nhiên
+    const isMat = Math.random() < 0.5;
+    const result = isMat ? "mặt" : "không";
+    const resultEmoji = isMat ? EMOTE_MAT : EMOTE_KHONG;
 
-    // Xử lý kết quả
+    // 4. Delay một chút trước khi hiện kết quả cuối cùng cho kịch tính
+    await new Promise(res => setTimeout(res, 500));
+
+    // 5. Xử lý thắng thua
     if (result === userChoice) {
         const rewardXu = betXu * 2;
         await addXu(message.author.id, rewardXu);
-        message.reply(`🪙 Kết quả: ${result.toUpperCase()}! Bạn thắng và nhận ${rewardXu} xu.`);
+        
+        return await msg.edit(`🪙 **ĐỒNG XU ĐÃ RƠI!**\n━━━━━━━━━━━━━━━━━━\n> Kết quả: **${resultEmoji} (${result.toUpperCase()})**\n\n🎉 **CHÚC MỪNG!** Bạn đoán đúng và nhận **+${rewardXu.toLocaleString()} xu**.`);
     } else {
-        message.reply(`🪙 Kết quả: ${result.toUpperCase()}! Bạn thua và mất ${betXu} xu.`);
+        return await msg.edit(`🪙 **ĐỒNG XU ĐÃ RƠI!**\n━━━━━━━━━━━━━━━━━━\n> Kết quả: **${resultEmoji} (${result.toUpperCase()})**\n\n💸 **RẤT TIẾC!** Bạn đã mất **-${betXu.toLocaleString()} xu**.`);
     }
 }
 // =====================
