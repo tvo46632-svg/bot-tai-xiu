@@ -1094,43 +1094,41 @@ async function cmdTralai(message, args) {
 // =====================
 //      HELP COMMAND (Bản Xịn)
 // =====================
-async function cmdHelp(message) {
-    const mainEmbed = new EmbedBuilder()
-        .setTitle('🎮 TRUNG TÂM GIẢI TRÍ CASINO')
-        .setDescription('Chào mừng bạn đến với sòng bạc! Hãy chọn mục bên dưới để xem chi tiết.\n> *Menu này sẽ tự đóng sau 2 phút.*')
-        .setColor('#FFD700')
-        .setTimestamp();
-
-    const row = new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setCustomId('h_eco').setLabel('Kinh Tế').setStyle(ButtonStyle.Primary).setEmoji('💰'),
-        new ButtonBuilder().setCustomId('h_game').setLabel('Trò Chơi').setStyle(ButtonStyle.Success).setEmoji('🎲'),
-        new ButtonBuilder().setCustomId('h_bank').setLabel('Ngân Hàng & Đổi Xu').setStyle(ButtonStyle.Danger).setEmoji('🏦')
-    );
-
-    const helpMsg = await message.reply({ embeds: [mainEmbed], components: [row] });
-    const collector = helpMsg.createMessageComponentCollector({ time: 120000 }); 
-
-    collector.on('collect', async i => {
+collector.on('collect', async i => {
         if (i.user.id !== message.author.id) return i.reply({ content: "Nút này không dành cho bạn!", ephemeral: true });
         
         const embed = new EmbedBuilder().setColor('#FFD700');
-        if (i.customId === 'h_eco') {
-            embed.setTitle('💰 KINH TẾ ').setDescription('• `!tien`: Xem số dư\n• `!diemdanh`: Nhận lương\n• `!chuyentien\n•`!chuyenxu`: Chuyển xu - tiền');
-        } else if (i.customId === 'h_game') {
-            embed.setTitle('🎲 TRÒ CHƠI').setDescription('• `!baucua`, `!taixiu`, `!xidach`, `!tungxu`, `!anxin`, `!boctham`');
-        } else if (i.customId === 'h_bank') {
-            embed.setTitle('🏦 NGÂN HÀNG').addFields(
-                { name: '💸 Vay Nợ', value: '`!vay <số>`: Vay 1 trả 2.' },
-                { name: '💱 Tỷ Giá', value: 'Đổi từ Xu sang Tiền (!doi).' }
-            );
-        }
-        await i.update({ embeds: [embed] });
-    });
 
-    collector.on('end', () => {
-        helpMsg.edit({ components: [] }).catch(() => {});
+        if (i.customId === 'h_eco') {
+            embed.setTitle('💰 HỆ THỐNG KINH TẾ')
+                 .setDescription(
+                    '• `!tien`       : Xem số dư & Nợ\n' +
+                    '• `!diemdanh`   : Nhận lương mỗi ngày\n' +
+                    '• `!chuyentien` : Chuyển tiền sạch ($)\n' +
+                    '• `!chuyenxu`   : Chuyển xu cá cược (🪙)'
+                 );
+        } else if (i.customId === 'h_game') {
+            embed.setTitle('🎲 KHO TRÒ CHƠI')
+                 .setDescription(
+                    '• `!taixiu`  : Cá cược Tài Xỉu\n' +
+                    '• `!baucua`  : Cá cược Bầu Cua\n' +
+                    '• `!xidach`  : Chơi bài Xì Dách\n' +
+                    '• `!tungxu`  : Đoán mặt đồng xu\n' +
+                    '• `!boctham` : Thử vận may mắn\n' +
+                    '• `!anxin`   : Xin tiền đại gia'
+                 );
+        } else if (i.customId === 'h_bank') {
+            embed.setTitle('🏦 NGÂN HÀNG CASINO')
+                 .setDescription(
+                    '• `!doi`    : Đổi Xu ↔ Tiền ($)\n' +
+                    '• `!vay`    : Vay vốn làm ăn\n' +
+                    '• `!tralai` : Thanh toán nợ nần'
+                 );
+        }
+
+        // QUAN TRỌNG: Phải có components: [row] để nút không bị biến mất
+        await i.update({ embeds: [embed], components: [row] });
     });
-}
 
 // =====================
 //      MAIN EVENTS 
