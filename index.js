@@ -188,175 +188,48 @@ async function cmdTien(message) {
 // =====================
 //    ĐỔI XU <=> TIỀN
 // =====================
-async function cmdDoi(message, args) {
-    try {
-        // In ra các đối số nhận được từ người dùng để debug
-        console.log('Arguments received:', args);
+async function cmdDoixu(message, args) {
 
-        // Kiểm tra nếu không có đủ 2 đối số
-        if (args.length < 2) {
-            message.reply("❗ Cách dùng: !doi <số_xu> xu hoặc !doi <số_tiền> tien");
-            return;
-        }
-
-        // Lấy số lượng và đơn vị (xu hoặc tien)
-        const amount = parseInt(args[0]);
-        const unit = args[1].toLowerCase();  // Đảm bảo chữ thường để tránh sai cú pháp
-
-        // Debug: kiểm tra số lượng nhận được
-        console.log('Amount:', amount);  
-        console.log('Unit:', unit);  
-
-        // Kiểm tra nếu amount không phải là một số hợp lệ hoặc <= 0
-        if (isNaN(amount) || amount <= 0) {
-            message.reply("❌ Số lượng không hợp lệ! Vui lòng nhập một số lớn hơn 0.");
-            return;
-        }
-
-        // Kiểm tra nếu đơn vị không hợp lệ (xu hoặc tien)
-        if (unit !== 'xu' && unit !== 'x' && unit !== 'tien' && unit !== 't') {
-            message.reply("❗ Lệnh không hợp lệ! Hãy thử lại với đúng cú pháp: !doi <số_xu> xu hoặc !doi <số_tiền> tien");
-            return;
-        }
-
-        const user = await getUser(message.author.id);
-
-        // Debug: Kiểm tra thông tin người dùng
-        console.log('User xu:', user.xu);
-        console.log('User money:', user.money);
-
-        // Kiểm tra cooldown (Tránh spam)
-        const now = Date.now();
-        const cooldownTime = 10000; // 10 giây cooldown cho mỗi người
-        if (user.lastExchange && now - user.lastExchange < cooldownTime) {
-            message.reply("❌ Bạn cần chờ một chút trước khi thực hiện lại!");
-            return;
-        }
-
-        // Cập nhật thời gian của lần đổi gần nhất
-        await updateUserLastExchange(message.author.id, now);
-
-        // Hiển thị thông báo hoạt ảnh đang đổi
-        const exchangeMessage = await message.reply("🔄 Đang đổi... vui lòng đợi 4 giây...");
-
-        // Kiểm tra nếu người dùng muốn đổi xu ra tiền
-        if (unit === 'xu' || unit === 'x') {
-            console.log('Đang xử lý đổi xu ra tiền...');
-            // Đổi xu ra tiền
-            if (user.xu < amount) {
-                message.reply("❌ Bạn không đủ xu!");
-                return;
-            }
-
-            let moneyOut = 0;
-
-            if (amount === 100) moneyOut = 50;
-            else if (amount === 200) moneyOut = 150;
-            else if (amount === 500) moneyOut = 450;
-            else if (amount === 1000) moneyOut = 900;
-            else if (amount >= 2000) moneyOut = Math.floor(amount * 0.9);
-            else {
-                message.reply("❗ Không hỗ trợ số xu này!");
-                return;
-            }
-
-            // Thực hiện hành động đổi xu ra tiền
-            await subXu(message.author.id, amount);
-            await addMoney(message.author.id, moneyOut);
-
-            // Sau 4 giây, xóa thông báo hoạt ảnh và gửi kết quả
-            setTimeout(() => {
-                exchangeMessage.edit(`🔁 Bạn đã đổi **${amount} xu → ${moneyOut} tiền** thành công!`);
-            }, 4000); // Đợi 4 giây
-
-            return;
-        }
-
-        // Kiểm tra nếu người dùng muốn đổi tiền ra xu
-        if (unit === 'tien' || unit === 't') {
-            console.log('Đang xử lý đổi tiền ra xu...');
-            // Đổi tiền ra xu
-            if (user.money < amount) {
-                message.reply("❌ Bạn không đủ tiền!");
-                return;
-            }
-
-            let xuOut = 0;
-            let feePercent = 20;  // Mặc định phí 20% nếu tiền <= 5000
-
-            if (amount >= 10000) {
-                feePercent = 40;  // Nếu tiền >= 10000 thì phí đổi 40%
-            }
-
-            // Tính số xu nhận được sau khi trừ phí
-            xuOut = Math.floor(amount * (1 - feePercent / 100));
-
-            // Thực hiện hành động đổi tiền ra xu
-            await subMoney(message.author.id, amount);
-            await addXu(message.author.id, xuOut);
-
-            // Sau 4 giây, xóa thông báo hoạt ảnh và gửi kết quả
-            setTimeout(() => {
-                exchangeMessage.edit(`🔁 Bạn đã đổi **${amount} tiền → ${xuOut} xu** (phí ${feePercent}%) thành công!`);
-            }, 4000); // Đợi 4 giây
-
-            return;
-        }
-
-        message.reply("❗ Cách dùng: !doi <số_xu> xu hoặc !doi <số_tiền> tien");
-    } catch (error) {
-        console.error("Lỗi khi xử lý lệnh !doi:", error);
-        message.reply("❌ Đã có lỗi xảy ra khi thực hiện lệnh, vui lòng thử lại sau.");
+    if (args.length < 1) {
+        message.reply("❗ Cách dùng: !doixu <số_xu>");
+        return;
     }
-}
 
-// Hàm cập nhật thời gian giao dịch cuối cùng của người dùng
-async function updateUserLastExchange(userId, time) {
-    try {
-        const user = await getUser(userId);
-        user.lastExchange = time;
-        await db.write();
-    } catch (error) {
-        console.error("Lỗi khi cập nhật thời gian giao dịch cuối cùng:", error);
+    const xuAmount = parseInt(args[0]);
+
+    if (isNaN(xuAmount) || xuAmount <= 0) {
+        message.reply("❌ Số xu không hợp lệ!");
+        return;
     }
+
+    const user = await getUser(message.author.id);
+
+    if (user.xu < xuAmount) {
+        message.reply("❌ Bạn không đủ xu!");
+        return;
+    }
+
+    let moneyOut = 0;
+
+    if (xuAmount === 100) moneyOut = 50;
+    else if (xuAmount === 200) moneyOut = 150;
+    else if (xuAmount === 500) moneyOut = 450;
+    else if (xuAmount === 1000) moneyOut = 900;
+    else if (xuAmount >= 2000) moneyOut = Math.floor(xuAmount * 0.9);
+    else {
+        message.reply("❗ Không hỗ trợ số xu này!");
+        return;
+    }
+
+    await subXu(message.author.id, xuAmount);
+    await addMoney(message.author.id, moneyOut);
+
+    message.reply(
+        `🔁 Bạn đã đổi **${xuAmount} xu → ${moneyOut} tiền** thành công!`
+    );
 }
 
-// Hàm lấy thông tin người dùng (ví dụ: số tiền, xu)
-async function getUser(userId) {
-    db.data.users[userId] ||= { money: 0, xu: 0, lastExchange: 0 };
-    await db.write();
-    return db.data.users[userId];
-}
 
-// Hàm trừ xu
-async function subXu(userId, amount) {
-    const user = await getUser(userId);
-    user.xu -= amount;
-    if (user.xu < 0) user.xu = 0;
-    await db.write();
-}
-
-// Hàm cộng tiền
-async function addMoney(userId, amount) {
-    const user = await getUser(userId);
-    user.money += amount;
-    await db.write();
-}
-
-// Hàm trừ tiền
-async function subMoney(userId, amount) {
-    const user = await getUser(userId);
-    user.money -= amount;
-    if (user.money < 0) user.money = 0;
-    await db.write();
-}
-
-// Hàm cộng xu
-async function addXu(userId, amount) {
-    const user = await getUser(userId);
-    user.xu += amount;
-    await db.write();
-}
 // =====================
 // TUNG XU (v2 cải tiến) với hoạt ảnh
 // =====================
