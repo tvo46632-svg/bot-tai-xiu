@@ -1173,7 +1173,7 @@ async function cmdHelp(message) {
 }
 
 // =====================
-//      MAIN EVENTS
+//      MAIN EVENTS 
 // =====================
 
 client.on("messageCreate", async (message) => {
@@ -1198,10 +1198,14 @@ client.on("messageCreate", async (message) => {
             case "tralai": await cmdTralai(message, args); break;
 
             // TÁCH RIÊNG LỆNH ĐỔI TIỀN CHO NGƯỜI DÙNG
+           case "doi": 
+                await cmdDoi(message, args); // Gọi hàm xử lý chung (cần cả số lượng và loại)
+                break;
             case "doixu": 
-            case "doi":
+                await cmdDoixu(message, args); // Chỉ cần số lượng, mặc định đổi XU -> TIỀN
+                break;
             case "doitien": 
-                await cmdDoixu(message, args); 
+                await cmdDoitien(message, args); // Chỉ cần số lượng, mặc định đổi TIỀN -> XU
                 break;
 
             // TÁCH RIÊNG LỆNH ADMIN (Chỉ bạn mới dùng được)
@@ -1216,7 +1220,7 @@ client.on("messageCreate", async (message) => {
                 const msg = await message.reply("❌ Lệnh không hợp lệ! Gõ `!help` để xem danh sách.");
                 setTimeout(() => msg.delete().catch(() => {}), 5000);
                 break;
-        }
+      }
     } catch (error) {
         console.error("Lỗi lệnh chat:", error);
     }
