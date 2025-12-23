@@ -201,7 +201,6 @@ async function cmdDoi(message, args) {
         const amount = parseInt(args[0]);
         const unit = args[1].toLowerCase(); // Lấy đơn vị từ đối số thứ hai (xu hoặc tien)
 
-        // Debug: In ra các giá trị amount và unit
         console.log('Amount:', amount);
         console.log('Unit:', unit);
 
@@ -344,7 +343,6 @@ async function addXu(userId, amount) {
     user.xu += amount;
     await db.write();
 }
-
 // =====================
 // TUNG XU (v2 cải tiến) với hoạt ảnh
 // =====================
