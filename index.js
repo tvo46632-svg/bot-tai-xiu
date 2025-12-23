@@ -963,6 +963,12 @@ client.on("interactionCreate", async (interaction)=>{
     }
 });
 
+Để thêm tính năng tự động xóa tin nhắn sau 5 giây để tránh spam, bạn chỉ cần sử dụng hàm setTimeout sau khi đã hiển thị kết quả cuối cùng.
+
+Dưới đây là đoạn code đã được cập nhật:
+
+JavaScript
+
 // =====================
 //      ĂN XIN (BỐC TÚI MÙ)
 // =====================
@@ -981,7 +987,12 @@ async function cmdAnxin(message) {
         info.count = 2;
     }
 
-    if (info.count <= 0) return message.reply("> ❌ Bạn đã dùng hết 2 lượt ăn xin hôm nay!");
+    if (info.count <= 0) {
+        const reply = await message.reply("> ❌ Bạn đã dùng hết 2 lượt ăn xin hôm nay!");
+        // Tự xóa thông báo hết lượt sau 5s
+        setTimeout(() => reply.delete().catch(() => {}), 5000);
+        return;
+    }
 
     // 1. Tính toán phần thưởng trước
     const rand = Math.random();
@@ -989,7 +1000,6 @@ async function cmdAnxin(message) {
     if (rand < 0.5) reward = 600;
     else reward = Math.floor(Math.random() * (599 - 200 + 1)) + 200;
 
-    // Phân loại vật phẩm
     const isRare = reward >= 600;
     const item = isRare 
         ? { name: "NGỌC LỤC BẢO", emoji: "💚", box: "🎁" } 
@@ -1010,7 +1020,14 @@ async function cmdAnxin(message) {
     await db.write();
 
     // 4. Kết quả cuối cùng
-    return await msg.edit(`### ${item.box} TÚI MÙ: ${item.name} ${item.emoji}\n> 💰 Bạn xin được: **${reward.toLocaleString()} xu**\n> 🎫 Lượt còn lại: \`${info.count}\``);
+    const finalMsg = await msg.edit(`### ${item.box} TÚI MÙ: ${item.name} ${item.emoji}\n> 💰 Bạn xin được: **${reward.toLocaleString()} xu**\n> 🎫 Lượt còn lại: \`${info.count}\``);
+
+    // 5. Tự động xóa tin nhắn sau 5 giây (5000ms)
+    setTimeout(() => {
+        finalMsg.delete().catch(() => {});
+        // Nếu muốn xóa cả tin nhắn lệnh của người dùng (!anxin)
+        message.delete().catch(() => {});
+    }, 5000);
 }
 // =====================
 //        VAY XU
