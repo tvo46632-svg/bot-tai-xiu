@@ -1131,89 +1131,46 @@ async function cmdTralai(message, args) {
 // =====================
 
 async function cmdHelp(message) {
-    const embed = new EmbedBuilder()
+    const mainEmbed = new EmbedBuilder()
         .setTitle('🎮 TRUNG TÂM GIẢI TRÍ CASINO')
-        .setDescription('> Vui lòng chọn danh mục lệnh bạn muốn xem bên dưới.')
+        .setDescription('Chào mừng bạn! Vui lòng nhấn nút bên dưới để xem lệnh.\n> *Menu này sẽ tự đóng sau 60 giây.*')
         .setColor('#FFD700');
 
     const row = new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setCustomId('help_economy').setLabel('Tiền & Xu').setStyle(ButtonStyle.Primary).setEmoji('💰'),
-        new ButtonBuilder().setCustomId('help_games').setLabel('Trò Chơi').setStyle(ButtonStyle.Success).setEmoji('🎲'),
-        new ButtonBuilder().setCustomId('help_social').setLabel('Chuyển & Vay').setStyle(ButtonStyle.Secondary).setEmoji('💸')
+        new ButtonBuilder().setCustomId('h_eco').setLabel('Tiền & Xu').setStyle(ButtonStyle.Primary).setEmoji('💰'),
+        new ButtonBuilder().setCustomId('h_game').setLabel('Trò Chơi').setStyle(ButtonStyle.Success).setEmoji('🎲'),
+        new ButtonBuilder().setCustomId('h_bank').setLabel('Chuyển & Vay').setStyle(ButtonStyle.Secondary).setEmoji('💸')
     );
 
-    await message.reply({ embeds: [embed], components: [row] });
-}
-🎮 **Các lệnh Casino Bot**
+    const helpMsg = await message.reply({ embeds: [mainEmbed], components: [row] });
 
-━━━━━━━━━━━━━━━━━━
-💰 **TIỀN & XU**
-• !tien — Xem số tiền và xu hiện có
-• !diemdanh — Điểm danh nhận xu mỗi ngày
+    const filter = i => i.user.id === message.author.id;
+    const collector = helpMsg.createMessageComponentCollector({ filter, time: 60000 });
 
-━━━━━━━━━━━━━━━━━━
-🔄 **ĐỔI XU → TIỀN**
-• !doixu <số_xu>
+    collector.on('collect', async i => {
+        const embed = new EmbedBuilder().setColor('#FFD700');
 
-📊 BẢNG GIÁ ĐỔI XU
-• 100 xu → 50 tiền
-• 200 xu → 150 tiền
-• 500 xu → 450 tiền
-• 1000 xu → 900 tiền
-• Từ 2000 xu trở lên → x0.9
-  (Ví dụ: 2000 xu = 1800 tiền)
+        if (i.customId === 'h_eco') {
+            embed.setTitle('💰 KINH TẾ & BẢNG GIÁ')
+                 .setDescription('• `!tien`: Xem tài sản\n• `!diemdanh`: Nhận xu hàng ngày\n• `!doixu <số xu>`: Đổi xu ➔ tiền\n\n**📊 BẢNG GIÁ ĐỔI:**\n- 100 xu ➔ 50 tiền\n- 500 xu ➔ 450 tiền\n- 1000 xu ➔ 900 tiền\n- >2000 xu ➔ x0.9');
+        } 
+        else if (i.customId === 'h_game') {
+            embed.setTitle('🎲 TRÒ CHƠI CASINO')
+                 .setDescription('• `!taixiu`: Đặt cược bằng nút bấm\n• `!tungxu`: Sấp hoặc ngửa\n• `!baucua`: Cược theo emoji\n• `!boctham`: Thử vận may (200 tiền)\n• `!anxin`: Bốc túi mù nhận xu');
+        } 
+        else if (i.customId === 'h_bank') {
+            embed.setTitle('💸 NGÂN HÀNG & CHUYỂN TIỀN')
+                 .setDescription('• `!chuyentien`: Phí 5% (Cần xác nhận)\n• `!chuyenxu`: Phí 7% (Cần xác nhận)\n• `!vay`: Vay xu lãi 100%-200%\n• `!tralai`: Trả nợ cho bot');
+        }
 
-━━━━━━━━━━━━━━━━━━
-🪙 **TUNG XU**
-• !tungxu <số_xu> ngửa / sấp
-• 50% thắng nhận x2
-• 50% thua mất xu
+        await i.update({ embeds: [embed] });
+    });
 
-━━━━━━━━━━━━━━━━━━
-🎲 **TÀI XỈU**
-• !taixiu <tiền> <chẵn/lẻ/tài/xỉu>
-• Quy tắc theo tổng 3 xí ngầu
-
-━━━━━━━━━━━━━━━━━━
-🦀🐟 **BẦU CUA**
-• !baucua — đặt cược bằng reaction
-• Mỗi reaction = 500 tiền
-• Trúng ăn theo số con xuất hiện
-
-━━━━━━━━━━━━━━━━━━
-🎁 **BỐC THĂM**
-• !boctham — mất 200 tiền
-• 3 lượt mỗi ngày
-
-━━━━━━━━━━━━━━━━━━
-🃏 **XÌ DÁCH**
-• !xidach <số tiền> — tham gia game xì dách
-• Bấm nút Rút / Dừng
-━━━━━━━━━━━━━━━━━━
-🔄 **CHUYỂN TIỀN**
-• !chuyentien @user <số tiền>
-• !chuyenxu @user <số xu>
-━━━━━━━━━━━━━━━━━━
-🥺 **ĂN XIN**
-• !anxin (xu từ bot)
-50% 600+
-50% 600-
-giới hạn từ 1-1000
-━━━━━━━━━━━━━━━━━━
-💸💸 **VAY TIỀN**
-• !vay (xu)
-• mỗi lần vay sẽ lãi 10%
-• tối đa có thể vay 10k xu
-━━━━━━━━━━━━━━━━━━
-💸💸 **TRẢ TIỀN + LÃI**
-• !tralai (xu)
-• nếu như b nợ chưa trả thì sẽ k thể vay thêm
-
-━━━━━━━━━━━━━━━━━━
-⚠️ Một số game có delay xử lý
-━━━━━━━━━━━━━━━━━━
-`;
-    await message.reply(helpText);
+    // Tự động xóa tin nhắn sau 60s để tránh spam
+    collector.on('end', () => {
+        helpMsg.delete().catch(() => {});
+        message.delete().catch(() => {});
+    });
 }
 
 // =====================
@@ -1222,7 +1179,7 @@ giới hạn từ 1-1000
 
 client.on("ready", async () => {
     await initDB();
-    console.log(`Logged in as ${client.user.tag}`);
+    console.log(`✅ Đã kết nối: ${client.user.tag}`);
 });
 
 client.on("messageCreate", async (message) => {
@@ -1236,7 +1193,7 @@ client.on("messageCreate", async (message) => {
             case "diemdanh": await cmdDiemdanh(message); break;
             case "tien": await cmdTien(message); break;
             case "tungxu": await cmdTungxu(message, args); break;
-            case "taixiu": await cmdTaixiu(message, args); break;
+            case "taixiu": await cmdTaixiu(message, args); break; // Đảm bảo đã sửa hàm cmdTaixiu theo bản mới
             case "baucua": await cmdBaucua(message); break;
             case "boctham": await cmdBoctham(message); break;
             case "chuyentien": await cmdChuyentien(message, args); break;
@@ -1245,19 +1202,20 @@ client.on("messageCreate", async (message) => {
             case "anxin": await cmdAnxin(message); break;
             case "vay": await cmdVay(message, args); break;
             case "tralai": await cmdTralai(message, args); break;
-            
-            // Lệnh đổi tiền (Công khai)
-            case "doi": await cmdDoi(message, args); break;
-            case "doixu": await cmdDoixu(message, args); break;
-            case "doitien": await cmdDoitien(message, args); break;
-            
+            case "doixu": 
+            case "doi":
+            case "doitien": 
+                await cmdDoixu(message, args); break;
             case "help": await cmdHelp(message); break;
-            default: message.reply("❌ Lệnh không hợp lệ!"); break;
+            default: 
+                const msg = await message.reply("❌ Lệnh không hợp lệ! Gõ `!help` để xem danh sách.");
+                setTimeout(() => msg.delete().catch(() => {}), 5000); // Tự xóa sau 5s cho sạch
+                break;
         }
     } catch (error) {
         console.error("Lỗi lệnh chat:", error);
     }
-}); // <--- ĐÂY LÀ DẤU QUAN TRỌNG BẠN BỊ THIẾU
+});
 
 // -------------------- BOT LOGIN --------------------
 client.login(process.env.TOKEN);
