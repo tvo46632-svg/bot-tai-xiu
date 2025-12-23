@@ -185,88 +185,92 @@ async function cmdTien(message) {
     message.reply(replyText); // Chỉ gọi 1 lần
 }
 
-// -------------------- ĐỔI XU → TIỀN --------------------
+// =====================
+// =====================
+// 1. ĐỔI XU → TIỀN (Chờ 4s)
+// =====================
 async function cmdDoixu(message, args) {
-    if (args.length < 2) {
-        message.reply("❗ Cách dùng: !doi <số_xu> xu hoặc !doi <số_tiền> tien");
-        return;
+    if (args.length < 1) {
+        return message.reply("❗ Cách dùng: !doixu <số_xu>");
     }
 
-    const amount = parseInt(args[0]);
-    const unit = args[1].toLowerCase(); // xu hoặc tien
-
-    // Kiểm tra số xu hoặc tiền hợp lệ
-    if (isNaN(amount) || amount <= 0) {
-        message.reply("❌ Số lượng không hợp lệ!");
-        return;
+    const xuAmount = parseInt(args[0]);
+    if (isNaN(xuAmount) || xuAmount <= 0) {
+        return message.reply("❌ Số xu không hợp lệ!");
     }
 
     const user = await getUser(message.author.id);
-
-    if (unit === "xu" || unit === "x") {
-        // Đổi xu ra tiền
-        if (user.xu < amount) {
-            message.reply("❌ Bạn không đủ xu!");
-            return;
-        }
-
-        let moneyOut = 0;
-
-        if (amount === 100) moneyOut = 50;
-        else if (amount === 200) moneyOut = 150;
-        else if (amount === 500) moneyOut = 450;
-        else if (amount === 1000) moneyOut = 900;
-        else if (amount >= 2000 && amount <= 5000) moneyOut = Math.floor(amount * 0.8);  // Phí 20%
-        else if (amount >= 10000) moneyOut = Math.floor(amount * 0.65);  // Phí 35%
-        else {
-            message.reply("❗ Không hỗ trợ số xu này!");
-            return;
-        }
-
-        // Thêm hoạt ảnh đổi tiền
-        const exchangeMessage = await message.reply("🔄 Đang đổi... vui lòng đợi 4 giây...");
-        await subXu(message.author.id, amount);
-        await addMoney(message.author.id, moneyOut);
-
-        // Sau 4 giây, xóa thông báo hoạt ảnh và gửi kết quả
-        setTimeout(() => {
-            exchangeMessage.edit(`🔁 Bạn đã đổi **${amount} xu → ${moneyOut} tiền** thành công!`);
-        }, 4000); // Đợi 4 giây
-
-    } else if (unit === "tien" || unit === "t") {
-        // Đổi tiền ra xu
-        if (user.money < amount) {
-            message.reply("❌ Bạn không đủ tiền!");
-            return;
-        }
-
-        let xuOut = 0;
-
-        if (amount === 100) xuOut = 50;
-        else if (amount === 200) xuOut = 150;
-        else if (amount === 500) xuOut = 450;
-        else if (amount === 1000) xuOut = 900;
-        else if (amount >= 2000) xuOut = Math.floor(amount * 1.1);  // Tăng thêm 10% tiền
-        else {
-            message.reply("❗ Không hỗ trợ số tiền này!");
-            return;
-        }
-
-        // Thêm hoạt ảnh đổi xu
-        const exchangeMessage = await message.reply("🔄 Đang đổi... vui lòng đợi 4 giây...");
-        await subMoney(message.author.id, amount);
-        await addXu(message.author.id, xuOut);
-
-        // Sau 4 giây, xóa thông báo hoạt ảnh và gửi kết quả
-        setTimeout(() => {
-            exchangeMessage.edit(`🔁 Bạn đã đổi **${amount} tiền → ${xuOut} xu** thành công!`);
-        }, 4000); // Đợi 4 giây
-
-    } else {
-        message.reply("❗ Cách dùng: !doi <số_xu> xu hoặc !doi <số_tiền> tien");
+    if (user.xu < xuAmount) {
+        return message.reply("❌ Bạn không đủ xu!");
     }
+
+    let moneyOut = 0;
+    // Logic tính toán tiền nhận được
+    if (xuAmount === 100) moneyOut = 50;
+    else if (xuAmount === 200) moneyOut = 150;
+    else if (xuAmount === 500) moneyOut = 450;
+    else if (xuAmount === 1000) moneyOut = 900;
+    else if (xuAmount >= 2000) moneyOut = Math.floor(xuAmount * 0.9);
+    else {
+        return message.reply("❗ Chỉ hỗ trợ đổi: 100, 200, 500, 1000 hoặc trên 2000 xu!");
+    }
+
+    // Gửi thông báo bắt đầu
+    const msg = await message.reply("⏳ Đang xử lý: **XU ➔ TIỀN**... [0%]");
+    
+    // Tạo hiệu ứng chạy % ảo cho vui mắt (Tổng 4 giây)
+    await sleep(2000);
+    await msg.edit("⏳ Đang chuyển đổi dữ liệu... [50%]");
+    await sleep(2000);
+
+    // Thực hiện trừ xu cộng tiền trong Database
+    await subXu(message.author.id, xuAmount);
+    await addMoney(message.author.id, moneyOut);
+
+    // Hoàn tất
+    await msg.edit(
+        `✅ **GIAO DỊCH HOÀN TẤT**\n🔁 Đã đổi: **${xuAmount.toLocaleString()} xu**\n💰 Nhận: **${moneyOut.toLocaleString()} tiền**`
+    );
 }
 
+// =====================
+// 2. ĐỔI TIỀN → XU (Chờ 3s)
+// =====================
+async function cmdDoitien(message, args) {
+    if (args.length < 1) {
+        return message.reply("❗ Cách dùng: !doitien <số_tiền>");
+    }
+
+    const moneyAmount = parseInt(args[0]);
+    if (isNaN(moneyAmount) || moneyAmount <= 0) {
+        return message.reply("❌ Số tiền không hợp lệ!");
+    }
+
+    const user = await getUser(message.author.id);
+    if (user.money < moneyAmount) {
+        return message.reply("❌ Bạn không đủ tiền!");
+    }
+
+    // Giả sử tỉ lệ đổi ngược lại là 1:1 (hoặc tùy bạn chỉnh)
+    const xuOut = moneyAmount;
+
+    // Gửi thông báo bắt đầu
+    const msg = await message.reply("⏳ Đang xử lý: **TIỀN ➔ XU**... [0%]");
+    
+    // Hiệu ứng chờ 3 giây
+    await sleep(1500);
+    await msg.edit("⏳ Đang nạp xu vào tài khoản... [60%]");
+    await sleep(1500);
+
+    // Thực hiện trừ tiền cộng xu trong Database
+    await subMoney(message.author.id, moneyAmount);
+    await addXu(message.author.id, xuOut);
+
+    // Hoàn tất
+    await msg.edit(
+        `✅ **GIAO DỊCH HOÀN TẤT**\n🔁 Đã đổi: **${moneyAmount.toLocaleString()} tiền**\n💎 Nhận: **${xuOut.toLocaleString()} xu**`
+    );
+}
 // =====================
 // TUNG XU (v2 cải tiến) với hoạt ảnh
 // =====================
@@ -909,9 +913,7 @@ async function cmdHelp(message) {
 
 ━━━━━━━━━━━━━━━━━━
 🔄 **ĐỔI XU → TIỀN**
-• !doi <số> xu
-• !doi <số> tiền
-
+• !doixu <số_xu>
 
 📊 BẢNG GIÁ ĐỔI XU
 • 100 xu → 50 tiền
@@ -937,8 +939,6 @@ async function cmdHelp(message) {
 • !baucua — đặt cược bằng reaction
 • Mỗi reaction = 500 tiền
 • Trúng ăn theo số con xuất hiện
-• Mỗi người có thể đặt 2 con / 1 bàn 
-• Nếu đặt quá 2 con sẽ hủy bàn ( trừ tiền - tránh spam )
 
 ━━━━━━━━━━━━━━━━━━
 🎁 **BỐC THĂM**
@@ -976,72 +976,40 @@ giới hạn từ 1-1000
     await message.reply(helpText);
 }
 
- // -------------------- MAIN EVENTS --------------------
-client.on("messageCreate", async (message) => {
-    if (message.author.bot) return;  // Đảm bảo không xử lý tin nhắn từ bot
+// =====================
+//      MAIN EVENTS
+// =====================
 
-    const PREFIX = "!";  // Tiền tố lệnh
-    if (!message.content.startsWith(PREFIX)) return;  // Kiểm tra nếu không phải lệnh
-
-    const args = message.content.slice(PREFIX.length).trim().split(/ +/);  // Tách các đối số của lệnh
-    const cmd = args.length > 0 ? args.shift().toLowerCase() : "";  // Lấy lệnh, chuyển thành chữ thường
-
-    try {
-        // Xử lý các lệnh
-        switch (cmd) {
-            case "diemdanh":
-                await cmdDiemdanh(message);
-                break;
-            case "tien":
-                await cmdTien(message);
-                break;
-            case "doixu":
-                await cmdDoixu(message, args);
-                break;
-            case "tungxu":
-                await cmdTungxu(message, args);
-                break;
-            case "taixiu":
-                await cmdTaixiu(message, args);
-                break;
-            case "baucua":
-                await cmdBaucua(message);
-                break;
-            case "boctham":
-                await cmdBoctham(message);
-                break;
-            case "chuyentien":
-                await cmdChuyentien(message, args);
-                break;
-            case "chuyenxu":
-                await cmdChuyenxu(message, args);
-                break;
-            case "xidach":
-                await cmdXidach(message, args);
-                break;
-            case "anxin":
-                await cmdAnxin(message);
-                break;
-            case "vay":
-                await cmdVay(message, args);
-                break;
-            case "tralai":
-                await cmdTralai(message, args);
-                break;
-            case "help":
-                await cmdHelp(message);
-                break;
-            default:
-                message.reply("❌ Lệnh không hợp lệ! Cú pháp đúng là: !<lệnh> <tham số>");
-                break;
-        }
-    } catch (error) {
-        console.error("Lỗi khi xử lý lệnh:", error);
-        message.reply("❌ Đã có lỗi xảy ra, vui lòng thử lại sau!");
-    }
+client.on("ready", async () => {
+    await initDB();
+    console.log(`Logged in as ${client.user.tag}`);
 });
 
-console.log('Bot đang chạy và xử lý lệnh...');
+client.on("messageCreate", async (message) => {
+    if (message.author.bot) return;
+    if (!message.content.startsWith(PREFIX)) return;
+
+    const args = message.content.slice(PREFIX.length).trim().split(/ +/);
+    const cmd = args.shift().toLowerCase();
+
+    switch (cmd) {
+        case "diemdanh": await cmdDiemdanh(message); break;
+        case "tien": await cmdTien(message); break;
+        case "doixu": await cmdDoixu(message,args); break;
+        case "tungxu": await cmdTungxu(message,args); break;
+        case "taixiu": await cmdTaixiu(message,args); break;
+        case "baucua": await cmdBaucua(message); break;
+        case "boctham": await cmdBoctham(message); break;
+        case "chuyentien": await cmdChuyentien(message,args); break;
+        case "chuyenxu": await cmdChuyenxu(message,args); break;
+        case "xidach": await cmdXidach(message,args); break;
+        case "anxin": await cmdAnxin(message); break;
+        case "vay": await cmdVay(message, args); break;
+        case "tralai": await cmdTralai(message, args); break;
+        case "help": await cmdHelp(message); break;
+        default: message.reply("❌ Lệnh không hợp lệ!");
+    }
+});
 
 // -------------------- BOT LOGIN --------------------
 client.login(process.env.TOKEN);
