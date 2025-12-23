@@ -287,6 +287,12 @@ async function cmdDoixu(message, args) {
 
     message.reply("❗ Cách dùng: !doixu <số_xu> hoặc !doixu <số_tiền>");
 }
+
+// Hàm cập nhật thời gian giao dịch cuối cùng của người dùng
+async function updateUserLastExchange(userId, time) {
+    // Cập nhật thời gian giao dịch cuối cùng của người dùng vào cơ sở dữ liệu
+    await setUser(userId, { lastExchange: time });
+}
 // =====================
 // TUNG XU (v2 cải tiến) với hoạt ảnh
 // =====================
