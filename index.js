@@ -286,27 +286,6 @@ async function cmdDoitien(message, args) {
     if (args.length < 1) return message.reply("❗ Cách dùng: `!doitien <số_tiền>`");
     await handleExchange(message, parseInt(args[0]), "tien");
 }
-
-
-// =====================
-// CÁC HÀM GỌI LỆNH
-// =====================
-async function cmdDoi(message, args) {
-    if (args.length < 2) return message.reply("❗ Cách dùng: `!doi <số_lượng> <xu/tiền>`");
-    await handleExchange(message, parseInt(args[0]), args[1].toLowerCase());
-}
-
-async function cmdDoixu(message, args) {
-    if (args.length < 1) return message.reply("❗ Cách dùng: `!doixu <số_xu>`");
-    await handleExchange(message, parseInt(args[0]), "xu");
-}
-
-async function cmdDoitien(message, args) {
-    if (args.length < 1) return message.reply("❗ Cách dùng: `!doitien <số_tiền>`");
-    await handleExchange(message, parseInt(args[0]), "tien");
-}
-// ... (Các khai báo require và SlashCommandBuilder bạn đã có)
-
 // 1. Khai báo lệnh Slash
 const doiCommand = new SlashCommandBuilder()
     .setName('doi')
