@@ -13,23 +13,6 @@ const {
     ButtonStyle
 } = require("discord.js");
 const { SlashCommandBuilder } = require('discord.js');
-
-const doiCommand = new SlashCommandBuilder()
-    .setName('doi')
-    .setDescription('Đổi Xu/Tiền ở chế độ ẩn (Chỉ bạn thấy)')
-    .addIntegerOption(option => 
-        option.setName('amount')
-            .setDescription('Số lượng muốn đổi')
-            .setRequired(true))
-    .addStringOption(option =>
-        option.setName('type')
-            .setDescription('Loại đơn vị muốn đổi')
-            .setRequired(true)
-            .addChoices(
-                { name: 'Xu sang Tiền', value: 'xu' },
-                { name: 'Tiền sang Xu', value: 'tien' }
-            ));
-
 const { Low, JSONFile } = require("lowdb");
 const path = require("path");
 
