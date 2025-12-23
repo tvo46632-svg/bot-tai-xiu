@@ -350,6 +350,9 @@ client.on("interactionCreate", async (interaction) => {
     }
 });
 // =====================
+//      TUNG XU
+// =====================
+
 async function cmdTungxu(message, args) {
     if (args.length < 2) {
         return message.reply("### ❗ Cách dùng: `!tungxu <số_xu> <n/s>`");
@@ -791,6 +794,16 @@ async function cmdChuyentien(message, args) {
 
 // ===================== CHUYỂN XU =====================
 async function cmdChuyenxu(message, args) {
+    const userDebt = await getUserDebt(message.author.id) || 0;
+    if (userDebt > 0) {
+        return message.reply(`### 🚫 Giao dịch bị khóa\n> Bạn không thể chuyển xu khi đang mang nợ (**${userDebt.toLocaleString()} xu**).`);
+    }
+async function cmdChuyentien(message, args) {
+    const userDebt = await getUserDebt(message.author.id) || 0;
+    if (userDebt > 0) {
+        return message.reply(`### 🚫 Giao dịch bị khóa\n> Bạn đang nợ bot **${userDebt.toLocaleString()} xu**. Hãy dùng lệnh \`!tralai\` để trả nợ trước khi chuyển tiền cho người khác!`);
+    }
+async function cmdChuyenxu(message, args) {
     const target = message.mentions.users.first();
     const amount = parseInt(args[1]);
 
@@ -939,45 +952,55 @@ client.on("interactionCreate", async (interaction)=>{
         blackjackSession[channelId]=null;
     }
 });
+
 // =====================
-//      ĂN XIN BOT (GIỚI HẠN 2 LẦN / NGÀY)
+//      ĂN XIN (BỐC TÚI MÙ)
 // =====================
 async function cmdAnxin(message) {
     const userId = message.author.id;
     await db.read();
 
-    // Khởi tạo data ăn xin nếu chưa có
     db.data.anxin ||= {};
     db.data.anxin[userId] ||= { lastDate: "", count: 0 };
 
     const info = db.data.anxin[userId];
     const today = new Date().toISOString().slice(0, 10);
 
-    // Nếu ngày khác hôm trước, reset lượt
     if (info.lastDate !== today) {
         info.lastDate = today;
         info.count = 2;
     }
 
-    if (info.count <= 0) {
-        message.reply("❌ Bạn đã dùng hết 2 lần ăn xin hôm nay!");
-        return;
-    }
+    if (info.count <= 0) return message.reply("> ❌ Bạn đã dùng hết 2 lượt ăn xin hôm nay!");
 
-    const user = await getUser(userId);
-
-    // Xác suất: 50% → 600 xu, 50% → 200-599 xu
+    // 1. Tính toán phần thưởng trước
     const rand = Math.random();
     let reward = 0;
     if (rand < 0.5) reward = 600;
     else reward = Math.floor(Math.random() * (599 - 200 + 1)) + 200;
 
-    await addXu(userId, reward);
+    // Phân loại vật phẩm
+    const isRare = reward >= 600;
+    const item = isRare 
+        ? { name: "NGỌC LỤC BẢO", emoji: "💚", box: "🎁" } 
+        : { name: "MẢNH SẮT VỤN", emoji: "⚪", box: "📦" };
 
+    // 2. Animation bốc túi mù
+    const msg = await message.reply("### 🛍️ Đang bốc túi mù...");
+    
+    const frames = ["📦", "🎁", "📦", "✨"];
+    for (let f of frames) {
+        await new Promise(res => setTimeout(res, 400));
+        await msg.edit(`### 🛍️ Đang xé túi mù... ${f}`);
+    }
+
+    // 3. Cập nhật Database
+    await addXu(userId, reward);
     info.count--;
     await db.write();
 
-    message.reply(`🪙 Bạn xin được ${reward} xu từ bot! Lượt còn lại hôm nay: ${info.count}`);
+    // 4. Kết quả cuối cùng
+    return await msg.edit(`### ${item.box} TÚI MÙ: ${item.name} ${item.emoji}\n> 💰 Bạn xin được: **${reward.toLocaleString()} xu**\n> 🎫 Lượt còn lại: \`${info.count}\``);
 }
 // =====================
 //        VAY XU
@@ -987,22 +1010,19 @@ async function cmdVay(message, args) {
     let currentCoins = await getUserCoins(userId) || 0;
     let userDebt = await getUserDebt(userId) || 0;
 
+    // Kiểm tra nợ cũ
     if (userDebt > 0) {
-        return message.reply(
-            `❌ Bạn vẫn đang nợ bot **${userDebt} xu**, bạn phải trả hết mới có thể vay tiếp!`
-        );
+        return message.reply(`### ❌ Thông báo nợ\n> Bạn đang nợ **${userDebt.toLocaleString()} xu**. Phải trả hết mới có thể vay tiếp!`);
     }
 
     const maxLoan = 10000;
-    const interest = 0.1;
+    const interest = 1.0; // Lãi suất 100%
     let loanAmount = args[0] ? parseInt(args[0]) : maxLoan;
 
-    if (isNaN(loanAmount) || loanAmount <= 0) {
-        return message.reply("❌ Vui lòng nhập số xu hợp lệ để vay!");
-    }
-
+    if (isNaN(loanAmount) || loanAmount <= 0) return message.reply("> ❌ Vui lòng nhập số xu hợp lệ!");
     if (loanAmount > maxLoan) loanAmount = maxLoan;
 
+    // Tính tổng nợ (Gốc + Lãi 100% = Gốc * 2)
     const totalOwed = Math.floor(loanAmount * (1 + interest));
 
     currentCoins += loanAmount;
@@ -1011,13 +1031,8 @@ async function cmdVay(message, args) {
     await setUserCoins(userId, currentCoins);
     await setUserDebt(userId, userDebt);
 
-    message.reply(
-        `✅ Bạn đã vay **${loanAmount} xu**.\n` +
-        `💰 Bạn sẽ phải trả lại **${totalOwed} xu** (bao gồm 10% lãi).\n` +
-        `Hiện tại bạn có **${currentCoins} xu**, nợ hiện tại: **${userDebt} xu**.`
-    );
-} // <- Đóng cmdVay ở đây
-
+    return message.reply(`### ✅ Vay vốn thành công\n> 💰 Nhận: **+${loanAmount.toLocaleString()} xu**\n> 💸 Tổng nợ phải trả: **${totalOwed.toLocaleString()} xu** (Lãi 100%)\n> 🏦 Số dư hiện tại: \`${currentCoins.toLocaleString()}\``);
+}
 // =====================
 //        TRẢ LÃI + NỢ
 // =====================
