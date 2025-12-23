@@ -294,7 +294,6 @@ async function updateUserLastExchange(userId, time) {
     } catch (error) {
         console.error("Lỗi khi cập nhật thời gian giao dịch cuối cùng:", error);
     }
-}
 
 // Hàm cập nhật thời gian giao dịch cuối cùng của người dùng
 async function updateUserLastExchange(userId, time) {
