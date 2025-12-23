@@ -238,38 +238,91 @@ async function cmdDoixu(message, args) {
 // =====================
 // ĐỔI TIỀN ➔ XU (Chờ 3s)
 // =====================
-async function cmdDoitien(message, args) {
-    try {
-        if (args.length < 1) return message.reply("❗ Cách dùng: !doitien <số_tiền>");
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-        const moneyAmount = parseInt(args[0]);
-        if (isNaN(moneyAmount) || moneyAmount <= 0) return message.reply("❌ Số tiền không hợp lệ!");
+async function cmdDoi(message, args) {
+    try {
+        // 1. Kiểm tra cú pháp: !doi 2000 xu hoặc !doi 2000 tiền
+        if (args.length < 2) {
+            return message.reply("❗ Cách dùng: `!doi <số_lượng> <xu/tiền>`\nVí dụ: `!doi 5000 xu` hoặc `!doi 2000 tiền` ");
+        }
+
+        const amount = parseInt(args[0]);
+        const type = args[1].toLowerCase(); // 'xu' hoặc 'tien' (hoặc 'tiền')
+
+        if (isNaN(amount) || amount <= 0) {
+            return message.reply("❌ Số lượng không hợp lệ!");
+        }
 
         const user = await getUser(message.author.id);
-        if (!user || user.money < moneyAmount) return message.reply("❌ Bạn không đủ tiền!");
+        if (!user) return message.reply("❌ Không tìm thấy dữ liệu người dùng!");
 
-        // Giả sử tỉ lệ 1:1
-        const xuOut = moneyAmount;
+        // ==========================================
+        // TRƯỜNG HỢP 1: ĐỔI XU ➔ TIỀN (Chờ 4s)
+        // ==========================================
+        if (type === "xu") {
+            if (user.xu < amount) return message.reply(`❌ Bạn không đủ xu (Hiện có: ${user.xu.toLocaleString()})`);
 
-        const msg = await message.reply("⏳ Đang khởi tạo giao dịch...");
+            let phi = 0;
+            if (amount < 5000) phi = 0;           // Dưới 5000: phí 0%
+            else if (amount < 20000) phi = 0.20; // 5000 - 19999: phí 20%
+            else phi = 0.35;                     // Trên 20000: phí 35%
 
-        // Hoạt ảnh 3 giây
-        await sleep(1000);
-        await msg.edit("⏳ Đang kết nối ngân hàng... [30%]");
-        await sleep(1000);
-        await msg.edit("⏳ Đang quy đổi Tiền ➔ Xu... [60%]");
-        await sleep(1000);
-        await msg.edit("⏳ Đang nạp xu... [90%]");
+            const moneyOut = Math.floor(amount * (1 - phi));
+            const phiPhanTram = phi * 100;
 
-        // THỰC HIỆN TRỪ/CỘNG TRONG DATABASE
-        await subMoney(message.author.id, moneyAmount);
-        await addXu(message.author.id, xuOut);
+            const msg = await message.reply(`⏳ Đang xử lý: **Xu ➔ Tiền** (Phí ${phiPhanTram}%)...`);
+            
+            // Hoạt ảnh 4 giây
+            await sleep(2000);
+            await msg.edit("⏳ Đang tính toán phí giao dịch... [50%]");
+            await sleep(2000);
 
-        return await msg.edit(`✅ **GIAO DỊCH THÀNH CÔNG**\n🔁 Đã đổi: **${moneyAmount.toLocaleString()} tiền**\n💎 Nhận: **${xuOut.toLocaleString()} xu**`);
+            // Database
+            await subXu(message.author.id, amount);
+            await addMoney(message.author.id, moneyOut);
+
+            return await msg.edit(
+                `✅ **GIAO DỊCH XU ➔ TIỀN THÀNH CÔNG**\n` +
+                `🔹 Đã đổi: **${amount.toLocaleString()} xu**\n` +
+                `🔸 Phí: **${phiPhanTram}%**\n` +
+                `💰 Nhận được: **${moneyOut.toLocaleString()} tiền**`
+            );
+        }
+
+        // ==========================================
+        // TRƯỜNG HỢP 2: ĐỔI TIỀN ➔ XU (Chờ 3s)
+        // ==========================================
+        else if (type === "tien" || type === "tiền") {
+            if (user.money < amount) return message.reply(`❌ Bạn không đủ tiền (Hiện có: ${user.money.toLocaleString()})`);
+
+            const xuOut = amount; // Tỷ lệ 1:1 cho tiền qua xu
+
+            const msg = await message.reply("⏳ Đang xử lý: **Tiền ➔ Xu** (Phí 0%)...");
+
+            // Hoạt ảnh 3 giây
+            await sleep(1500);
+            await msg.edit("⏳ Đang chuyển tiền vào hệ thống... [60%]");
+            await sleep(1500);
+
+            // Database
+            await subMoney(message.author.id, amount);
+            await addXu(message.author.id, xuOut);
+
+            return await msg.edit(
+                `✅ **GIAO DỊCH TIỀN ➔ XU THÀNH CÔNG**\n` +
+                `🔹 Đã đổi: **${amount.toLocaleString()} tiền**\n` +
+                `💎 Nhận được: **${xuOut.toLocaleString()} xu**`
+            );
+        } 
+        
+        else {
+            return message.reply("❌ Loại đơn vị không hợp lệ! Hãy nhập 'xu' hoặc 'tiền'.");
+        }
 
     } catch (error) {
         console.error(error);
-        return message.reply("❌ Có lỗi xảy ra trong quá trình xử lý: " + error.message);
+        return message.reply("❌ Lỗi hệ thống: " + error.message);
     }
 }
 // =====================
