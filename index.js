@@ -261,7 +261,7 @@ async function handleExchange(message, amountInput, typeInput) {
             return msg.edit(`✅ **ĐỔI THÀNH CÔNG**\n➖ Trừ: **${amount.toLocaleString()} Xu**\n➕ Nhận: **${moneyOut.toLocaleString()} Tiền**`);
         }
 
-        // ======================================
+       // ======================================
         // TRƯỜNG HỢP 2: ĐỔI TIỀN -> XU (THUẾ 10%)
         // ======================================
         else if (["tien", "tiền", "money", "vnd"].includes(type)) {
@@ -271,17 +271,17 @@ async function handleExchange(message, amountInput, typeInput) {
 
             // --- TÍNH THUẾ 10% ---
             let thue = 0.10; 
-            // Số Xu thực nhận sau khi trừ 10% thuế
             const xuOut = Math.floor(amount * (1 - thue));
 
             const msg = await message.reply(`⏳ Đang đổi **${amount.toLocaleString()} Tiền** sang Xu... (Thuế 10%)`);
 
             // --- CẬP NHẬT DATABASE ---
-            await subMoney(message.author.id, amount); // Trừ đủ số tiền người dùng nhập
-            await addXu(message.author.id, xuOut);     // Chỉ cộng số Xu sau thuế
+            // Sửa subMoney thành addMoney với số âm để tránh lỗi "is not defined"
+            await addMoney(message.author.id, -amount); 
+            await addXu(message.author.id, xuOut);     
 
             return msg.edit(`✅ **ĐỔI THÀNH CÔNG**\n➖ Trừ: **${amount.toLocaleString()} Tiền**\n➕ Nhận: **${xuOut.toLocaleString()} Xu** (Đã trừ 10% thuế)`);
-        }}
+        } // <--- CHỈ DÙNG 1 DẤU NGOẶC Ở ĐÂY
         
         // ======================================
         // TRƯỜNG HỢP 3: KHÔNG HIỂU LỆNH
