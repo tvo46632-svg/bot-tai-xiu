@@ -1125,7 +1125,7 @@ async function cmdHelp(message) {
         if (i.customId === 'h_eco') {
             embed.setTitle('💰 KINH TẾ ').setDescription('• `!tien`: Xem số dư\n• `!diemdanh`: Nhận lương\n• `!chuyentien`: Chuyển tiền - xu - tien');
         } else if (i.customId === 'h_game') {
-            embed.setTitle('🎲 TRÒ CHƠI').setDescription('• `!baucua`, `!taixiu`, `!tungxu`, `!anxin`, `!boctham`');
+            embed.setTitle('🎲 TRÒ CHƠI').setDescription('• `!baucua`, `!taixiu`, `!xidach`, `!tungxu`, `!anxin`, `!boctham`');
         } else if (i.customId === 'h_bank') {
             embed.setTitle('🏦 NGÂN HÀNG').addFields(
                 { name: '💸 Vay Nợ', value: '`!vay <số>`: Vay 1 trả 2.' },
@@ -1158,6 +1158,7 @@ client.on("messageCreate", async (message) => {
             case "doitien": await handleExchange(message, args[0], "tien"); break;
             case "boctham": await cmdBoctham(message);  break;
             case "anxin": await cmdAnxin(message); break;
+            case "xidach": await cmdXidach(message, args); break;
                 
             case "addmoney": 
             case "reset": 
