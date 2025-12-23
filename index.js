@@ -188,31 +188,16 @@ async function cmdTien(message) {
 // =====================
 // ĐỔI XU <=> TIỀN
 // =====================
-async function cmdDoixu(message, args) {
-    if (args.length < 1) {
-        message.reply("❗ Cách dùng: !doixu <số_xu> hoặc !doixu <số_tiền>");
+async function cmdDoi(message, args) {
+    if (args.length < 2) {
+        message.reply("❗ Cách dùng: !doi <số_xu> xu hoặc !doi <số_tiền> tien");
         return;
     }
 
-    console.log('Đang thực hiện lệnh doixu...'); // Kiểm tra xem bot có nhận lệnh không
+    console.log('Đang thực hiện lệnh doi...'); // Kiểm tra xem bot có nhận lệnh không
 
-    const inputAmount = args[0].trim();
-    let amount;
-    let isXu = false;
-    let isTien = false;
-
-    // Kiểm tra nếu người dùng chỉ nhập số
-    if (inputAmount.endsWith('xu')) {
-        isXu = true;
-        amount = parseInt(inputAmount.replace('xu', '').trim());
-    } else if (inputAmount.endsWith('tiền')) {
-        isTien = true;
-        amount = parseInt(inputAmount.replace('tiền', '').trim());
-    } else {
-        // Nếu người dùng không nhập rõ "xu" hoặc "tiền", yêu cầu họ làm rõ
-        message.reply("❗ Bạn cần nhập rõ đơn vị: `xu` hoặc `tiền`. Ví dụ: `!doixu 2000xu` hoặc `!doixu 2000tiền`");
-        return;
-    }
+    const amount = parseInt(args[0]);
+    const unit = args[1].toLowerCase(); // Lấy đơn vị từ đối số thứ hai (xu hoặc tien)
 
     if (isNaN(amount) || amount <= 0) {
         message.reply("❌ Số lượng không hợp lệ!");
@@ -235,7 +220,8 @@ async function cmdDoixu(message, args) {
     // Hiển thị hoạt ảnh đang đổi (3 chấm hoặc biểu tượng)
     const exchangeMessage = await message.reply("🔄 Đang đổi... vui lòng đợi 4 giây...");
 
-    if (isXu) {
+    // Kiểm tra nếu người dùng muốn đổi xu ra tiền
+    if (unit === 'xu' || unit === 'x') {
         // Đổi xu ra tiền
         if (user.xu < amount) {
             message.reply("❌ Bạn không đủ xu!");
@@ -266,7 +252,8 @@ async function cmdDoixu(message, args) {
         return;
     }
 
-    if (isTien) {
+    // Kiểm tra nếu người dùng muốn đổi tiền ra xu
+    if (unit === 'tien' || unit === 't') {
         // Đổi tiền ra xu
         if (user.money < amount) {
             message.reply("❌ Bạn không đủ tiền!");
@@ -295,7 +282,18 @@ async function cmdDoixu(message, args) {
         return;
     }
 
-    message.reply("❗ Cách dùng: !doixu <số_xu> hoặc !doixu <số_tiền>");
+    message.reply("❗ Cách dùng: !doi <số_xu> xu hoặc !doi <số_tiền> tien");
+}
+
+// Hàm cập nhật thời gian giao dịch cuối cùng của người dùng
+async function updateUserLastExchange(userId, time) {
+    try {
+        const user = await getUser(userId);
+        user.lastExchange = time;
+        await db.write();
+    } catch (error) {
+        console.error("Lỗi khi cập nhật thời gian giao dịch cuối cùng:", error);
+    }
 }
 
 // Hàm cập nhật thời gian giao dịch cuối cùng của người dùng
