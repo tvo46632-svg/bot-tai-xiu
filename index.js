@@ -206,13 +206,6 @@ async function cmdTien(message) {
 // 1. Phải đảm bảo có hàm tạo độ trễ này
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-// =====================
-Lỗi SyntaxError: await is only valid in async functions xảy ra vì trong file của bạn đang có một đoạn code "mồ côi" (thường là do dán đè hoặc thừa dấu đóng ngoặc }) khiến cho lệnh await nằm ngoài hàm async.
-
-Dựa trên đoạn code bạn gửi, đây là bản vệ sinh sạch sẽ 100%. Bạn hãy xóa toàn bộ code cũ liên quan đến đổi tiền và dán đúng khối này vào:
-
-JavaScript
-
 // ==========================================
 // HÀM XỬ LÝ CHÍNH (Đã sửa lỗi ngoặc)
 // ==========================================
@@ -277,6 +270,23 @@ async function handleExchange(message, amount, type) {
     }
 } // <--- KẾT THÚC HÀMhandleExchange
 
+// ==========================================
+// CÁC HÀM ĐIỀU HƯỚNG (Bắt buộc phải có)
+// ==========================================
+async function cmdDoi(message, args) {
+    if (args.length < 2) return message.reply("❗ Cách dùng: `!doi <số_lượng> <xu/tiền>`");
+    await handleExchange(message, parseInt(args[0]), args[1].toLowerCase());
+}
+
+async function cmdDoixu(message, args) {
+    if (args.length < 1) return message.reply("❗ Cách dùng: `!doixu <số_xu>`");
+    await handleExchange(message, parseInt(args[0]), "xu");
+}
+
+async function cmdDoitien(message, args) {
+    if (args.length < 1) return message.reply("❗ Cách dùng: `!doitien <số_tiền>`");
+    await handleExchange(message, parseInt(args[0]), "tien");
+}
 // ==========================================
 // CÁC HÀM ĐIỀU HƯỚNG (Bắt buộc phải có)
 // ==========================================
