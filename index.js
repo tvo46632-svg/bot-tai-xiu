@@ -215,7 +215,7 @@ async function cmdDoixu(message, args) {
 
     // Kiểm tra nếu người dùng muốn đổi xu ra tiền
     if (args[0].endsWith('xu')) {
-        const xuAmount = parseInt(args[0].replace('xu', ''));
+        const xuAmount = parseInt(args[0].replace('xu', '').trim());
 
         if (isNaN(xuAmount) || xuAmount <= 0) {
             message.reply("❌ Số xu không hợp lệ!");
@@ -253,7 +253,7 @@ async function cmdDoixu(message, args) {
 
     // Kiểm tra nếu người dùng muốn đổi tiền ra xu
     if (args[0].endsWith('tiền')) {
-        const moneyAmount = parseInt(args[0].replace('tiền', ''));
+        const moneyAmount = parseInt(args[0].replace('tiền', '').trim());
 
         if (isNaN(moneyAmount) || moneyAmount <= 0) {
             message.reply("❌ Số tiền không hợp lệ!");
@@ -288,6 +288,17 @@ async function cmdDoixu(message, args) {
     }
 
     message.reply("❗ Cách dùng: !doixu <số_xu> hoặc !doixu <số_tiền>");
+}
+
+// Hàm cập nhật thời gian giao dịch cuối cùng của người dùng
+async function updateUserLastExchange(userId, time) {
+    try {
+        const user = await getUser(userId);
+        user.lastExchange = time;
+        await db.write();
+    } catch (error) {
+        console.error("Lỗi khi cập nhật thời gian giao dịch cuối cùng:", error);
+    }
 }
 // =====================
 // TUNG XU (v2 cải tiến) với hoạt ảnh
