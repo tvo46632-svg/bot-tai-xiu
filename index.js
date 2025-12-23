@@ -239,6 +239,24 @@ async function handleExchange(message, amount, type) {
         return message.reply("❌ Lỗi xử lý: " + e.message);
     }
 }
+async function cmdDoi(message, args) {
+    if (args.length < 2) return message.reply("❗ Cách dùng: `!doi <số_lượng> <xu/tiền>`\nVí dụ: `!doi 5000 xu` hoặc `!doi 1000 tiền` ");
+    const amount = parseInt(args[0]);
+    const type = args[1].toLowerCase();
+    await handleExchange(message, amount, type);
+}
+
+async function cmdDoixu(message, args) {
+    if (args.length < 1) return message.reply("❗ Cách dùng: `!doixu <số_xu>`");
+    const amount = parseInt(args[0]);
+    await handleExchange(message, amount, "xu");
+}
+
+async function cmdDoitien(message, args) {
+    if (args.length < 1) return message.reply("❗ Cách dùng: `!doitien <số_tiền>`");
+    const amount = parseInt(args[0]);
+    await handleExchange(message, amount, "tien");
+}
 // =====================
 // TUNG XU (v2 cải tiến) với hoạt ảnh
 // =====================
@@ -960,32 +978,35 @@ client.on("messageCreate", async (message) => {
     const args = message.content.slice(PREFIX.length).trim().split(/ +/);
     const cmd = args.shift().toLowerCase();
 
-    switch (cmd) {
-        case "diemdanh": await cmdDiemdanh(message); break;
-        case "tien": await cmdTien(message); break;
-        case "tungxu": await cmdTungxu(message, args); break;
-        case "taixiu": await cmdTaixiu(message, args); break;
-        case "baucua": await cmdBaucua(message); break;
-        case "boctham": await cmdBoctham(message); break;
-        case "chuyentien": await cmdChuyentien(message, args); break;
-        case "chuyenxu": await cmdChuyenxu(message, args); break;
-        case "xidach": await cmdXidach(message, args); break;
-        case "anxin": await cmdAnxin(message); break;
-        case "vay": await cmdVay(message, args); break;
-        case "tralai": await cmdTralai(message, args); break;
-        
-        // Nhóm lệnh đổi tiền
-        case "doi": await cmdDoi(message, args); break;
-        case "doixu": await cmdDoixu(message, args); break;
-        case "doitien": await cmdDoitien(message, args); break;
-        
-        case "help": await cmdHelp(message); break;
-        
-        default: 
-            message.reply("❌ Lệnh không hợp lệ!");
-            break;
-    } // Đóng ngoặc switch
-}); // Đóng ngoặc client.on
-
+    try {
+        switch (cmd) {
+            case "diemdanh": await cmdDiemdanh(message); break;
+            case "tien": await cmdTien(message); break;
+            case "tungxu": await cmdTungxu(message, args); break;
+            case "taixiu": await cmdTaixiu(message, args); break;
+            case "baucua": await cmdBaucua(message); break;
+            case "boctham": await cmdBoctham(message); break;
+            case "chuyentien": await cmdChuyentien(message, args); break;
+            case "chuyenxu": await cmdChuyenxu(message, args); break;
+            case "xidach": await cmdXidach(message, args); break;
+            case "anxin": await cmdAnxin(message); break;
+            case "vay": await cmdVay(message, args); break;
+            case "tralai": await cmdTralai(message, args); break;
+            
+            // Các lệnh đổi tiền
+            case "doi": await cmdDoi(message, args); break;
+            case "doixu": await cmdDoixu(message, args); break;
+            case "doitien": await cmdDoitien(message, args); break;
+            
+            case "help": await cmdHelp(message); break;
+            
+            default: 
+                message.reply("❌ Lệnh không hợp lệ!");
+                break;
+        }
+    } catch (error) {
+        console.error("Lỗi thực thi lệnh:", error);
+    }
+});
 // -------------------- BOT LOGIN --------------------
 client.login(process.env.TOKEN);
