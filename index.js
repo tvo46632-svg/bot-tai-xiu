@@ -1095,7 +1095,7 @@ async function cmdTralai(message, args) {
 //      HELP COMMAND (Bản Xịn)
 // =====================
 async function cmdHelp(message) {
-    let timeLeft = 60; // Thiết lập 60 giây
+    let timeLeft = 60; // Tổng thời gian 60 giây
 
     const generateEmbed = (seconds) => {
         return new EmbedBuilder()
@@ -1113,16 +1113,21 @@ async function cmdHelp(message) {
 
     const helpMsg = await message.reply({ embeds: [generateEmbed(timeLeft)], components: [row] });
 
-    // --- BỘ ĐẾM NGƯỢC ---
+    // --- BỘ ĐẾM NGƯỢC (Cập nhật mỗi 20 giây) ---
     const timer = setInterval(async () => {
-        timeLeft -= 5; // Cập nhật mỗi 5 giây để tránh bị Discord giới hạn (rate limit)
+        timeLeft -= 20; // Trừ đi 20 giây mỗi lần
+        
         if (timeLeft <= 0) {
             clearInterval(timer);
         } else {
-            const updatedEmbed = EmbedBuilder.from(helpMsg.embeds[0]).setDescription(`Chào mừng bạn! Hãy chọn mục bên dưới để xem chi tiết.\n\n⏳ **Tự động đóng và dọn dẹp sau:** \`${timeLeft} giây\``);
+            // Lấy embed hiện tại và chỉ cập nhật phần giây đếm ngược
+            const currentEmbed = helpMsg.embeds[0];
+            const updatedEmbed = EmbedBuilder.from(currentEmbed)
+                .setDescription(currentEmbed.description.replace(/\`\d+ giây\`/, `\`${timeLeft} giây\``));
+            
             await helpMsg.edit({ embeds: [updatedEmbed] }).catch(() => {});
         }
-    }, 5000);
+    }, 20000); // 20000ms = 20 giây
 
     const collector = helpMsg.createMessageComponentCollector({ time: 60000 }); 
 
@@ -1133,11 +1138,33 @@ async function cmdHelp(message) {
         const descSuffix = `\n\n⏳ **Tự động đóng sau:** \`${timeLeft} giây\``;
 
         if (i.customId === 'h_eco') {
-            embed.setTitle('💰 HỆ THỐNG KINH TẾ').setDescription('• `!tien`       : Xem số dư & Nợ\n• `!diemdanh`   : Nhận lương\n• `!chuyentien` : Chuyển tiền ($)\n• `!chuyenxu`   : Chuyển xu (🪙)' + descSuffix);
+            embed.setTitle('💰 HỆ THỐNG KINH TẾ')
+                 .setDescription(
+                    '• `!tien`       : Xem số dư & Nợ\n' +
+                    '• `!diemdanh`   : Nhận lương mỗi ngày\n' +
+                    '• `!chuyentien` : Chuyển tiền (Thuế 5%)\n' +
+                    '• `!chuyenxu`   : Chuyển xu (Thuế 7% - 10%)' + descSuffix
+                 );
         } else if (i.customId === 'h_game') {
-            embed.setTitle('🎲 KHO TRÒ CHƠI').setDescription('• `!taixiu`, `!baucua`, `!xidach`, `!tungxu`, `!boctham`, `!anxin`' + descSuffix);
+            embed.setTitle('🎲 KHO TRÒ CHƠI')
+                 .setDescription(
+                    '• `!taixiu`, `!baucua`, `!xidach`, `!tungxu`, `!boctham`, `!anxin`' + descSuffix
+                 );
         } else if (i.customId === 'h_bank') {
-            embed.setTitle('🏦 NGÂN HÀNG CASINO').setDescription('• `!doi`    : Đổi Xu ↔ Tiền ($)\n• `!vay`    : Vay vốn\n• `!tralai` : Trả nợ' + descSuffix);
+            embed.setTitle('🏦 NGÂN HÀNG & QUY ĐỔI')
+                 .addFields(
+                    { 
+                        name: '🏦 Chính sách Vay (Vay 1 Trả 2)', 
+                        value: '• Số dư < 11k : Vay cố định tối đa `10,000`\n• Số dư > 11k : Vay tối đa `x2` tài khoản', 
+                        inline: false 
+                    },
+                    { 
+                        name: '💱 Quy đổi & Thuế phí', 
+                        value: '• `!doi` : Đổi Xu ↔ Tiền (Có phí rút %)\n• Thuế chuyển Xu : 7% - 10% tùy mốc', 
+                        inline: false 
+                    }
+                 )
+                 .setFooter({ text: `Menu tự xóa sau ${timeLeft} giây` });
         }
 
         await i.update({ embeds: [embed], components: [row] });
@@ -1145,13 +1172,10 @@ async function cmdHelp(message) {
 
     collector.on('end', async () => {
         clearInterval(timer);
-        // Xóa tin nhắn của Bot
         await helpMsg.delete().catch(() => {});
-        // Xóa tin nhắn lệnh !help của người dùng
         await message.delete().catch(() => {});
     });
 }
-
 // =====================
 //      MAIN EVENTS 
 // =====================
