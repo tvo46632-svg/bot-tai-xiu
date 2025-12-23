@@ -237,124 +237,65 @@ async function cmdTien(message) {
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 // ==========================================
-// 2. HÀM XỬ LÝ ĐỔI TIỀN (BẢN FULL OPTION)
+// HÀM ĐỔI TIỀN (BẢN FIX LỖI ELSE - THUẾ 10%)
 // ==========================================
 async function handleExchange(message, amountInput, typeInput) {
     try {
-        // 1. Lấy dữ liệu user
         const user = await getUser(message.author.id);
         if (!user) return message.reply("❌ Không tìm thấy ví của bạn!");
 
-        // Chuẩn hóa dữ liệu số từ Database
         const currentXu = Number(user.xu || 0);
         const currentMoney = Number(user.money || 0);
 
-        // 2. Kiểm tra đầu vào
         const amount = parseInt(amountInput);
-        if (!amount || isNaN(amount) || amount <= 0) {
-            return message.reply("❌ Số lượng sai! Ví dụ: `!doi 10000 xu`").then(m => {
-                setTimeout(() => m.delete().catch(() => {}), 5000);
-            });
+        if (isNaN(amount) || amount <= 0) {
+            return message.reply("❌ Số lượng sai! Ví dụ: `!doi 100 xu`").then(m => setTimeout(() => m.delete().catch(() => {}), 5000));
         }
 
         const type = typeInput ? typeInput.toString().trim().toLowerCase() : "xu";
 
-        // --- TRƯỜNG HỢP 1: ĐỔI XU SANG TIỀN ($) ---
+        // --- TRƯỜNG HỢP 1: XU -> TIỀN (THEO BẢNG GIÁ HELP) ---
         if (type === "xu") {
             if (currentXu < amount) {
-                return message.reply(`❌ Bạn không đủ xu! (Có: ${currentXu.toLocaleString()} xu)`)
-                    .then(m => setTimeout(() => m.delete().catch(() => {}), 5000));
+                return message.reply(`❌ Bạn không đủ xu! (Có: ${currentXu.toLocaleString()} xu)`);
             }
 
             let moneyOut = 0;
-            // ÁP DỤNG ĐÚNG BẢNG GIÁ THEO LỆNH HELP CỦA BẠN
-            if (amount < 200) {
-                moneyOut = Math.floor(amount * 0.5);   // 100 xu -> 50$
-            } else if (amount < 500) {
-                moneyOut = Math.floor(amount * 0.75);  // 200 xu -> 150$
-            } else if (amount < 1000) {
-                moneyOut = Math.floor(amount * 0.9);   // 500 xu -> 450$
-            } else if (amount < 2000) {
-                moneyOut = Math.floor(amount * 0.9);   // 1000 xu -> 900$
-            } else {
-                moneyOut = Math.floor(amount * 0.9);   // Từ 2000 xu trở lên x0.9
-            }
+            if (amount < 200) moneyOut = Math.floor(amount * 0.5);
+            else if (amount < 500) moneyOut = Math.floor(amount * 0.75);
+            else moneyOut = Math.floor(amount * 0.9);
 
-            // --- ANIMATION XỬ LÝ ---
-            const msg = await message.reply(`⏳ Đang xử lý giao dịch: **${amount.toLocaleString()} Xu** ➔ **Tiền**...`);
-            await new Promise(res => setTimeout(res, 2000)); // Chờ 2 giây tạo hiệu ứng
+            const msg = await message.reply(`⏳ Đang xử lý: **${amount.toLocaleString()} Xu** ➔ **Tiền**...`);
+            await new Promise(res => setTimeout(res, 2000));
 
             await addXu(message.author.id, -amount);
             await addMoney(message.author.id, moneyOut);
 
-            // --- KẾT QUẢ VÀ TỰ XÓA ---
             return await msg.edit(`✅ **ĐỔI THÀNH CÔNG**\n💰 Nhận: **+${moneyOut.toLocaleString()} Tiền**\n🪙 Khấu trừ: **-${amount.toLocaleString()} Xu**`)
-                .then(m => {
-                    setTimeout(() => { 
-                        m.delete().catch(() => {}); 
-                        message.delete().catch(() => {}); 
-                    }, 5000);
-                });
-        }
-
-        // --- TRƯỜNG HỢP 2: ĐỔI TIỀN SANG XU (Tỷ lệ 1:1) ---
+                .then(m => setTimeout(() => { m.delete().catch(() => {}); message.delete().catch(() => {}); }, 5000));
+        } 
+        // --- TRƯỜNG HỢP 2: TIỀN -> XU (THUẾ 10%) ---
         else if (["tien", "tiền", "money"].includes(type)) {
             if (currentMoney < amount) {
-                return message.reply(`❌ Bạn không đủ tiền! (Có: ${currentMoney.toLocaleString()} tiền)`)
-                    .then(m => setTimeout(() => m.delete().catch(() => {}), 5000));
+                return message.reply(`❌ Bạn không đủ tiền! (Có: ${currentMoney.toLocaleString()} tiền)`);
             }
 
-            const msg = await message.reply(`⏳ Đang kết nối ngân hàng: **${amount.toLocaleString()} Tiền** ➔ **Xu**...`);
-            await new Promise(res => setTimeout(res, 1500));
+            const thue = Math.floor(amount * 0.1);
+            const xuNhan = amount - thue;
+
+            const msg = await message.reply(`⏳ Đang xử lý: **${amount.toLocaleString()} Tiền** ➔ **Xu** (Thuế 10%)...`);
+            await new Promise(res => setTimeout(res, 2000));
 
             await addMoney(message.author.id, -amount);
-            await addXu(message.author.id, amount);
+            await addXu(message.author.id, xuNhan);
 
-            return await msg.edit(`✅ **ĐỔI THÀNH CÔNG**\n🪙 Nhận: **+${amount.toLocaleString()} Xu**\n💰 Khấu trừ: **-${amount.toLocaleString()} Tiền**`)
-                .then(m => {
-                    setTimeout(() => { 
-                        m.delete().catch(() => {}); 
-                        message.delete().catch(() => {}); 
-                    }, 5000);
-                });
+            return await msg.edit(`✅ **ĐỔI THÀNH CÔNG**\n🪙 Nhận: **+${xuNhan.toLocaleString()} Xu**\n💰 Khấu trừ: **-${amount.toLocaleString()} Tiền**\n(Thuế: ${thue.toLocaleString()})`)
+                .then(m => setTimeout(() => { m.delete().catch(() => {}); message.delete().catch(() => {}); }, 5000));
         }
-
-        else {
-            return message.reply("❓ Bot không hiểu! Dùng: `!doi 100 xu` hoặc `!doi 100 tien`").then(m => {
-                setTimeout(() => m.delete().catch(() => {}), 5000);
-            });
-        }
-
     } catch (e) {
-        console.error("Lỗi hệ thống đổi tiền:", e);
-        return message.reply("❌ Lỗi hệ thống! Vui lòng thử lại sau.");
+        console.error("Lỗi:", e);
     }
 }
-      // --- TRƯỜNG HỢP 2: ĐỔI TIỀN SANG XU (CÓ THUẾ 10%) ---
-        else if (["tien", "tiền", "money"].includes(type)) {
-            if (currentMoney < amount) {
-                return message.reply(`❌ Bạn không đủ tiền! (Có: ${currentMoney.toLocaleString()} tiền)`)
-                    .then(m => setTimeout(() => m.delete().catch(() => {}), 5000));
-            }
-
-            // TÍNH TOÁN THUẾ 10%
-            const thue = Math.floor(amount * 0.1);
-            const xuNhanDuoc = amount - thue;
-
-            const msg = await message.reply(`⏳ Đang chuyển đổi: **${amount.toLocaleString()} Tiền** ➔ **Xu** (Phí 10%)...`);
-            await new Promise(res => setTimeout(res, 2000)); // Animation chờ 2s
-
-            await addMoney(message.author.id, -amount);
-            await addXu(message.author.id, xuNhanDuoc);
-
-            return await msg.edit(`✅ **ĐỔI THÀNH CÔNG**\n🪙 Nhận: **+${xuNhanDuoc.toLocaleString()} Xu**\n💰 Khấu trừ: **-${amount.toLocaleString()} Tiền** (Thuế: ${thue.toLocaleString()})`)
-                .then(m => {
-                    setTimeout(() => { 
-                        m.delete().catch(() => {}); 
-                        message.delete().catch(() => {}); 
-                    }, 5000); // Tự xóa sau 5 giây
-                });
-        }
 // ==========================================
 // 3. CÁC HÀM GỌI LỆNH (COMMANDS)
 // ==========================================
