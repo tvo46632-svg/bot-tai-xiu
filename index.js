@@ -1230,8 +1230,10 @@ async function cmdHelp(message) {
 // =====================
 
 client.on("messageCreate", async (message) => {
+    // 1. Chống bot và kiểm tra Prefix
     if (message.author.bot || !message.content.startsWith(PREFIX)) return;
 
+    // 2. Tách lệnh và đối số
     const args = message.content.slice(PREFIX.length).trim().split(/ +/);
     const cmd = args.shift().toLowerCase();
 
@@ -1240,16 +1242,10 @@ client.on("messageCreate", async (message) => {
             case "diemdanh": await cmdDiemdanh(message); break;
             case "tien": await cmdTien(message); break;
             
-            // Lệnh đổi tiền (Sửa lại để khớp với hàm handleExchange đã viết)
-            case "doi": 
-                await handleExchange(message, args[0], args[1]); 
-                break;
-            case "doixu": 
-                await handleExchange(message, args[0], "xu"); 
-                break;
-            case "doitien": 
-                await handleExchange(message, args[0], "tien"); 
-                break;
+            // Lệnh đổi tiền
+            case "doi": await handleExchange(message, args[0], args[1]); break;
+            case "doixu": await handleExchange(message, args[0], "xu"); break;
+            case "doitien": await handleExchange(message, args[0], "tien"); break;
 
             // Lệnh Admin
             case "addmoney":
@@ -1257,7 +1253,7 @@ client.on("messageCreate", async (message) => {
                 await cmdAdmin(message, args); 
                 break; 
 
-            // Các lệnh game khác (Đảm bảo bạn đã khai báo các hàm này bên trên)
+            // Các lệnh game khác
             case "tungxu": if(typeof cmdTungxu !== 'undefined') await cmdTungxu(message, args); break;
             case "taixiu": if(typeof cmdTaixiu !== 'undefined') await cmdTaixiu(message, args); break;
             case "baucua": if(typeof cmdBaucua !== 'undefined') await cmdBaucua(message, args); break;
@@ -1269,6 +1265,8 @@ client.on("messageCreate", async (message) => {
     } catch (error) {
         console.error("Lỗi lệnh chat:", error);
     }
-}); // <--- Dấu này đóng client.on, thiếu cái này là bot crash!
+}); // <--- PHẢI CÓ DẤU NÀY ĐỂ ĐÓNG client.on
+
 // -------------------- BOT LOGIN --------------------
+// Đảm bảo dòng này là dòng cuối cùng và không nằm trong bất kỳ ngoặc nhọn nào
 client.login(process.env.TOKEN);
