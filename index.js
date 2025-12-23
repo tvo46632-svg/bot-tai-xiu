@@ -196,7 +196,29 @@ async function cmdDoixu(message, args) {
 
     console.log('Đang thực hiện lệnh doixu...'); // Kiểm tra xem bot có nhận lệnh không
 
-    const amount = parseInt(args[0]);
+    const inputAmount = args[0].trim();
+    let amount;
+    let isXu = false;
+    let isTien = false;
+
+    // Kiểm tra nếu người dùng chỉ nhập số
+    if (inputAmount.endsWith('xu')) {
+        isXu = true;
+        amount = parseInt(inputAmount.replace('xu', '').trim());
+    } else if (inputAmount.endsWith('tiền')) {
+        isTien = true;
+        amount = parseInt(inputAmount.replace('tiền', '').trim());
+    } else {
+        // Nếu người dùng không nhập rõ "xu" hoặc "tiền", yêu cầu họ làm rõ
+        message.reply("❗ Bạn cần nhập rõ đơn vị: `xu` hoặc `tiền`. Ví dụ: `!doixu 2000xu` hoặc `!doixu 2000tiền`");
+        return;
+    }
+
+    if (isNaN(amount) || amount <= 0) {
+        message.reply("❌ Số lượng không hợp lệ!");
+        return;
+    }
+
     const user = await getUser(message.author.id);
 
     // Kiểm tra cooldown (Tránh spam)
@@ -213,54 +235,40 @@ async function cmdDoixu(message, args) {
     // Hiển thị hoạt ảnh đang đổi (3 chấm hoặc biểu tượng)
     const exchangeMessage = await message.reply("🔄 Đang đổi... vui lòng đợi 4 giây...");
 
-    // Kiểm tra nếu người dùng muốn đổi xu ra tiền
-    if (args[0].endsWith('xu')) {
-        const xuAmount = parseInt(args[0].replace('xu', '').trim());
-
-        if (isNaN(xuAmount) || xuAmount <= 0) {
-            message.reply("❌ Số xu không hợp lệ!");
-            return;
-        }
-
-        if (user.xu < xuAmount) {
+    if (isXu) {
+        // Đổi xu ra tiền
+        if (user.xu < amount) {
             message.reply("❌ Bạn không đủ xu!");
             return;
         }
 
         let moneyOut = 0;
 
-        if (xuAmount === 100) moneyOut = 50;
-        else if (xuAmount === 200) moneyOut = 150;
-        else if (xuAmount === 500) moneyOut = 450;
-        else if (xuAmount === 1000) moneyOut = 900;
-        else if (xuAmount >= 2000) moneyOut = Math.floor(xuAmount * 0.9);
+        if (amount === 100) moneyOut = 50;
+        else if (amount === 200) moneyOut = 150;
+        else if (amount === 500) moneyOut = 450;
+        else if (amount === 1000) moneyOut = 900;
+        else if (amount >= 2000) moneyOut = Math.floor(amount * 0.9);
         else {
             message.reply("❗ Không hỗ trợ số xu này!");
             return;
         }
 
         // Thực hiện hành động đổi xu ra tiền
-        await subXu(message.author.id, xuAmount);
+        await subXu(message.author.id, amount);
         await addMoney(message.author.id, moneyOut);
 
         // Sau 4 giây, xóa thông báo hoạt ảnh và gửi kết quả
         setTimeout(() => {
-            exchangeMessage.edit(`🔁 Bạn đã đổi **${xuAmount} xu → ${moneyOut} tiền** thành công!`);
+            exchangeMessage.edit(`🔁 Bạn đã đổi **${amount} xu → ${moneyOut} tiền** thành công!`);
         }, 4000); // Đợi 4 giây
 
         return;
     }
 
-    // Kiểm tra nếu người dùng muốn đổi tiền ra xu
-    if (args[0].endsWith('tiền')) {
-        const moneyAmount = parseInt(args[0].replace('tiền', '').trim());
-
-        if (isNaN(moneyAmount) || moneyAmount <= 0) {
-            message.reply("❌ Số tiền không hợp lệ!");
-            return;
-        }
-
-        if (user.money < moneyAmount) {
+    if (isTien) {
+        // Đổi tiền ra xu
+        if (user.money < amount) {
             message.reply("❌ Bạn không đủ tiền!");
             return;
         }
@@ -268,20 +276,20 @@ async function cmdDoixu(message, args) {
         let xuOut = 0;
         let feePercent = 20;  // Mặc định phí 20% nếu tiền <= 5000
 
-        if (moneyAmount >= 10000) {
+        if (amount >= 10000) {
             feePercent = 40;  // Nếu tiền >= 10000 thì phí đổi 40%
         }
 
         // Tính số xu nhận được sau khi trừ phí
-        xuOut = Math.floor(moneyAmount * (1 - feePercent / 100));
+        xuOut = Math.floor(amount * (1 - feePercent / 100));
 
         // Thực hiện hành động đổi tiền ra xu
-        await subMoney(message.author.id, moneyAmount);
+        await subMoney(message.author.id, amount);
         await addXu(message.author.id, xuOut);
 
         // Sau 4 giây, xóa thông báo hoạt ảnh và gửi kết quả
         setTimeout(() => {
-            exchangeMessage.edit(`🔁 Bạn đã đổi **${moneyAmount} tiền → ${xuOut} xu** (phí ${feePercent}%) thành công!`);
+            exchangeMessage.edit(`🔁 Bạn đã đổi **${amount} tiền → ${xuOut} xu** (phí ${feePercent}%) thành công!`);
         }, 4000); // Đợi 4 giây
 
         return;
