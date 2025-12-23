@@ -948,7 +948,9 @@ async function cmdHelp(message) {
 
 ━━━━━━━━━━━━━━━━━━
 🔄 **ĐỔI XU → TIỀN**
-• !doixu <số_xu>
+• !doi <số> xu
+• !doi <số> tiền
+
 
 📊 BẢNG GIÁ ĐỔI XU
 • 100 xu → 50 tiền
