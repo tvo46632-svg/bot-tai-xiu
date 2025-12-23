@@ -402,69 +402,95 @@ async function cmdTungxu(message, args) {
     }
 }
 // =====================
-//         TÀI XỈU
-// =====================
-async function cmdTaixiu(message, args) {
-
-    if (args.length < 2) {
-        message.reply("❗ Cách dùng: !taixiu <tiền> <chẵn/lẻ/tài/xỉu>");
-        return;
+async function cmdTaixiu(message) {
+    const userId = message.author.id;
+    
+    // 1. Kiểm tra nợ trước khi chơi (tích hợp từ yêu cầu trước của bạn)
+    const userDebt = await getUserDebt(userId) || 0;
+    if (userDebt > 0) {
+        return message.reply(`### 🚫 Truy cập bị chặn\n> Bạn đang nợ **${userDebt.toLocaleString()} xu**. Hãy trả nợ trước khi tham gia sòng bạc!`);
     }
 
-    const betMoney = parseInt(args[0]);
-    const userChoice = args[1].toLowerCase();
+    // 2. Tạo các nút bấm lựa chọn
+    const row = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId('tx_tai').setLabel('TÀI (11-18)').setStyle(ButtonStyle.Danger).setEmoji('🔴'),
+        new ButtonBuilder().setCustomId('tx_xiu').setLabel('XỈU (3-10)').setStyle(ButtonStyle.Primary).setEmoji('🔵'),
+        new ButtonBuilder().setCustomId('tx_chan').setLabel('CHẴN').setStyle(ButtonStyle.Secondary).setEmoji('2️⃣'),
+        new ButtonBuilder().setCustomId('tx_le').setLabel('LẺ').setStyle(ButtonStyle.Secondary).setEmoji('1️⃣')
+    );
 
-    if (isNaN(betMoney) || betMoney <= 0) {
-        message.reply("❌ Số tiền cược không hợp lệ!");
-        return;
-    }
+    const mainMsg = await message.reply({
+        content: `### 🎲 SÒNG BẠC TÀI XỈU\n> Vui lòng chọn cửa đặt cược bên dưới!\n> *Lưu ý: Cược tối thiểu 300 - Tối đa 10,000*`,
+        components: [row]
+    });
 
-    if (!["chẵn", "lẻ", "tài", "xỉu"].includes(userChoice)) {
-        message.reply("❌ Chọn: chẵn / lẻ / tài / xỉu");
-        return;
-    }
+    // 3. Thu thập lựa chọn cửa cược
+    const filter = i => i.user.id === userId;
+    const collector = mainMsg.createMessageComponentCollector({ filter, time: 30000 });
 
-    const user = await getUser(message.author.id);
+    collector.on('collect', async i => {
+        const choiceMap = { 'tx_tai': 'tài', 'tx_xiu': 'xỉu', 'tx_chan': 'chẵn', 'tx_le': 'lẻ' };
+        const userChoice = choiceMap[i.customId];
 
-    if (user.money < betMoney) {
-        message.reply("❌ Bạn không đủ tiền!");
-        return;
-    }
+        // 4. Yêu cầu nhập số tiền cược
+        await i.update({ content: `### 💸 ĐẶT CƯỢC: ${userChoice.toUpperCase()}\n> Vui lòng nhập số tiền muốn cược (300 - 10,000):`, components: [] });
 
-    await subMoney(message.author.id, betMoney);
+        const moneyFilter = m => m.author.id === userId && !isNaN(m.content);
+        const moneyCollector = message.channel.createMessageCollector({ filter: moneyFilter, time: 20000, max: 1 });
 
-    await delay(2000);
+        moneyCollector.on('collect', async m => {
+            const betMoney = parseInt(m.content);
+            
+            // Xóa tin nhắn nhập tiền của người dùng cho gọn
+            if (m.deletable) m.delete().catch(() => {});
 
-    const values = [
-        randomInt(1, 6),
-        randomInt(1, 6),
-        randomInt(1, 6),
-    ];
+            // Kiểm tra điều kiện tiền cược
+            if (betMoney < 300 || betMoney > 10000) 
+                return mainMsg.edit(`> ❌ Tiền cược không hợp lệ (300 - 10,000). Vui lòng thử lại lệnh!`);
 
-    const sum = values[0] + values[1] + values[2];
+            const user = await getUser(userId);
+            if (user.money < betMoney) 
+                return mainMsg.edit(`> ❌ Bạn không đủ tiền! Bạn chỉ còn **${user.money.toLocaleString()}** tiền.`);
 
-    let didWin = false;
+            // Bắt đầu ván đấu
+            await subMoney(userId, betMoney);
+            
+            // 5. Animation Xóc Đĩa
+            const xocFrames = ["🎲 ▬ ▬ ▬", "▬ 🎲 ▬ ▬", "▬ ▬ 🎲 ▬", "▬ ▬ ▬ 🎲"];
+            for (let j = 0; j < 6; j++) {
+                await mainMsg.edit(`### 🎲 ĐANG XÓC ĐĨA...\n> **[ ${xocFrames[j % 4]} ]**`);
+                await new Promise(res => setTimeout(res, 400));
+            }
 
-    if (userChoice === "chẵn" && sum % 2 === 0) didWin = true;
-    if (userChoice === "lẻ" && sum % 2 === 1) didWin = true;
-    if (userChoice === "tài" && sum >= 11) didWin = true;
-    if (userChoice === "xỉu" && sum <= 10) didWin = true;
+            // 6. Tính toán kết quả
+            const d1 = Math.floor(Math.random() * 6) + 1;
+            const d2 = Math.floor(Math.random() * 6) + 1;
+            const d3 = Math.floor(Math.random() * 6) + 1;
+            const sum = d1 + d2 + d3;
+            const diceEmojis = ["", "⚀", "⚁", "⚂", "⚃", "⚄", "⚅"];
 
-    if (didWin) {
-        const moneyGain = betMoney * 2;
-        await addMoney(message.author.id, moneyGain);
-        message.reply(
-            `🎲 Kết quả: ${values.join(" | ")} (Tổng: ${sum})\n` +
-            `✅ Bạn thắng và nhận ${moneyGain} tiền!`
-        );
-    } else {
-        message.reply(
-            `🎲 Kết quả: ${values.join(" | ")} (Tổng: ${sum})\n` +
-            `❌ Bạn thua và mất ${betMoney} tiền!`
-        );
-    }
+            let win = false;
+            if (userChoice === "tài" && sum >= 11) win = true;
+            if (userChoice === "xỉu" && sum <= 10) win = true;
+            if (userChoice === "chẵn" && sum % 2 === 0) win = true;
+            if (userChoice === "lẻ" && sum % 2 === 1) win = true;
+
+            // 7. Hiển thị kết quả
+            const resultMsg = `### 🎲 KẾT QUẢ: ${diceEmojis[d1]} ${diceEmojis[d2]} ${diceEmojis[d3]} (${sum})`;
+            if (win) {
+                const gain = betMoney * 2;
+                await addMoney(userId, gain);
+                await mainMsg.edit(`${resultMsg}\n> ✅ Chúc mừng! Bạn chọn **${userChoice}** và thắng **+${gain.toLocaleString()}** tiền.`);
+            } else {
+                await mainMsg.edit(`${resultMsg}\n> ❌ Rất tiếc! Bạn chọn **${userChoice}** và đã mất **-${betMoney.toLocaleString()}** tiền.`);
+            }
+        });
+    });
+
+    collector.on('end', collected => {
+        if (collected.size === 0) mainMsg.edit({ content: "> ⏳ Đã hết thời gian lựa chọn.", components: [] }).catch(() => {});
+    });
 }
-
 // =====================
 // BẦU CUA CÓ HIỆU ỨNG "SỐC DĨA" + TUỲ Ý TIỀN
 // =====================
