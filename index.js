@@ -64,6 +64,29 @@ function delay(ms) {
 }
 
 // ---------------- USER DATA FUNCTIONS ----------------
+// QUYỀN ADMIN
+async function cmdAdmin(message, args) {
+    const ADMIN_ID = "ID_CUA_BAN_O_DAY"; // THAY ID CỦA BẠN VÀO ĐÂY
+    if (message.author.id !== ADMIN_ID) return message.reply("❌ Bạn không phải Admin!");
+
+    const subCmd = message.content.slice(PREFIX.length).trim().split(/ +/)[0].toLowerCase();
+
+    if (subCmd === "addmoney") {
+        const targetUser = message.mentions.users.first();
+        const amount = parseInt(args[1]);
+        const type = args[2] ? args[2].toLowerCase() : "tien";
+
+        if (!targetUser || isNaN(amount)) return message.reply("⚠️ HD: `!addmoney @user 1000 xu` (hoặc tiền)");
+
+        if (type === "xu") {
+            await addXu(targetUser.id, amount);
+            message.reply(`✅ Đã thêm **${amount.toLocaleString()} xu** cho ${targetUser.username}`);
+        } else {
+            await addMoney(targetUser.id, amount);
+            message.reply(`✅ Đã thêm **${amount.toLocaleString()} tiền** cho ${targetUser.username}`);
+        }
+    }
+}
 
 // Get or create user
 async function getUser(userId) {
@@ -1106,87 +1129,93 @@ async function cmdTralai(message, args) {
 
     message.reply(replyText);
 } // <- Đóng cmdTralai
-// =====================
-//      QUYỀN HẠN ADMIN
-// =====================
-async function cmdAdmin(message, args) {
-    const ADMIN_ID = "1414458785841549342"; 
-    
-    if (message.author.id !== ADMIN_ID) {
-        return message.reply("❌ Bạn không có quyền Admin!");
-    }
-
-    // Lấy lệnh thực tế từ message
-    const cmd = message.content.split(' ')[0].slice(1).toLowerCase();
-    const targetUser = message.mentions.users.first();
-
-    if (cmd === "addmoney") {
-        // args[0] là @user, args[1] là số lượng, args[2] là loại
-        const amount = parseInt(args[1]);
-        const type = args[2]?.toLowerCase();
-
-        if (!targetUser || isNaN(amount)) {
-            return message.reply("⚠️ HD: `!addmoney @user 1000 tiền` hoặc `!addmoney @user 1000 xu`.");
-        }
-
-        if (type === "xu") {
-            // Đảm bảo bạn đã có hàm addXu trong database
-            await addXu(targetUser.id, amount); 
-            message.reply(`✅ Đã thêm **${amount.toLocaleString()} xu** cho **${targetUser.username}**.`);
-        } else {
-            await addMoney(targetUser.id, amount);
-            message.reply(`✅ Đã thêm **${amount.toLocaleString()} tiền** cho **${targetUser.username}**.`);
-        }
-    } 
-    
-    else if (cmd === "reset") {
-        if (!targetUser) return message.reply("⚠️ Tag người cần reset.");
-        // Đảm bảo hàm updateUser hoạt động đúng với database của bạn
-        await updateUser(targetUser.id, { money: 0, xu: 0 });
-        message.reply(`🧹 Đã reset tài sản của **${targetUser.username}** về 0.`);
-    }
-}
 
 // =====================
-//      HELP (FULL + BẢNG GIÁ)
+//      HELP (FULL + BẢNG GIÁ + VAY)
 // =====================
 
 async function cmdHelp(message) {
+    // Tạo Embed giới thiệu ban đầu
     const mainEmbed = new EmbedBuilder()
         .setTitle('🎮 TRUNG TÂM GIẢI TRÍ CASINO')
-        .setDescription('Menu hướng dẫn dành cho tất cả người chơi.\n> *Menu này sẽ tự đóng sau 2 phút.*')
+        .setDescription('Chào mừng bạn đến với sòng bạc! Hãy chọn mục bên dưới để xem chi tiết.\n> *Menu này sẽ tự đóng sau 2 phút.*')
         .setColor('#FFD700')
         .setTimestamp();
 
+    // Tạo hàng nút bấm (Nút Admin đã thay bằng Ngân Hàng)
     const row = new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setCustomId('h_eco').setLabel('Kinh Tế').setStyle(ButtonStyle.Primary).setEmoji('💰'),
-        new ButtonBuilder().setCustomId('h_game').setLabel('Trò Chơi').setStyle(ButtonStyle.Success).setEmoji('🎲'),
-        new ButtonBuilder().setCustomId('h_admin').setLabel('Admin').setStyle(ButtonStyle.Danger).setEmoji('🛠️')
+        new ButtonBuilder()
+            .setCustomId('h_eco')
+            .setLabel('Kinh Tế')
+            .setStyle(ButtonStyle.Primary)
+            .setEmoji('💰'),
+        
+        new ButtonBuilder()
+            .setCustomId('h_game')
+            .setLabel('Trò Chơi')
+            .setStyle(ButtonStyle.Success)
+            .setEmoji('🎲'),
+
+        new ButtonBuilder()
+            .setCustomId('h_bank')
+            .setLabel('Ngân Hàng & Đổi Xu') 
+            .setStyle(ButtonStyle.Danger)
+            .setEmoji('🏦')
     );
 
     const helpMsg = await message.reply({ embeds: [mainEmbed], components: [row] });
 
-    // Loại bỏ bộ lọc id để mọi người cùng bấm được
+    // Tạo collector
     const collector = helpMsg.createMessageComponentCollector({ time: 120000 }); 
 
     collector.on('collect', async i => {
         const embed = new EmbedBuilder().setColor('#FFD700');
 
         if (i.customId === 'h_eco') {
-            embed.setTitle('💰 KINH TẾ & ĐỔI TIỀN')
-                 .setDescription('• `!tien`: Xem tài sản\n• `!diemdanh`: Nhận quà hàng ngày\n• `!doi <số xu>`: Đổi xu ➔ tiền');
+            embed.setTitle('💰 KINH TẾ CƠ BẢN')
+                 .setDescription(
+                    'Các lệnh quản lý tài sản cá nhân:\n\n' +
+                    '• `!tien`: Xem số dư hiện tại\n' +
+                    '• `!diemdanh`: Nhận lương hàng ngày\n' +
+                    '• `!chuyentien @user <số>`: Chuyển tiền cho người khác'
+                 );
         } 
         else if (i.customId === 'h_game') {
-            embed.setTitle('🎲 TRÒ CHƠI CASINO')
-                 .setDescription('• `!baucua <mức>`: Cược bầu cua\n• `!taixiu <mức>`: Chơi tài xỉu\n• `!tungxu <mức>`: Tung đồng xu\n• `!anxin`: Nhận xu miễn phí');
-        }
-        else if (i.customId === 'h_admin') {
-            embed.setTitle('🛠️ QUYỀN HẠN ADMIN')
-                 .setDescription('• `!addmoney @user <số> <loại>`: Thêm tiền/xu\n• `!reset @user`: Xóa sạch tài sản của ai đó\n*(Chỉ chủ Bot mới có thể sử dụng)*');
+            embed.setTitle('🎲 DANH SÁCH TRÒ CHƠI')
+                 .setDescription(
+                    'Thử vận may của bạn với các trò chơi:\n\n' +
+                    '• `!baucua <mức>`: Bầu Cua Tôm Cá\n' +
+                    '• `!taixiu <mức>`: Tài Xỉu (Chẵn/Lẻ)\n' +
+                    '• `!tungxu <mức>`: Tung đồng xu 50/50\n' +
+                    '• `!anxin`: Xin tiền khi trắng tay'
+                 );
+        } 
+        else if (i.customId === 'h_bank') {
+            // === CẬP NHẬT: BẢNG GIÁ ĐỔI XU MỚI & CHÍNH SÁCH VAY ===
+            embed.setTitle('🏦 NGÂN HÀNG & TỶ GIÁ')
+                 .addFields(
+                    { 
+                        name: '💸 Chính Sách Vay Nợ (`!vay <số tiền>`)', 
+                        value: '> **Hạn mức:** Tối đa gấp đôi (x2) số dư.\n' +
+                               '> **Hỗ trợ:** Số dư < 11k ➔ Hạn mức cố định 10k.\n' +
+                               '> **Lãi suất:**\n' +
+                               '- Mặc định: **100%** (Vay 1 trả 2).\n' +
+                               '- Vay lớn: **200%** (Vay 1 trả 3).' 
+                    },
+                    { 
+                        name: '💱 Bảng Giá Đổi Xu (`!doi <số xu>`)', 
+                        value: 'Tỷ lệ quy đổi từ **Xu** sang **Tiền**:\n' +
+                               '• `100 xu`  ➔ **50 $**\n' +
+                               '• `200 xu`  ➔ **150 $**\n' +
+                               '• `500 xu`  ➔ **450 $**\n' +
+                               '• `1000 xu` ➔ **900 $**\n' +
+                               '• `Từ 2000 xu` ➔ **x0.9** giá trị\n' +
+                               '*(Ví dụ: 2000 xu = 1800 $)*' 
+                    }
+                 )
+                 .setFooter({ text: 'Lưu ý: Vay không trả sẽ bị nợ xấu và khóa tính năng!' });
         }
 
-        // Dùng i.reply({ ephemeral: true }) nếu muốn nội dung chỉ người bấm thấy
-        // Hoặc i.update nếu muốn thay đổi nội dung chung cho cả server xem
         await i.update({ embeds: [embed] });
     });
 
@@ -1241,31 +1270,5 @@ client.on("messageCreate", async (message) => {
         console.error("Lỗi lệnh chat:", error);
     }
 }); // <--- Dấu này đóng client.on, thiếu cái này là bot crash!
-
-// =====================
-//      HÀM ADMIN CHUẨN
-// =====================
-async function cmdAdmin(message, args) {
-    const ADMIN_ID = "ID_CUA_BAN_O_DAY"; // THAY ID CỦA BẠN VÀO ĐÂY
-    if (message.author.id !== ADMIN_ID) return message.reply("❌ Bạn không phải Admin!");
-
-    const subCmd = message.content.slice(PREFIX.length).trim().split(/ +/)[0].toLowerCase();
-
-    if (subCmd === "addmoney") {
-        const targetUser = message.mentions.users.first();
-        const amount = parseInt(args[1]);
-        const type = args[2] ? args[2].toLowerCase() : "tien";
-
-        if (!targetUser || isNaN(amount)) return message.reply("⚠️ HD: `!addmoney @user 1000 xu` (hoặc tiền)");
-
-        if (type === "xu") {
-            await addXu(targetUser.id, amount);
-            message.reply(`✅ Đã thêm **${amount.toLocaleString()} xu** cho ${targetUser.username}`);
-        } else {
-            await addMoney(targetUser.id, amount);
-            message.reply(`✅ Đã thêm **${amount.toLocaleString()} tiền** cho ${targetUser.username}`);
-        }
-    }
-}
 // -------------------- BOT LOGIN --------------------
 client.login(process.env.TOKEN);
