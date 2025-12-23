@@ -207,16 +207,25 @@ async function cmdTien(message) {
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 // =====================
-// HÀM XỬ LÝ CHÍNH (Đã tích hợp tự xóa)
-// =====================
+Lỗi SyntaxError: await is only valid in async functions xảy ra vì trong file của bạn đang có một đoạn code "mồ côi" (thường là do dán đè hoặc thừa dấu đóng ngoặc }) khiến cho lệnh await nằm ngoài hàm async.
+
+Dựa trên đoạn code bạn gửi, đây là bản vệ sinh sạch sẽ 100%. Bạn hãy xóa toàn bộ code cũ liên quan đến đổi tiền và dán đúng khối này vào:
+
+JavaScript
+
+// ==========================================
+// HÀM XỬ LÝ CHÍNH (Đã sửa lỗi ngoặc)
+// ==========================================
 async function handleExchange(message, amount, type) {
     try {
-        if (isNaN(amount) || amount <= 0) return message.reply("❌ Số lượng không hợp lệ!");
+        if (!amount || isNaN(amount) || amount <= 0) {
+            return message.reply("❌ Số lượng không hợp lệ!");
+        }
 
         const user = await getUser(message.author.id);
         if (!user) return message.reply("❌ Không tìm thấy dữ liệu người dùng!");
 
-        // --- TRƯỜNG HỢP: ĐỔI XU -> TIỀN (4s) ---
+        // --- TRƯỜNG HỢP: ĐỔI XU -> TIỀN ---
         if (type === "xu") {
             if (user.xu < amount) return message.reply(`❌ Bạn không đủ xu! (Hiện có: ${user.xu.toLocaleString()})`);
             
@@ -241,7 +250,7 @@ async function handleExchange(message, amount, type) {
             });
         }
 
-        // --- TRƯỜNG HỢP: ĐỔI TIỀN -> XU (3s) ---
+        // --- TRƯỜNG HỢP: ĐỔI TIỀN -> XU ---
         if (type === "tien" || type === "tiền") {
             if (user.money < amount) return message.reply(`❌ Bạn không đủ tiền! (Hiện có: ${user.money.toLocaleString()})`);
 
@@ -264,8 +273,26 @@ async function handleExchange(message, amount, type) {
         }
     } catch (e) {
         console.error("Lỗi đổi tiền:", e);
-        return message.reply("❌ Có lỗi xảy ra!");
+        return message.reply("❌ Có lỗi xảy ra trong quá trình xử lý!");
     }
+} // <--- KẾT THÚC HÀMhandleExchange
+
+// ==========================================
+// CÁC HÀM ĐIỀU HƯỚNG (Bắt buộc phải có)
+// ==========================================
+async function cmdDoi(message, args) {
+    if (args.length < 2) return message.reply("❗ Cách dùng: `!doi <số_lượng> <xu/tiền>`");
+    await handleExchange(message, parseInt(args[0]), args[1].toLowerCase());
+}
+
+async function cmdDoixu(message, args) {
+    if (args.length < 1) return message.reply("❗ Cách dùng: `!doixu <số_xu>`");
+    await handleExchange(message, parseInt(args[0]), "xu");
+}
+
+async function cmdDoitien(message, args) {
+    if (args.length < 1) return message.reply("❗ Cách dùng: `!doitien <số_tiền>`");
+    await handleExchange(message, parseInt(args[0]), "tien");
 }
 
 // =====================
