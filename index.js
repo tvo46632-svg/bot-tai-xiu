@@ -1030,35 +1030,57 @@ async function cmdAnxin(message) {
     }, 5000);
 }
 // =====================
-//        VAY XU
+//        VAY XU 
 // =====================
 async function cmdVay(message, args) {
     const userId = message.author.id;
     let currentCoins = await getUserCoins(userId) || 0;
     let userDebt = await getUserDebt(userId) || 0;
 
-    // Kiểm tra nợ cũ
+    // 1. Kiểm tra nợ cũ
     if (userDebt > 0) {
         return message.reply(`### ❌ Thông báo nợ\n> Bạn đang nợ **${userDebt.toLocaleString()} xu**. Phải trả hết mới có thể vay tiếp!`);
     }
 
-    const maxLoan = 10000;
-    const interest = 1.0; // Lãi suất 100%
+    // 2. Tính toán hạn mức vay tối đa (maxLoan) và lãi suất (interest)
+    let maxLoan = 10000; // Mặc định tối đa 10k cho người nghèo
+    let interest = 1.0;  // Lãi suất mặc định 100% (Vay 1 trả 2)
+
+    if (currentCoins >= 11000) {
+        // Nếu có từ 11k trở lên: Vay tối đa gấp đôi số dư tài khoản
+        maxLoan = currentCoins * 2;
+        // Lãi suất tăng lên 200% (Vay 1 trả 3) để tránh vay quá nhiều
+        interest = 2.0; 
+    } else {
+        // Nếu số dư dưới 11k: Hạn mức vay cố định là 10k (hoặc gấp đôi nếu số dư nhỏ)
+        // Đảm bảo tối thiểu vẫn có thể vay được 10k
+        maxLoan = Math.max(10000, currentCoins * 2);
+        interest = 1.0;
+    }
+
+    // 3. Xử lý số tiền người dùng muốn vay
     let loanAmount = args[0] ? parseInt(args[0]) : maxLoan;
 
     if (isNaN(loanAmount) || loanAmount <= 0) return message.reply("> ❌ Vui lòng nhập số xu hợp lệ!");
-    if (loanAmount > maxLoan) loanAmount = maxLoan;
+    
+    // Giới hạn không vượt quá hạn mức cho phép
+    if (loanAmount > maxLoan) {
+        return message.reply(`### ⚠️ Hạn mức không đủ\n> Với số dư hiện tại, bạn chỉ có thể vay tối đa **${maxLoan.toLocaleString()} xu**.`);
+    }
 
-    // Tính tổng nợ (Gốc + Lãi 100% = Gốc * 2)
+    // 4. Tính tổng nợ: Gốc + (Gốc * Lãi suất)
     const totalOwed = Math.floor(loanAmount * (1 + interest));
 
+    // 5. Cập nhật Database
     currentCoins += loanAmount;
     userDebt = totalOwed;
 
     await setUserCoins(userId, currentCoins);
     await setUserDebt(userId, userDebt);
 
-    return message.reply(`### ✅ Vay vốn thành công\n> 💰 Nhận: **+${loanAmount.toLocaleString()} xu**\n> 💸 Tổng nợ phải trả: **${totalOwed.toLocaleString()} xu** (Lãi 100%)\n> 🏦 Số dư hiện tại: \`${currentCoins.toLocaleString()}\``);
+    // 6. Phản hồi kết quả
+    const interestPercent = interest * 100;
+    return message.reply(`### ✅ Vay vốn thành công\n> 💰 Nhận: **+${loanAmount.toLocaleString()} xu**\n> 💸 Tổng nợ phải trả: **${totalOwed.toLocaleString()} xu** (Lãi ${interestPercent}%)\n> 🏦 Số dư mới: \`${currentCoins.toLocaleString()}\``);
 }
 // =====================
 //        TRẢ LÃI + NỢ
@@ -1109,7 +1131,19 @@ async function cmdTralai(message, args) {
 // =====================
 
 async function cmdHelp(message) {
-    const helpText = `
+    const embed = new EmbedBuilder()
+        .setTitle('🎮 TRUNG TÂM GIẢI TRÍ CASINO')
+        .setDescription('> Vui lòng chọn danh mục lệnh bạn muốn xem bên dưới.')
+        .setColor('#FFD700');
+
+    const row = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId('help_economy').setLabel('Tiền & Xu').setStyle(ButtonStyle.Primary).setEmoji('💰'),
+        new ButtonBuilder().setCustomId('help_games').setLabel('Trò Chơi').setStyle(ButtonStyle.Success).setEmoji('🎲'),
+        new ButtonBuilder().setCustomId('help_social').setLabel('Chuyển & Vay').setStyle(ButtonStyle.Secondary).setEmoji('💸')
+    );
+
+    await message.reply({ embeds: [embed], components: [row] });
+}
 🎮 **Các lệnh Casino Bot**
 
 ━━━━━━━━━━━━━━━━━━
