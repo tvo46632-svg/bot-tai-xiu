@@ -131,7 +131,7 @@ async function setUserDebt(userId, amount) {
 // ===================== COMMANDS =====================
 
 // =====================
-//      ĐIỂM DANH JACKPOT
+//      ĐIỂM DANH JACKPOT (ANIMATION MƯỢT)
 // =====================
 async function cmdDiemdanh(message) {
     const userId = message.author.id;
@@ -139,12 +139,12 @@ async function cmdDiemdanh(message) {
 
     const today = new Date().toISOString().slice(0, 10);
 
-    // Kiểm tra xem đã điểm danh chưa
+    // 1. Kiểm tra điểm danh
     if (db.data.daily[userId] === today) {
-        return message.reply("❌ Bạn đã điểm danh hôm nay rồi! Hãy quay lại vào ngày mai.");
+        return message.reply("❌ Bạn đã điểm danh hôm nay rồi!");
     }
 
-    // Tỷ lệ bạn đã cho sẵn
+    // 2. Tính toán kết quả trước (nhưng chưa hiện)
     const rand = Math.random() * 100;
     let xuReward = 0;
     if (rand <= 50) xuReward = 1000;
@@ -153,29 +153,35 @@ async function cmdDiemdanh(message) {
     else if (rand <= 98) xuReward = 3000;
     else xuReward = 3200;
 
-    // --- BẮT ĐẦU ANIMATION ---
-    const msg = await message.reply("🎰 **ĐANG QUAY THƯỞNG...** 🎰\n`[ ▓▓▓▓▓▓▓▓▓▓ ]` 0%");
+    // Danh sách các số ảo để nhảy
+    const fakeNumbers = ["1,000", "2,500", "3,200", "500", "1,200", "2,000", "3,000", "800"];
 
-    const frames = ["1,000", "2,000", "3,200", "500", "1,500", "2,500", "3,000"];
-    
-    // Giả lập hiệu ứng nhảy số (3 bước)
-    await new Promise(resolve => setTimeout(resolve, 800));
-    await msg.edit(`🎰 **ĐANG QUAY THƯỞNG...** 🎰\n\`[ 🎰 ${frames[Math.floor(Math.random() * frames.length)]} 🎰 ]\` 30%`);
-    
-    await new Promise(resolve => setTimeout(resolve, 800));
-    await msg.edit(`🎰 **ĐANG QUAY THƯỞNG...** 🎰\n\`[ 🎰 ${frames[Math.floor(Math.random() * frames.length)]} 🎰 ]\` 65%`);
+    // 3. Gửi tin nhắn bắt đầu
+    const msg = await message.reply("🎰 **MÁY QUAY THƯỞNG ĐANG CHẠY...** 🎰");
 
-    await new Promise(resolve => setTimeout(resolve, 800));
-    await msg.edit(`🎰 **ĐANG QUAY THƯỞNG...** 🎰\n\`[ 🎰 ${frames[Math.floor(Math.random() * frames.length)]} 🎰 ]\` 99%`);
+    // 4. Vòng lặp nhảy số liên tục (Animation)
+    for (let i = 0; i < 6; i++) {
+        // Lấy ngẫu nhiên một số trong mảng fakeNumbers để hiển thị ảo
+        const randomFake = fakeNumbers[Math.floor(Math.random() * fakeNumbers.length)];
+        
+        // Tạo thanh progress bar chạy ảo
+        const progress = "▓".repeat(i + 1) + "░".repeat(5 - i);
+        
+        await msg.edit(`🎰 **JACKPOT SPINNING** 🎰\n━━━━━━━━━━━━━━━━━━\n> **[ 🎰 ${randomFake} 🎰 ]**\n━━━━━━━━━━━━━━━━━━\n\`${progress}\` *Đang khớp số...*`);
+        
+        // Tốc độ nhảy (400ms là mức an toàn nhất để không bị Discord chặn)
+        await new Promise(res => setTimeout(res, 400));
+    }
 
-    // Lưu dữ liệu vào database
+    // 5. Lưu dữ liệu
     db.data.daily[userId] = today;
     await addXu(userId, xuReward);
 
-    // Kết quả cuối cùng
-    const finalEmoji = xuReward >= 3000 ? "🌟 JACKPOT! 🌟" : "🎉";
+    // 6. Hiển thị kết quả cuối cùng
+    const isJackpot = xuReward >= 3000;
+    const finalHeader = isJackpot ? "🎊 🔥 **SIÊU CẤP JACKPOT** 🔥 🎊" : "✅ **ĐIỂM DANH THÀNH CÔNG**";
     
-    return await msg.edit(`${finalEmoji} **ĐIỂM DANH THÀNH CÔNG** ${finalEmoji}\n━━━━━━━━━━━━━━━━━━\n👤 Người chơi: **${message.author.username}**\n💰 Phần thưởng: \` ${xuReward.toLocaleString()} xu \`\n━━━━━━━━━━━━━━━━━━\n*Hãy quay lại vào ngày mai!*`);
+    await msg.edit(`${finalHeader}\n━━━━━━━━━━━━━━━━━━\n👤 Người chơi: **${message.author.username}**\n💰 Nhận được: **${xuReward.toLocaleString()} xu**\n━━━━━━━━━━━━━━━━━━\n*Số dư mới của bạn đã được cập nhật!*`);
 }
 
 // =====================
