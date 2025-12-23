@@ -186,11 +186,9 @@ async function cmdTien(message) {
 }
 
 // =====================
-// ĐỔI XU <=> TIỀN
-// =====================
 async function cmdDoi(message, args) {
     try {
-        // Debug: In ra các đối số nhận được
+        // In ra các đối số nhận được từ người dùng để debug
         console.log('Arguments received:', args);
 
         // Kiểm tra nếu không có đủ 2 đối số
@@ -199,21 +197,29 @@ async function cmdDoi(message, args) {
             return;
         }
 
-        const amount = parseInt(args[0]);  // Số tiền hoặc xu
-        const unit = args[1].toLowerCase();  // Đơn vị xu/tien hoặc x/t
+        // Lấy số lượng và đơn vị (xu hoặc tien)
+        const amount = parseInt(args[0]);
+        const unit = args[1].toLowerCase();  // Đảm bảo chữ thường để tránh sai cú pháp
 
-        console.log('Amount:', amount);  // Debug: kiểm tra số lượng nhận được
-        console.log('Unit:', unit);      // Debug: kiểm tra đơn vị nhận được
+        // Debug: kiểm tra số lượng nhận được
+        console.log('Amount:', amount);  
+        console.log('Unit:', unit);  
 
-        // Kiểm tra nếu amount không phải là một số hợp lệ
+        // Kiểm tra nếu amount không phải là một số hợp lệ hoặc <= 0
         if (isNaN(amount) || amount <= 0) {
-            message.reply("❌ Số lượng không hợp lệ!");
+            message.reply("❌ Số lượng không hợp lệ! Vui lòng nhập một số lớn hơn 0.");
+            return;
+        }
+
+        // Kiểm tra nếu đơn vị không hợp lệ (xu hoặc tien)
+        if (unit !== 'xu' && unit !== 'x' && unit !== 'tien' && unit !== 't') {
+            message.reply("❗ Lệnh không hợp lệ! Hãy thử lại với đúng cú pháp: !doi <số_xu> xu hoặc !doi <số_tiền> tien");
             return;
         }
 
         const user = await getUser(message.author.id);
 
-        // Kiểm tra số xu và tiền trong tài khoản người dùng
+        // Debug: Kiểm tra thông tin người dùng
         console.log('User xu:', user.xu);
         console.log('User money:', user.money);
 
