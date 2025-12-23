@@ -238,17 +238,15 @@ async function cmdDoixu(message, args) {
 // =====================
 // ĐỔI TIỀN ➔ XU (Chờ 3s)
 // =====================
-const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-
 async function cmdDoi(message, args) {
     try {
-        // 1. Kiểm tra cú pháp: !doi 2000 xu hoặc !doi 2000 tiền
+        // 1. Kiểm tra đầu vào
         if (args.length < 2) {
             return message.reply("❗ Cách dùng: `!doi <số_lượng> <xu/tiền>`\nVí dụ: `!doi 5000 xu` hoặc `!doi 2000 tiền` ");
         }
 
         const amount = parseInt(args[0]);
-        const type = args[1].toLowerCase(); // 'xu' hoặc 'tien' (hoặc 'tiền')
+        const type = args[1].toLowerCase();
 
         if (isNaN(amount) || amount <= 0) {
             return message.reply("❌ Số lượng không hợp lệ!");
@@ -257,9 +255,9 @@ async function cmdDoi(message, args) {
         const user = await getUser(message.author.id);
         if (!user) return message.reply("❌ Không tìm thấy dữ liệu người dùng!");
 
-        // ==========================================
-        // TRƯỜNG HỢP 1: ĐỔI XU ➔ TIỀN (Chờ 4s)
-        // ==========================================
+        // ------------------------------------------
+        // TRƯỜNG HỢP 1: ĐỔI XU ➔ TIỀN (Phí bậc thang - Chờ 4s)
+        // ------------------------------------------
         if (type === "xu") {
             if (user.xu < amount) return message.reply(`❌ Bạn không đủ xu (Hiện có: ${user.xu.toLocaleString()})`);
 
@@ -275,10 +273,10 @@ async function cmdDoi(message, args) {
             
             // Hoạt ảnh 4 giây
             await sleep(2000);
-            await msg.edit("⏳ Đang tính toán phí giao dịch... [50%]");
+            await msg.edit("⏳ Đang áp dụng mức phí và chuyển đổi... [50%]");
             await sleep(2000);
 
-            // Database
+            // Cập nhật Database
             await subXu(message.author.id, amount);
             await addMoney(message.author.id, moneyOut);
 
@@ -290,22 +288,22 @@ async function cmdDoi(message, args) {
             );
         }
 
-        // ==========================================
-        // TRƯỜNG HỢP 2: ĐỔI TIỀN ➔ XU (Chờ 3s)
-        // ==========================================
+        // ------------------------------------------
+        // TRƯỜNG HỢP 2: ĐỔI TIỀN ➔ XU (Tỷ lệ 1:1 - Chờ 3s)
+        // ------------------------------------------
         else if (type === "tien" || type === "tiền") {
             if (user.money < amount) return message.reply(`❌ Bạn không đủ tiền (Hiện có: ${user.money.toLocaleString()})`);
 
-            const xuOut = amount; // Tỷ lệ 1:1 cho tiền qua xu
+            const xuOut = amount; 
 
-            const msg = await message.reply("⏳ Đang xử lý: **Tiền ➔ Xu** (Phí 0%)...");
+            const msg = await message.reply("⏳ Đang xử lý: **Tiền ➔ Xu** (Tỷ lệ 1:1)...");
 
             // Hoạt ảnh 3 giây
             await sleep(1500);
-            await msg.edit("⏳ Đang chuyển tiền vào hệ thống... [60%]");
+            await msg.edit("⏳ Đang nạp xu vào ví của bạn... [60%]");
             await sleep(1500);
 
-            // Database
+            // Cập nhật Database
             await subMoney(message.author.id, amount);
             await addXu(message.author.id, xuOut);
 
@@ -321,7 +319,7 @@ async function cmdDoi(message, args) {
         }
 
     } catch (error) {
-        console.error(error);
+        console.error("Lỗi tại lệnh !doi:", error);
         return message.reply("❌ Lỗi hệ thống: " + error.message);
     }
 }
