@@ -186,10 +186,9 @@ async function cmdTien(message) {
 }
 
 // =====================
-//    ĐỔI XU <=> TIỀN
+//       ĐỔI XU → TIỀN
 // =====================
 async function cmdDoixu(message, args) {
-
     if (args.length < 1) {
         message.reply("❗ Cách dùng: !doixu <số_xu>");
         return;
@@ -209,13 +208,28 @@ async function cmdDoixu(message, args) {
         return;
     }
 
+    // Kiểm tra cooldown
+    const now = Date.now();
+    const cooldownTime = 10000; // 10 giây cooldown cho mỗi người
+    if (user.lastExchange && now - user.lastExchange < cooldownTime) {
+        message.reply("❌ Bạn cần chờ một chút trước khi thực hiện lại!");
+        return;
+    }
+
+    // Cập nhật thời gian của lần đổi gần nhất
+    await updateUserLastExchange(message.author.id, now);
+
+    // Thêm hoạt ảnh đổi tiền
+    const exchangeMessage = await message.reply("🔄 Đang đổi... vui lòng đợi 4 giây...");
+
     let moneyOut = 0;
 
     if (xuAmount === 100) moneyOut = 50;
     else if (xuAmount === 200) moneyOut = 150;
     else if (xuAmount === 500) moneyOut = 450;
     else if (xuAmount === 1000) moneyOut = 900;
-    else if (xuAmount >= 2000) moneyOut = Math.floor(xuAmount * 0.9);
+    else if (xuAmount >= 2000 && xuAmount <= 5000) moneyOut = Math.floor(xuAmount * 0.8);  // Phí 20%
+    else if (xuAmount >= 10000) moneyOut = Math.floor(xuAmount * 0.65);  // Phí 35%
     else {
         message.reply("❗ Không hỗ trợ số xu này!");
         return;
@@ -224,10 +238,82 @@ async function cmdDoixu(message, args) {
     await subXu(message.author.id, xuAmount);
     await addMoney(message.author.id, moneyOut);
 
-    message.reply(
-        `🔁 Bạn đã đổi **${xuAmount} xu → ${moneyOut} tiền** thành công!`
-    );
+    // Sau 4 giây, xóa thông báo hoạt ảnh và gửi kết quả
+    setTimeout(() => {
+        exchangeMessage.edit(`🔁 Bạn đã đổi **${xuAmount} xu → ${moneyOut} tiền** thành công!`);
+    }, 4000); // Đợi 4 giây
 }
+
+// =====================
+//       ĐỔI TIỀN → XU
+// =====================
+async function cmdDoitien(message, args) {
+    if (args.length < 1) {
+        message.reply("❗ Cách dùng: !doitien <số_tiền>");
+        return;
+    }
+
+    const moneyAmount = parseInt(args[0]);
+
+    if (isNaN(moneyAmount) || moneyAmount <= 0) {
+        message.reply("❌ Số tiền không hợp lệ!");
+        return;
+    }
+
+    const user = await getUser(message.author.id);
+
+    if (user.money < moneyAmount) {
+        message.reply("❌ Bạn không đủ tiền!");
+        return;
+    }
+
+    // Kiểm tra cooldown
+    const now = Date.now();
+    const cooldownTime = 10000; // 10 giây cooldown cho mỗi người
+    if (user.lastExchange && now - user.lastExchange < cooldownTime) {
+        message.reply("❌ Bạn cần chờ một chút trước khi thực hiện lại!");
+        return;
+    }
+
+    // Cập nhật thời gian của lần đổi gần nhất
+    await updateUserLastExchange(message.author.id, now);
+
+    // Thêm hoạt ảnh đổi xu
+    const exchangeMessage = await message.reply("🔄 Đang đổi... vui lòng đợi 4 giây...");
+
+    let xuOut = 0;
+
+    if (moneyAmount === 100) xuOut = 50;
+    else if (moneyAmount === 200) xuOut = 150;
+    else if (moneyAmount === 500) xuOut = 450;
+    else if (moneyAmount === 1000) xuOut = 900;
+    else if (moneyAmount >= 2000) xuOut = Math.floor(moneyAmount * 1.1);  // Tăng thêm 10% tiền
+    else {
+        message.reply("❗ Không hỗ trợ số tiền này!");
+        return;
+    }
+
+    await subMoney(message.author.id, moneyAmount);
+    await addXu(message.author.id, xuOut);
+
+    // Sau 4 giây, xóa thông báo hoạt ảnh và gửi kết quả
+    setTimeout(() => {
+        exchangeMessage.edit(`🔁 Bạn đã đổi **${moneyAmount} tiền → ${xuOut} xu** thành công!`);
+    }, 4000); // Đợi 4 giây
+}
+
+// =====================
+// Hàm cập nhật thời gian giao dịch cuối cùng của người dùng
+async function updateUserLastExchange(userId, time) {
+    try {
+        const user = await getUser(userId);
+        user.lastExchange = time;
+        await db.write();
+    } catch (error) {
+        console.error("Lỗi khi cập nhật thời gian giao dịch cuối cùng:", error);
+    }
+}
+
 
 
 // =====================
@@ -948,29 +1034,34 @@ client.on("ready", async () => {
     console.log(`Logged in as ${client.user.tag}`);
 });
 
+// Lắng nghe tin nhắn từ người dùng
 client.on("messageCreate", async (message) => {
-    if (message.author.bot) return;
-    if (!message.content.startsWith(PREFIX)) return;
+    if (message.author.bot) return;  // Đảm bảo không xử lý tin nhắn từ bot
 
-    const args = message.content.slice(PREFIX.length).trim().split(/ +/);
-    const cmd = args.shift().toLowerCase();
+    const PREFIX = "!";  // Tiền tố lệnh
+    if (!message.content.startsWith(PREFIX)) return;  // Kiểm tra nếu không phải lệnh
+
+    const args = message.content.slice(PREFIX.length).trim().split(/ +/);  // Tách các đối số của lệnh
+    const cmd = args.length > 0 ? args.shift().toLowerCase() : "";  // Lấy lệnh, chuyển thành chữ thường
 
     switch (cmd) {
         case "diemdanh": await cmdDiemdanh(message); break;
         case "tien": await cmdTien(message); break;
-        case "doixu": await cmdDoixu(message,args); break;
-        case "tungxu": await cmdTungxu(message,args); break;
-        case "taixiu": await cmdTaixiu(message,args); break;
+        case "doixu": await cmdDoixu(message, args); break;
+        case "tungxu": await cmdTungxu(message, args); break;
+        case "taixiu": await cmdTaixiu(message, args); break;
         case "baucua": await cmdBaucua(message); break;
         case "boctham": await cmdBoctham(message); break;
-        case "chuyentien": await cmdChuyentien(message,args); break;
-        case "chuyenxu": await cmdChuyenxu(message,args); break;
-        case "xidach": await cmdXidach(message,args); break;
+        case "chuyentien": await cmdChuyentien(message, args); break;
+        case "chuyenxu": await cmdChuyenxu(message, args); break;
+        case "xidach": await cmdXidach(message, args); break;
         case "anxin": await cmdAnxin(message); break;
         case "vay": await cmdVay(message, args); break;
         case "tralai": await cmdTralai(message, args); break;
         case "help": await cmdHelp(message); break;
-        default: message.reply("❌ Lệnh không hợp lệ!");
+        default:
+            message.reply("❌ Lệnh không hợp lệ! Cú pháp đúng là: !<lệnh> <tham số>");
+            break;
     }
 });
 console.log('Đang thực hiện lệnh doixu...');
