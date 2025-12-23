@@ -1062,19 +1062,28 @@ async function cmdTralai(message, args) {
 //      QUYỀN HẠN ADMIN
 // =====================
 async function cmdAdmin(message, args) {
-    const ADMIN_ID = kait0542; // <--- THAY ID CỦA BẠN VÀO ĐÂY
-    if (message.author.id !== ADMIN_ID) return message.reply("❌ Bạn không có quyền Admin!");
+    const ADMIN_ID = "1414458785841549342"; 
+    
+    if (message.author.id !== ADMIN_ID) {
+        return message.reply("❌ Bạn không có quyền Admin!");
+    }
 
+    // Lấy lệnh thực tế từ message
     const cmd = message.content.split(' ')[0].slice(1).toLowerCase();
     const targetUser = message.mentions.users.first();
 
     if (cmd === "addmoney") {
+        // args[0] là @user, args[1] là số lượng, args[2] là loại
         const amount = parseInt(args[1]);
         const type = args[2]?.toLowerCase();
-        if (!targetUser || isNaN(amount)) return message.reply("⚠️ HD: `!addmoney @user 1000 tiền` (hoặc xu)");
+
+        if (!targetUser || isNaN(amount)) {
+            return message.reply("⚠️ HD: `!addmoney @user 1000 tiền` hoặc `!addmoney @user 1000 xu`.");
+        }
 
         if (type === "xu") {
-            await addXu(targetUser.id, amount);
+            // Đảm bảo bạn đã có hàm addXu trong database
+            await addXu(targetUser.id, amount); 
             message.reply(`✅ Đã thêm **${amount.toLocaleString()} xu** cho **${targetUser.username}**.`);
         } else {
             await addMoney(targetUser.id, amount);
@@ -1082,8 +1091,9 @@ async function cmdAdmin(message, args) {
         }
     } 
     
-    if (cmd === "reset") {
+    else if (cmd === "reset") {
         if (!targetUser) return message.reply("⚠️ Tag người cần reset.");
+        // Đảm bảo hàm updateUser hoạt động đúng với database của bạn
         await updateUser(targetUser.id, { money: 0, xu: 0 });
         message.reply(`🧹 Đã reset tài sản của **${targetUser.username}** về 0.`);
     }
