@@ -1142,7 +1142,7 @@ async function cmdHelp(message) {
         .setColor('#FFD700')
         .setTimestamp();
 
-    // Tạo hàng nút bấm (Nút Admin đã thay bằng Ngân Hàng)
+    // Tạo hàng nút bấm
     const row = new ActionRowBuilder().addComponents(
         new ButtonBuilder()
             .setCustomId('h_eco')
@@ -1191,7 +1191,6 @@ async function cmdHelp(message) {
                  );
         } 
         else if (i.customId === 'h_bank') {
-            // === CẬP NHẬT: BẢNG GIÁ ĐỔI XU MỚI & CHÍNH SÁCH VAY ===
             embed.setTitle('🏦 NGÂN HÀNG & TỶ GIÁ')
                  .addFields(
                     { 
@@ -1230,10 +1229,8 @@ async function cmdHelp(message) {
 // =====================
 
 client.on("messageCreate", async (message) => {
-    // 1. Chống bot và kiểm tra Prefix
     if (message.author.bot || !message.content.startsWith(PREFIX)) return;
 
-    // 2. Tách lệnh và đối số
     const args = message.content.slice(PREFIX.length).trim().split(/ +/);
     const cmd = args.shift().toLowerCase();
 
@@ -1241,23 +1238,19 @@ client.on("messageCreate", async (message) => {
         switch (cmd) {
             case "diemdanh": await cmdDiemdanh(message); break;
             case "tien": await cmdTien(message); break;
-            
-            // Lệnh đổi tiền
             case "doi": await handleExchange(message, args[0], args[1]); break;
             case "doixu": await handleExchange(message, args[0], "xu"); break;
             case "doitien": await handleExchange(message, args[0], "tien"); break;
 
-            // Lệnh Admin
             case "addmoney":
             case "reset": 
-                await cmdAdmin(message, args); 
+                if (typeof cmdAdmin !== 'undefined') await cmdAdmin(message, args); 
                 break; 
 
-            // Các lệnh game khác
             case "tungxu": if(typeof cmdTungxu !== 'undefined') await cmdTungxu(message, args); break;
             case "taixiu": if(typeof cmdTaixiu !== 'undefined') await cmdTaixiu(message, args); break;
             case "baucua": if(typeof cmdBaucua !== 'undefined') await cmdBaucua(message, args); break;
-            case "help": if(typeof cmdHelp !== 'undefined') await cmdHelp(message); break;
+            case "help": await cmdHelp(message); break;
 
             default: 
                 break;
@@ -1265,8 +1258,7 @@ client.on("messageCreate", async (message) => {
     } catch (error) {
         console.error("Lỗi lệnh chat:", error);
     }
-}); // <--- PHẢI CÓ DẤU NÀY ĐỂ ĐÓNG client.on
+});
 
 // -------------------- BOT LOGIN --------------------
-// Đảm bảo dòng này là dòng cuối cùng và không nằm trong bất kỳ ngoặc nhọn nào
 client.login(process.env.TOKEN);
