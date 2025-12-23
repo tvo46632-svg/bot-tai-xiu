@@ -350,66 +350,52 @@ client.on("interactionCreate", async (interaction) => {
     }
 });
 // =====================
-// TUNG XU (v5 - Ngửa/Sấp Viết Tắt)
-// =====================
 async function cmdTungxu(message, args) {
     if (args.length < 2) {
-        return message.reply("❗ Cách dùng: `!tungxu <số_xu> <ngửa/sấp>` (hoặc n/s)");
+        return message.reply("### ❗ Cách dùng: `!tungxu <số_xu> <n/s>`");
     }
 
     const betXu = parseInt(args[0]);
     let userChoice = args[1].toLowerCase();
 
-    // Hỗ trợ viết tắt n/s hoặc ngửa/sấp
     if (userChoice === "n" || userChoice === "ngửa") userChoice = "ngửa";
     if (userChoice === "s" || userChoice === "sấp") userChoice = "sấp";
 
-    if (isNaN(betXu) || betXu <= 0) return message.reply("❌ Số xu không hợp lệ!");
-    if (!["ngửa", "sấp"].includes(userChoice)) return message.reply("❌ Bạn phải chọn: `ngửa` (n) hoặc `sấp` (s)!");
+    if (isNaN(betXu) || betXu <= 0) return message.reply("> ❌ Số xu không hợp lệ!");
+    if (!["ngửa", "sấp"].includes(userChoice)) return message.reply("> ❌ Chọn: `ngửa` (n) hoặc `sấp` (s)!");
 
     const user = await getUser(message.author.id);
-    if (user.xu < betXu) return message.reply("❌ Bạn không đủ xu để cược!");
+    if (user.xu < betXu) return message.reply("> ❌ Bạn không đủ xu để cược!");
 
     await subXu(message.author.id, betXu);
 
-    // Cấu hình Emoji hiển thị
-    const EMOTE_NGUA = "🏛️"; // Mặt ngửa (có hình)
-    const EMOTE_SAP = "🟡";  // Mặt sấp (vàng óng)
+    const EMOTE_NGUA = "🏛️"; 
+    const EMOTE_SAP = "🟡";  
 
-    // 1. Khởi động búng xu
-    const msg = await message.reply(`🪙 **Vút...** ${message.author.username} đã búng đồng xu lên không trung!`);
+    // Tin nhắn ban đầu nhỏ gọn
+    const msg = await message.reply(`> 🪙 **${message.author.username}** đang búng xu...`);
 
-    // 2. Hoạt ảnh xoay lật (Animation)
-    const spinFrames = [
-        EMOTE_SAP, 
-        "➖", // Cạnh xu
-        EMOTE_NGUA, 
-        "➖", 
-        EMOTE_SAP, 
-        "✨"
-    ]; 
+    const spinFrames = [EMOTE_SAP, "➖", EMOTE_NGUA, "➖", EMOTE_SAP, "✨"]; 
     
     for (let i = 0; i < spinFrames.length; i++) {
-        // Tốc độ 300ms để animation mượt và nhanh giống búng tay
         await new Promise(res => setTimeout(res, 300)); 
-        await msg.edit(`✨ **ĐANG XOAY...** ✨\n>        ${spinFrames[i]}        \n[ ▒▒▒▒▒▒▒▒▒▒ ]`);
+        // Dùng định dạng nhỏ gọn
+        await msg.edit(`### ✨ Đang xoay... ${spinFrames[i]}`);
     }
 
-    // 3. Kết quả ngẫu nhiên 50/50
     const result = Math.random() < 0.5 ? "ngửa" : "sấp";
     const resultEmoji = (result === "ngửa") ? EMOTE_NGUA : EMOTE_SAP;
 
-    // Tạm dừng ngắn để tăng độ hồi hộp
     await new Promise(res => setTimeout(res, 500));
 
-    // 4. Kiểm tra kết quả và trả thưởng
     if (result === userChoice) {
         const rewardXu = betXu * 2;
         await addXu(message.author.id, rewardXu);
         
-        return await msg.edit(`🪙 **ĐỒNG XU ĐÃ RƠI!**\n━━━━━━━━━━━━━━━━━━\n> Kết quả: **${resultEmoji} (${result.toUpperCase()})**\n\n🎉 **BẠN THẮNG!** Chúc mừng bạn nhận được **+${rewardXu.toLocaleString()} xu**.`);
+        // Kết quả trình bày gọn gàng trong Blockquote
+        return await msg.edit(`### 🪙 KẾT QUẢ: ${resultEmoji}\n> 🎉 **Thắng:** +${rewardXu.toLocaleString()} xu`);
     } else {
-        return await msg.edit(`🪙 **ĐỒNG XU ĐÃ RƠI!**\n━━━━━━━━━━━━━━━━━━\n> Kết quả: **${resultEmoji} (${result.toUpperCase()})**\n\n💸 **BẠN THUA!** Bạn đã mất **-${betXu.toLocaleString()} xu**.`);
+        return await msg.edit(`### 🪙 KẾT QUẢ: ${resultEmoji}\n> 💸 **Thua:** -${betXu.toLocaleString()} xu`);
     }
 }
 // =====================
