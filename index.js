@@ -214,84 +214,108 @@ async function cmdTien(message) {
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 // ==========================================
-// 2. HÀM XỬ LÝ ĐỔI TIỀN CHÍNH
+// 2. HÀM XỬ LÝ ĐỔI TIỀN (ĐÃ FIX & THÊM LOG)
 // ==========================================
-async function handleExchange(message, amount, type) {
+async function handleExchange(message, amountInput, typeInput) {
     try {
+        // 1. Log ra xem Bot nhận được gì (Xem trong Terminal/Console)
+        console.log(`Debug đổi tiền: User=${message.author.id}, Amount=${amountInput}, Type=${typeInput}`);
+
+        // 2. Kiểm tra số lượng hợp lệ
+        const amount = parseInt(amountInput); // Ép về số nguyên
         if (!amount || isNaN(amount) || amount <= 0) {
-            return message.reply("❌ Số lượng không hợp lệ!");
+            return message.reply("❌ Số lượng không hợp lệ! Ví dụ: `!doi 10000 xu`");
         }
 
         const user = await getUser(message.author.id);
-        if (!user) return message.reply("❌ Không tìm thấy dữ liệu người dùng!");
+        if (!user) return message.reply("❌ Không tìm thấy ví của bạn!");
 
-        // --- TRƯỜNG HỢP: ĐỔI XU -> TIỀN ---
+        // 3. Ép kiểu dữ liệu trong ví về số (Tránh lỗi String < Number)
+        // LƯU Ý: Kiểm tra kỹ xem database của bạn lưu là 'xu' hay 'Xu' hay 'coins'
+        const currentXu = Number(user.xu || 0); 
+        const currentMoney = Number(user.money || 0);
+
+        // Chuẩn hóa loại tiền (xóa khoảng trắng, về chữ thường)
+        const type = typeInput.trim().toLowerCase();
+
+        // ======================================
+        // CASE 1: ĐỔI XU -> TIỀN
+        // ======================================
         if (type === "xu") {
-            if (user.xu < amount) return message.reply(`❌ Bạn không đủ xu! (Hiện có: ${user.xu.toLocaleString()})`);
-            
+            // Kiểm tra số dư
+            if (currentXu < amount) {
+                return message.reply(`❌ Bạn không đủ Xu! (Có: ${currentXu.toLocaleString()} xu)`);
+            }
+
+            // Tính phí
             let phi = amount < 5000 ? 0 : (amount < 20000 ? 0.20 : 0.35);
             const moneyOut = Math.floor(amount * (1 - phi));
 
-            const msg = await message.reply(`⏳ Đang xử lý: **Xu ➔ Tiền** (Phí ${phi * 100}%)...`);
-            await sleep(2000);
-            await msg.edit("⏳ Đang xác nhận giao dịch... [50%]");
-            await sleep(2000);
-
+            const msg = await message.reply(`⏳ Đang đổi **${amount.toLocaleString()} Xu** ➔ **Tiền**...`);
+            
+            // Thực hiện trừ/cộng trong DB
             await subXu(message.author.id, amount);
             await addMoney(message.author.id, moneyOut);
 
-            const finalMsg = `✅ **THÀNH CÔNG**\n🔁 Đã đổi: **${amount.toLocaleString()} xu**\n💰 Nhận: **${moneyOut.toLocaleString()} tiền**\n*(Tin nhắn tự xóa sau 5s)*`;
-            
-            return await msg.edit(finalMsg).then(m => {
-                setTimeout(() => {
-                    m.delete().catch(() => {}); 
-                    message.delete().catch(() => {}); 
-                }, 5000);
-            });
+            return msg.edit(`✅ **THÀNH CÔNG**\n➖ Trừ: **${amount.toLocaleString()} Xu**\n➕ Nhận: **${moneyOut.toLocaleString()} Tiền**`);
         }
 
-        // --- TRƯỜNG HỢP: ĐỔI TIỀN -> XU ---
-        if (type === "tien" || type === "tiền") {
-            if (user.money < amount) return message.reply(`❌ Bạn không đủ tiền! (Hiện có: ${user.money.toLocaleString()})`);
+        // ======================================
+        // CASE 2: ĐỔI TIỀN -> XU
+        // ======================================
+        // Chấp nhận nhiều cách viết: tien, tiền, money
+        else if (["tien", "tiền", "money"].includes(type)) {
+            if (currentMoney < amount) {
+                return message.reply(`❌ Bạn không đủ Tiền! (Có: ${currentMoney.toLocaleString()} tiền)`);
+            }
 
-            const msg = await message.reply("⏳ Đang xử lý: **Tiền ➔ Xu**...");
-            await sleep(1500);
-            await msg.edit("⏳ Đang nạp xu vào ví... [60%]");
-            await sleep(1500);
+            const msg = await message.reply(`⏳ Đang đổi **${amount.toLocaleString()} Tiền** ➔ **Xu**...`);
 
+            // Thực hiện trừ/cộng trong DB
             await subMoney(message.author.id, amount);
             await addXu(message.author.id, amount);
 
-            const finalMsg = `✅ **THÀNH CÔNG**\n🔁 Đã đổi: **${amount.toLocaleString()} tiền**\n💎 Nhận: **${amount.toLocaleString()} xu**\n*(Tin nhắn tự xóa sau 5s)*`;
-            
-            return await msg.edit(finalMsg).then(m => {
-                setTimeout(() => {
-                    m.delete().catch(() => {}); 
-                    message.delete().catch(() => {});
-                }, 5000);
-            });
+            return msg.edit(`✅ **THÀNH CÔNG**\n➖ Trừ: **${amount.toLocaleString()} Tiền**\n➕ Nhận: **${amount.toLocaleString()} Xu**`);
+        } 
+        
+        // ======================================
+        // CASE 3: KHÔNG HIỂU LỆNH (nó bị "0 th" - im lặng)
+        // ======================================
+        else {
+            return message.reply(`❌ Loại tiền không hợp lệ!\nDùng: \`!doi <số> xu\` hoặc \`!doi <số> tien\``);
         }
+
     } catch (e) {
-        console.error("Lỗi tại handleExchange:", e);
+        console.error("Lỗi Crash tại handleExchange:", e);
+        return message.reply(`❌ Lỗi hệ thống: ${e.message}`);
     }
 }
-
 // ==========================================
 // 3. CÁC HÀM GỌI LỆNH (COMMANDS)
 // ==========================================
 async function cmdDoi(message, args) {
-    if (args.length < 2) return message.reply("❗ Cách dùng: `!doi <số_lượng> <xu/tiền>`");
-    await handleExchange(message, parseInt(args[0]), args[1].toLowerCase());
+    // args nhận vào từ message event nên được tách chuẩn
+    // Ví dụ cách tách chuẩn trong event messageCreate:
+    // const args = message.content.slice(prefix.length).trim().split(/ +/);
+    
+    if (args.length < 2) {
+        return message.reply("❗ Sai cú pháp! Dùng: `!doi <số_lượng> <xu/tiền>`\nVí dụ: `!doi 5000 xu`");
+    }
+    
+    // args[0] là số lượng, args[1] là loại tiền
+    await handleExchange(message, args[0], args[1]);
 }
 
 async function cmdDoixu(message, args) {
-    if (args.length < 1) return message.reply("❗ Cách dùng: `!doixu <số_xu>`");
-    await handleExchange(message, parseInt(args[0]), "xu");
+    if (args.length < 1) return message.reply("❗ Dùng: `!doixu <số_xu>`");
+    // Mặc định type là "xu"
+    await handleExchange(message, args[0], "xu");
 }
 
 async function cmdDoitien(message, args) {
-    if (args.length < 1) return message.reply("❗ Cách dùng: `!doitien <số_tiền>`");
-    await handleExchange(message, parseInt(args[0]), "tien");
+    if (args.length < 1) return message.reply("❗ Dùng: `!doitien <số_tiền>`");
+    // Mặc định type là "tien"
+    await handleExchange(message, args[0], "tien");
 }
 // 1. Khai báo lệnh Slash
 const doiCommand = new SlashCommandBuilder()
