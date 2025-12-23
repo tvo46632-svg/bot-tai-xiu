@@ -294,16 +294,43 @@ async function updateUserLastExchange(userId, time) {
     } catch (error) {
         console.error("Lỗi khi cập nhật thời gian giao dịch cuối cùng:", error);
     }
+}
 
-// Hàm cập nhật thời gian giao dịch cuối cùng của người dùng
-async function updateUserLastExchange(userId, time) {
-    try {
-        const user = await getUser(userId);
-        user.lastExchange = time;
-        await db.write();
-    } catch (error) {
-        console.error("Lỗi khi cập nhật thời gian giao dịch cuối cùng:", error);
-    }
+// Hàm lấy thông tin người dùng (ví dụ: số tiền, xu)
+async function getUser(userId) {
+    db.data.users[userId] ||= { money: 0, xu: 0, lastExchange: 0 };
+    await db.write();
+    return db.data.users[userId];
+}
+
+// Hàm trừ xu
+async function subXu(userId, amount) {
+    const user = await getUser(userId);
+    user.xu -= amount;
+    if (user.xu < 0) user.xu = 0;
+    await db.write();
+}
+
+// Hàm cộng tiền
+async function addMoney(userId, amount) {
+    const user = await getUser(userId);
+    user.money += amount;
+    await db.write();
+}
+
+// Hàm trừ tiền
+async function subMoney(userId, amount) {
+    const user = await getUser(userId);
+    user.money -= amount;
+    if (user.money < 0) user.money = 0;
+    await db.write();
+}
+
+// Hàm cộng xu
+async function addXu(userId, amount) {
+    const user = await getUser(userId);
+    user.xu += amount;
+    await db.write();
 }
 // =====================
 // TUNG XU (v2 cải tiến) với hoạt ảnh
