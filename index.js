@@ -1090,12 +1090,5 @@ client.on("messageCreate", async (message) => {
 
 const finalMsg = `✅ **THÀNH CÔNG**\n🔁 Đã đổi: **${amount.toLocaleString()} xu**\n💰 Nhận: **${moneyOut.toLocaleString()} tiền**`;
 
-// Gửi tin nhắn và thiết lập tự xóa sau 5 giây
-return await msg.edit(finalMsg).then(m => {
-    setTimeout(() => {
-        m.delete().catch(() => {}); // Xóa tin nhắn của Bot
-        input.delete().catch(() => {}); // Xóa tin nhắn !doi của bạn
-    }, 5000); // 5000ms = 5 giây
-});
 // -------------------- BOT LOGIN --------------------
 client.login(process.env.TOKEN);
