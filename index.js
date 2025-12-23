@@ -1210,44 +1210,62 @@ client.on("messageCreate", async (message) => {
         switch (cmd) {
             case "diemdanh": await cmdDiemdanh(message); break;
             case "tien": await cmdTien(message); break;
-            case "tungxu": await cmdTungxu(message, args); break;
-            case "taixiu": await cmdTaixiu(message, args); break; 
-            case "baucua": await cmdBaucua(message, args); break;
-            case "boctham": await cmdBoctham(message, args); break;
-            case "chuyentien": await cmdChuyentien(message, args); break;
-            case "chuyenxu": await cmdChuyenxu(message, args); break;
-            case "xidach": await cmdXidach(message, args); break;
-            case "anxin": await cmdAnxin(message); break;
-            case "vay": await cmdVay(message, args); break;
-            case "tralai": await cmdTralai(message, args); break;
-
-            // TÁCH RIÊNG LỆNH ĐỔI TIỀN CHO NGƯỜI DÙNG
-           case "doi": 
-                await cmdDoi(message, args); // Gọi hàm xử lý chung (cần cả số lượng và loại)
+            
+            // Lệnh đổi tiền (Sửa lại để khớp với hàm handleExchange đã viết)
+            case "doi": 
+                await handleExchange(message, args[0], args[1]); 
                 break;
             case "doixu": 
-                await cmdDoixu(message, args); // Chỉ cần số lượng, mặc định đổi XU -> TIỀN
+                await handleExchange(message, args[0], "xu"); 
                 break;
             case "doitien": 
-                await cmdDoitien(message, args); // Chỉ cần số lượng, mặc định đổi TIỀN -> XU
+                await handleExchange(message, args[0], "tien"); 
                 break;
 
-            // TÁCH RIÊNG LỆNH ADMIN (Chỉ bạn mới dùng được)
+            // Lệnh Admin
             case "addmoney":
             case "reset": 
                 await cmdAdmin(message, args); 
                 break; 
 
-            case "help": await cmdHelp(message); break;
+            // Các lệnh game khác (Đảm bảo bạn đã khai báo các hàm này bên trên)
+            case "tungxu": if(typeof cmdTungxu !== 'undefined') await cmdTungxu(message, args); break;
+            case "taixiu": if(typeof cmdTaixiu !== 'undefined') await cmdTaixiu(message, args); break;
+            case "baucua": if(typeof cmdBaucua !== 'undefined') await cmdBaucua(message, args); break;
+            case "help": if(typeof cmdHelp !== 'undefined') await cmdHelp(message); break;
 
             default: 
-                const msg = await message.reply("❌ Lệnh không hợp lệ! Gõ `!help` để xem danh sách.");
-                setTimeout(() => msg.delete().catch(() => {}), 5000);
                 break;
-      }
+        }
     } catch (error) {
         console.error("Lỗi lệnh chat:", error);
     }
-});
+}); // <--- Dấu này đóng client.on, thiếu cái này là bot crash!
+
+// =====================
+//      HÀM ADMIN CHUẨN
+// =====================
+async function cmdAdmin(message, args) {
+    const ADMIN_ID = "ID_CUA_BAN_O_DAY"; // THAY ID CỦA BẠN VÀO ĐÂY
+    if (message.author.id !== ADMIN_ID) return message.reply("❌ Bạn không phải Admin!");
+
+    const subCmd = message.content.slice(PREFIX.length).trim().split(/ +/)[0].toLowerCase();
+
+    if (subCmd === "addmoney") {
+        const targetUser = message.mentions.users.first();
+        const amount = parseInt(args[1]);
+        const type = args[2] ? args[2].toLowerCase() : "tien";
+
+        if (!targetUser || isNaN(amount)) return message.reply("⚠️ HD: `!addmoney @user 1000 xu` (hoặc tiền)");
+
+        if (type === "xu") {
+            await addXu(targetUser.id, amount);
+            message.reply(`✅ Đã thêm **${amount.toLocaleString()} xu** cho ${targetUser.username}`);
+        } else {
+            await addMoney(targetUser.id, amount);
+            message.reply(`✅ Đã thêm **${amount.toLocaleString()} tiền** cho ${targetUser.username}`);
+        }
+    }
+}
 // -------------------- BOT LOGIN --------------------
 client.login(process.env.TOKEN);
