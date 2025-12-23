@@ -193,17 +193,19 @@ async function cmdDoi(message, args) {
         // Debug: In ra các đối số nhận được
         console.log('Arguments:', args);
 
+        // Kiểm tra nếu không có đủ 2 đối số
         if (args.length < 2) {
             message.reply("❗ Cách dùng: !doi <số_xu> xu hoặc !doi <số_tiền> tien");
             return;
         }
 
-        const amount = parseInt(args[0]);
-        const unit = args[1].toLowerCase(); // Lấy đơn vị từ đối số thứ hai (xu hoặc tien)
+        const amount = parseInt(args[0]);  // Số tiền hoặc xu
+        const unit = args[1].toLowerCase();  // Đơn vị xu/tien hoặc x/t
 
         console.log('Amount:', amount);
         console.log('Unit:', unit);
 
+        // Kiểm tra nếu amount không phải là một số hợp lệ
         if (isNaN(amount) || amount <= 0) {
             message.reply("❌ Số lượng không hợp lệ!");
             return;
@@ -225,7 +227,7 @@ async function cmdDoi(message, args) {
         // Hiển thị hoạt ảnh đang đổi (3 chấm hoặc biểu tượng)
         const exchangeMessage = await message.reply("🔄 Đang đổi... vui lòng đợi 4 giây...");
 
-        // Kiểm tra nếu người dùng muốn đổi xu ra tiền
+        // Kiểm tra đơn vị và xử lý đổi xu ra tiền
         if (unit === 'xu' || unit === 'x') {
             console.log('Đang xử lý đổi xu ra tiền...');
             // Đổi xu ra tiền
@@ -289,6 +291,7 @@ async function cmdDoi(message, args) {
             return;
         }
 
+        // Nếu không phải xu hoặc tiền, thông báo cách dùng
         message.reply("❗ Cách dùng: !doi <số_xu> xu hoặc !doi <số_tiền> tien");
     } catch (error) {
         console.error("Lỗi khi xử lý lệnh !doi:", error);
