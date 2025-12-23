@@ -197,7 +197,7 @@ client.on("messageCreate", async (message) => {
     const args = message.content.slice(PREFIX.length).trim().split(/ +/);  // Tách các đối số của lệnh
     const cmd = args.length > 0 ? args.shift().toLowerCase() : "";  // Lấy lệnh, chuyển thành chữ thường
 
-    // Xử lý lệnh !doi
+    // Lệnh đổi tiền và xu
     if (cmd === "doi") {
         if (args.length < 2) {
             message.reply("❗ Cách dùng: !doi <số_xu> xu hoặc !doi <số_tiền> tien");
@@ -990,68 +990,72 @@ giới hạn từ 1-1000
     await message.reply(helpText);
 }
 
-// =====================
-//      MAIN EVENTS
-// =====================
-
+    // -------------------- MAIN EVENTS --------------------
 client.on("messageCreate", async (message) => {
-    if (message.author.bot) return;
+    if (message.author.bot) return;  // Đảm bảo không xử lý tin nhắn từ bot
 
     const PREFIX = "!";  // Tiền tố lệnh
-    if (!message.content.startsWith(PREFIX)) return;
+    if (!message.content.startsWith(PREFIX)) return;  // Kiểm tra nếu không phải lệnh
 
     const args = message.content.slice(PREFIX.length).trim().split(/ +/);  // Tách các đối số của lệnh
     const cmd = args.length > 0 ? args.shift().toLowerCase() : "";  // Lấy lệnh, chuyển thành chữ thường
 
-    switch (cmd) {
-        case "diemdanh":
-            await cmdDiemdanh(message);
-            break;
-        case "tien":
-            await cmdTien(message);
-            break;
-        case "doixu":
-            await cmdDoixu(message, args);
-            break;
-        case "tungxu":
-            await cmdTungxu(message, args);
-            break;
-        case "taixiu":
-            await cmdTaixiu(message, args);
-            break;
-        case "baucua":
-            await cmdBaucua(message);
-            break;
-        case "boctham":
-            await cmdBoctham(message);
-            break;
-        case "chuyentien":
-            await cmdChuyentien(message, args);
-            break;
-        case "chuyenxu":
-            await cmdChuyenxu(message, args);
-            break;
-        case "xidach":
-            await cmdXidach(message, args);
-            break;
-        case "anxin":
-            await cmdAnxin(message);
-            break;
-        case "vay":
-            await cmdVay(message, args);
-            break;
-        case "tralai":
-            await cmdTralai(message, args);
-            break;
-        case "help":
-            await cmdHelp(message);
-            break;
-        default:
-            message.reply("❌ Lệnh không hợp lệ! Cú pháp đúng là: !<lệnh> <tham số>");
-            break;
+    try {
+        // Xử lý các lệnh
+        switch (cmd) {
+            case "diemdanh":
+                await cmdDiemdanh(message);
+                break;
+            case "tien":
+                await cmdTien(message);
+                break;
+            case "doixu":
+                await cmdDoixu(message, args);
+                break;
+            case "tungxu":
+                await cmdTungxu(message, args);
+                break;
+            case "taixiu":
+                await cmdTaixiu(message, args);
+                break;
+            case "baucua":
+                await cmdBaucua(message);
+                break;
+            case "boctham":
+                await cmdBoctham(message);
+                break;
+            case "chuyentien":
+                await cmdChuyentien(message, args);
+                break;
+            case "chuyenxu":
+                await cmdChuyenxu(message, args);
+                break;
+            case "xidach":
+                await cmdXidach(message, args);
+                break;
+            case "anxin":
+                await cmdAnxin(message);
+                break;
+            case "vay":
+                await cmdVay(message, args);
+                break;
+            case "tralai":
+                await cmdTralai(message, args);
+                break;
+            case "help":
+                await cmdHelp(message);
+                break;
+            default:
+                message.reply("❌ Lệnh không hợp lệ! Cú pháp đúng là: !<lệnh> <tham số>");
+                break;
+        }
+    } catch (error) {
+        console.error("Lỗi khi xử lý lệnh:", error);
+        message.reply("❌ Đã có lỗi xảy ra, vui lòng thử lại sau!");
     }
 });
-console.log('Đang thực hiện lệnh doixu...');
+
+console.log('Bot đang chạy và xử lý lệnh...');
 
 // -------------------- BOT LOGIN --------------------
 client.login(process.env.TOKEN);
