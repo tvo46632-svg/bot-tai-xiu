@@ -8,6 +8,7 @@ const {
     Client,
     GatewayIntentBits,
     Partials,
+    EmbedBuilder,
     ActionRowBuilder,
     ButtonBuilder,
     ButtonStyle
