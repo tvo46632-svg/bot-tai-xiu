@@ -994,36 +994,58 @@ giới hạn từ 1-1000
 //      MAIN EVENTS
 // =====================
 
-client.on("ready", async () => {
-    await initDB();
-    console.log(`Logged in as ${client.user.tag}`);
-});
-
-// Lắng nghe tin nhắn từ người dùng
 client.on("messageCreate", async (message) => {
-    if (message.author.bot) return;  // Đảm bảo không xử lý tin nhắn từ bot
+    if (message.author.bot) return;
 
     const PREFIX = "!";  // Tiền tố lệnh
-    if (!message.content.startsWith(PREFIX)) return;  // Kiểm tra nếu không phải lệnh
+    if (!message.content.startsWith(PREFIX)) return;
 
     const args = message.content.slice(PREFIX.length).trim().split(/ +/);  // Tách các đối số của lệnh
     const cmd = args.length > 0 ? args.shift().toLowerCase() : "";  // Lấy lệnh, chuyển thành chữ thường
 
     switch (cmd) {
-        case "diemdanh": await cmdDiemdanh(message); break;
-        case "tien": await cmdTien(message); break;
-        case "doixu": await cmdDoixu(message, args); break;
-        case "tungxu": await cmdTungxu(message, args); break;
-        case "taixiu": await cmdTaixiu(message, args); break;
-        case "baucua": await cmdBaucua(message); break;
-        case "boctham": await cmdBoctham(message); break;
-        case "chuyentien": await cmdChuyentien(message, args); break;
-        case "chuyenxu": await cmdChuyenxu(message, args); break;
-        case "xidach": await cmdXidach(message, args); break;
-        case "anxin": await cmdAnxin(message); break;
-        case "vay": await cmdVay(message, args); break;
-        case "tralai": await cmdTralai(message, args); break;
-        case "help": await cmdHelp(message); break;
+        case "diemdanh":
+            await cmdDiemdanh(message);
+            break;
+        case "tien":
+            await cmdTien(message);
+            break;
+        case "doixu":
+            await cmdDoixu(message, args);
+            break;
+        case "tungxu":
+            await cmdTungxu(message, args);
+            break;
+        case "taixiu":
+            await cmdTaixiu(message, args);
+            break;
+        case "baucua":
+            await cmdBaucua(message);
+            break;
+        case "boctham":
+            await cmdBoctham(message);
+            break;
+        case "chuyentien":
+            await cmdChuyentien(message, args);
+            break;
+        case "chuyenxu":
+            await cmdChuyenxu(message, args);
+            break;
+        case "xidach":
+            await cmdXidach(message, args);
+            break;
+        case "anxin":
+            await cmdAnxin(message);
+            break;
+        case "vay":
+            await cmdVay(message, args);
+            break;
+        case "tralai":
+            await cmdTralai(message, args);
+            break;
+        case "help":
+            await cmdHelp(message);
+            break;
         default:
             message.reply("❌ Lệnh không hợp lệ! Cú pháp đúng là: !<lệnh> <tham số>");
             break;
