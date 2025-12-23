@@ -723,146 +723,130 @@ async function cmdBoctham(message) {
 // ===================== CHUYỂN TIỀN =====================
 
 async function cmdChuyentien(message, args) {
+    const userId = message.author.id;
+    
+    // 1. Kiểm tra nợ trước tiên
+    const userDebt = await getUserDebt(userId) || 0;
+    if (userDebt > 0) {
+        return message.reply(`### 🚫 Giao dịch bị khóa\n> Bạn đang nợ bot **${userDebt.toLocaleString()} xu**. Hãy dùng lệnh \`!tralai\` để trả nợ trước!`);
+    }
+
     const target = message.mentions.users.first();
     const amount = parseInt(args[1]);
 
-    // 1. Kiểm tra đầu vào
+    // 2. Kiểm tra đầu vào
     if (!target || isNaN(amount) || amount <= 0) 
         return message.reply("> ❗ HD: `!chuyentien @user <số tiền>`");
     
-    if (target.id === message.author.id) 
+    if (target.id === userId) 
         return message.reply("> ❌ Bạn không thể tự chuyển tiền cho chính mình!");
 
-    const senderData = await getUser(message.author.id);
+    const senderData = await getUser(userId);
     if (senderData.money < amount) 
         return message.reply("> ❌ Bạn không đủ tiền trong tài khoản!");
 
-    // 2. Tính toán phí chuyển (5%)
+    // 3. Tính toán phí 5%
     const fee = Math.floor(amount * 0.05);
-    const totalDeduction = amount; // Tổng trừ người gửi (đã bao gồm phí trong số tiền gửi hoặc trừ thêm tùy bạn, ở đây là trừ đúng số tiền gửi)
-    const netAmount = amount - fee; // Số tiền người nhận thực tế nhận được
+    const netAmount = amount - fee;
 
-    // 3. Tạo nút xác nhận
     const row = new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-            .setCustomId('confirm_transfer')
-            .setLabel('Nhận tiền')
-            .setStyle(ButtonStyle.Success),
-        new ButtonBuilder()
-            .setCustomId('cancel_transfer')
-            .setLabel('Từ chối')
-            .setStyle(ButtonStyle.Danger)
+        new ButtonBuilder().setCustomId('confirm_transfer').setLabel('Nhận tiền').setStyle(ButtonStyle.Success),
+        new ButtonBuilder().setCustomId('cancel_transfer').setLabel('Từ chối').setStyle(ButtonStyle.Danger)
     );
 
     const mainMsg = await message.reply({
-        content: `### 💸 Yêu cầu chuyển tiền\n> 👤 **Người gửi:** ${message.author}\n> 👤 **Người nhận:** ${target}\n> 💰 **Số tiền:** \`${netAmount.toLocaleString()}\` (Đã trừ phí 5%)\n> ⏳ *Hết hạn sau 60 giây. ${target}, vui lòng xác nhận bên dưới!*`,
+        content: `### 💸 Yêu cầu chuyển tiền\n> 👤 **Gửi:** ${message.author.username} ➔ **Nhận:** ${target.username}\n> 💰 **Thực nhận:** \`${netAmount.toLocaleString()}\` (Phí 5%: ${fee})\n> ⏳ *Hết hạn sau 60s.*`,
         components: [row]
     });
 
-    // 4. Bộ thu thập phản hồi (Collector) trong 1 phút
-    const filter = i => (i.customId === 'confirm_transfer' || i.customId === 'cancel_transfer') && i.user.id === target.id;
+    // 4. Collector: Cho phép cả 2 nhấn nút
+    const filter = i => (i.customId === 'confirm_transfer' || i.customId === 'cancel_transfer') && (i.user.id === target.id || i.user.id === userId);
     const collector = mainMsg.createMessageComponentCollector({ filter, time: 60000 });
 
     collector.on('collect', async i => {
         if (i.customId === 'confirm_transfer') {
-            // Kiểm tra lại tiền người gửi một lần nữa trước khi thực hiện
-            const finalCheck = await getUser(message.author.id);
-            if (finalCheck.money < amount) {
-                return i.update({ content: "> ❌ Giao dịch thất bại: Người gửi không còn đủ tiền!", components: [] });
-            }
+            const finalCheck = await getUser(userId);
+            if (finalCheck.money < amount) return i.update({ content: "> ❌ Người gửi không còn đủ tiền!", components: [] });
 
-            // Thực hiện chuyển tiền
-            await subMoney(message.author.id, amount);
+            await subMoney(userId, amount);
             await addMoney(target.id, netAmount);
 
             await i.update({
-                content: `### ✅ Giao dịch thành công\n> 💸 **${target.username}** đã nhận **${netAmount.toLocaleString()}** tiền từ **${message.author.username}**.\n> 🏛️ Phí hệ thống: \`${fee.toLocaleString()}\``,
+                content: `### ✅ Giao dịch thành công\n> 💸 **${target.username}** đã nhận **${netAmount.toLocaleString()}** tiền từ **${message.author.username}**.`,
                 components: []
             });
         } else {
-            await i.update({ content: `> ❌ **${target.username}** đã từ chối nhận tiền. Giao dịch bị hủy.`, components: [] });
+            await i.update({ content: `> ❌ Giao dịch đã bị hủy bởi **${i.user.username}**.`, components: [] });
         }
         collector.stop();
     });
 
     collector.on('end', collected => {
-        if (collected.size === 0) {
-            mainMsg.edit({ content: "> ⏳ Giao dịch đã hết hạn (60s) và tự động hủy bỏ.", components: [] }).catch(() => {});
-        }
+        if (collected.size === 0) mainMsg.edit({ content: "> ⏳ Giao dịch đã hết hạn.", components: [] }).catch(() => {});
     });
 }
-
 // ===================== CHUYỂN XU =====================
 async function cmdChuyenxu(message, args) {
-    const userDebt = await getUserDebt(message.author.id) || 0;
+    const userId = message.author.id;
+
+    // 1. Kiểm tra nợ
+    const userDebt = await getUserDebt(userId) || 0;
     if (userDebt > 0) {
-        return message.reply(`### 🚫 Giao dịch bị khóa\n> Bạn không thể chuyển xu khi đang mang nợ (**${userDebt.toLocaleString()} xu**).`);
+        return message.reply(`### 🚫 Giao dịch bị khóa\n> Bạn không thể chuyển xu khi đang nợ (**${userDebt.toLocaleString()} xu**).`);
     }
-async function cmdChuyentien(message, args) {
-    const userDebt = await getUserDebt(message.author.id) || 0;
-    if (userDebt > 0) {
-        return message.reply(`### 🚫 Giao dịch bị khóa\n> Bạn đang nợ bot **${userDebt.toLocaleString()} xu**. Hãy dùng lệnh \`!tralai\` để trả nợ trước khi chuyển tiền cho người khác!`);
-    }
-async function cmdChuyenxu(message, args) {
+
     const target = message.mentions.users.first();
     const amount = parseInt(args[1]);
 
-    // 1. Kiểm tra đầu vào gọn gàng
+    // 2. Kiểm tra đầu vào
     if (!target || isNaN(amount) || amount <= 0) 
         return message.reply("> ### ❗ HD: `!chuyenxu @user <số xu>`");
     
-    if (target.id === message.author.id) 
-        return message.reply("> ❌ Không thể tự chuyển xu cho chính mình!");
+    if (target.id === userId) 
+        return message.reply("> ❌ Không thể tự chuyển cho chính mình!");
 
-    const senderData = await getUser(message.author.id);
+    const senderData = await getUser(userId);
     if (senderData.xu < amount) 
-        return message.reply("> ❌ Bạn không đủ xu để thực hiện giao dịch!");
+        return message.reply("> ❌ Bạn không đủ xu!");
 
-    // 2. Tính toán phí 7%
+    // 3. Tính toán phí 7%
     const fee = Math.floor(amount * 0.07);
     const netXu = amount - fee;
 
-    // 3. Tạo nút xác nhận
     const row = new ActionRowBuilder().addComponents(
         new ButtonBuilder().setCustomId('confirm_xu').setLabel('Nhận Xu').setStyle(ButtonStyle.Success),
         new ButtonBuilder().setCustomId('cancel_xu').setLabel('Từ chối').setStyle(ButtonStyle.Danger)
     );
 
     const mainMsg = await message.reply({
-        content: `### 🔁 Yêu cầu chuyển Xu\n> 👤 **Gửi:** ${message.author.username} ➔ **Nhận:** ${target.username}\n> 💰 **Thực nhận:** \`${netXu.toLocaleString()}\` xu (Phí 7%: ${fee})\n> ⏳ *Hết hạn sau 60s. ${target}, hãy xác nhận!*`,
+        content: `### 🔁 Yêu cầu chuyển Xu\n> 👤 **Gửi:** ${message.author.username} ➔ **Nhận:** ${target.username}\n> 💰 **Thực nhận:** \`${netXu.toLocaleString()}\` xu (Phí 7%: ${fee})\n> ⏳ *Hết hạn sau 60s.*`,
         components: [row]
     });
 
-    // 4. Bộ thu thập xác nhận từ người nhận
-    const filter = i => i.user.id === target.id;
+    // 4. Collector: Cho phép cả 2 nhấn nút
+    const filter = i => (i.customId === 'confirm_xu' || i.customId === 'cancel_xu') && (i.user.id === target.id || i.user.id === userId);
     const collector = mainMsg.createMessageComponentCollector({ filter, time: 60000 });
 
     collector.on('collect', async i => {
         if (i.customId === 'confirm_xu') {
-            // Kiểm tra lại xu người gửi lần cuối
-            const finalCheck = await getUser(message.author.id);
-            if (finalCheck.xu < amount) {
-                return i.update({ content: "> ❌ Giao dịch thất bại: Người gửi không còn đủ xu!", components: [] });
-            }
+            const finalCheck = await getUser(userId);
+            if (finalCheck.xu < amount) return i.update({ content: "> ❌ Người gửi không còn đủ xu!", components: [] });
 
-            // Thực hiện trừ/cộng xu
-            await subXu(message.author.id, amount);
+            await subXu(userId, amount);
             await addXu(target.id, netXu);
 
             await i.update({
-                content: `### ✅ Chuyển Xu thành công\n> 🔁 **${target.username}** đã nhận được **${netXu.toLocaleString()}** xu từ **${message.author.username}**.\n> 🏛️ Phí giao dịch: \`${fee.toLocaleString()}\` xu`,
+                content: `### ✅ Chuyển Xu thành công\n> 🔁 **${target.username}** đã nhận **${netXu.toLocaleString()}** xu từ **${message.author.username}**.`,
                 components: []
             });
         } else {
-            await i.update({ content: `> ❌ **${target.username}** đã từ chối nhận xu.`, components: [] });
+            await i.update({ content: `> ❌ Giao dịch đã bị hủy bởi **${i.user.username}**.`, components: [] });
         }
         collector.stop();
     });
 
     collector.on('end', collected => {
-        if (collected.size === 0) {
-            mainMsg.edit({ content: "> ⏳ Giao dịch chuyển xu đã hết hạn.", components: [] }).catch(() => {});
-        }
+        if (collected.size === 0) mainMsg.edit({ content: "> ⏳ Giao dịch hết hạn.", components: [] }).catch(() => {});
     });
 }
 
