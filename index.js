@@ -718,7 +718,6 @@ async function cmdBoctham(message) {
     return await msg.edit(`### ${tier.emoji} HỘP QUÀ ${tier.name} ${tier.emoji}\n> ${tier.color} ${statusText} tiền\n> 🎫 Còn lại: \`${info.count}\` lượt`);
 }
 // ===================== CHUYỂN TIỀN =====================
-const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require("discord.js");
 
 async function cmdChuyentien(message, args) {
     const target = message.mentions.users.first();
