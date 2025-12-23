@@ -186,49 +186,107 @@ async function cmdTien(message) {
 }
 
 // =====================
-//       ĐỔI XU → TIỀN
+// ĐỔI XU <=> TIỀN
 // =====================
 async function cmdDoixu(message, args) {
-
     if (args.length < 1) {
-        message.reply("❗ Cách dùng: !doixu <số_xu>");
+        message.reply("❗ Cách dùng: !doixu <số_xu> hoặc !doixu <số_tiền>");
         return;
     }
 
-    const xuAmount = parseInt(args[0]);
-
-    if (isNaN(xuAmount) || xuAmount <= 0) {
-        message.reply("❌ Số xu không hợp lệ!");
-        return;
-    }
-
+    const amount = parseInt(args[0]);
     const user = await getUser(message.author.id);
 
-    if (user.xu < xuAmount) {
-        message.reply("❌ Bạn không đủ xu!");
+    // Kiểm tra cooldown (Tránh spam)
+    const now = Date.now();
+    const cooldownTime = 10000; // 10 giây cooldown cho mỗi người
+    if (user.lastExchange && now - user.lastExchange < cooldownTime) {
+        message.reply("❌ Bạn cần chờ một chút trước khi thực hiện lại!");
         return;
     }
 
-    let moneyOut = 0;
+    // Cập nhật thời gian của lần đổi gần nhất
+    await updateUserLastExchange(message.author.id, now);
 
-    if (xuAmount === 100) moneyOut = 50;
-    else if (xuAmount === 200) moneyOut = 150;
-    else if (xuAmount === 500) moneyOut = 450;
-    else if (xuAmount === 1000) moneyOut = 900;
-    else if (xuAmount >= 2000) moneyOut = Math.floor(xuAmount * 0.9);
-    else {
-        message.reply("❗ Không hỗ trợ số xu này!");
+    // Hiển thị hoạt ảnh đang đổi (3 chấm hoặc biểu tượng)
+    const exchangeMessage = await message.reply("🔄 Đang đổi... vui lòng đợi 4 giây...");
+
+    // Kiểm tra nếu người dùng muốn đổi xu ra tiền
+    if (args[0].endsWith('xu')) {
+        const xuAmount = parseInt(args[0].replace('xu', ''));
+
+        if (isNaN(xuAmount) || xuAmount <= 0) {
+            message.reply("❌ Số xu không hợp lệ!");
+            return;
+        }
+
+        if (user.xu < xuAmount) {
+            message.reply("❌ Bạn không đủ xu!");
+            return;
+        }
+
+        let moneyOut = 0;
+
+        if (xuAmount === 100) moneyOut = 50;
+        else if (xuAmount === 200) moneyOut = 150;
+        else if (xuAmount === 500) moneyOut = 450;
+        else if (xuAmount === 1000) moneyOut = 900;
+        else if (xuAmount >= 2000) moneyOut = Math.floor(xuAmount * 0.9);
+        else {
+            message.reply("❗ Không hỗ trợ số xu này!");
+            return;
+        }
+
+        // Thực hiện hành động đổi xu ra tiền
+        await subXu(message.author.id, xuAmount);
+        await addMoney(message.author.id, moneyOut);
+
+        // Sau 4 giây, xóa thông báo hoạt ảnh và gửi kết quả
+        setTimeout(() => {
+            exchangeMessage.edit(`🔁 Bạn đã đổi **${xuAmount} xu → ${moneyOut} tiền** thành công!`);
+        }, 4000); // Đợi 4 giây
+
         return;
     }
 
-    await subXu(message.author.id, xuAmount);
-    await addMoney(message.author.id, moneyOut);
+    // Kiểm tra nếu người dùng muốn đổi tiền ra xu
+    if (args[0].endsWith('tiền')) {
+        const moneyAmount = parseInt(args[0].replace('tiền', ''));
 
-    message.reply(
-        `🔁 Bạn đã đổi **${xuAmount} xu → ${moneyOut} tiền** thành công!`
-    );
+        if (isNaN(moneyAmount) || moneyAmount <= 0) {
+            message.reply("❌ Số tiền không hợp lệ!");
+            return;
+        }
+
+        if (user.money < moneyAmount) {
+            message.reply("❌ Bạn không đủ tiền!");
+            return;
+        }
+
+        let xuOut = 0;
+        let feePercent = 20;  // Mặc định phí 20% nếu tiền <= 5000
+
+        if (moneyAmount >= 10000) {
+            feePercent = 40;  // Nếu tiền >= 10000 thì phí đổi 40%
+        }
+
+        // Tính số xu nhận được sau khi trừ phí
+        xuOut = Math.floor(moneyAmount * (1 - feePercent / 100));
+
+        // Thực hiện hành động đổi tiền ra xu
+        await subMoney(message.author.id, moneyAmount);
+        await addXu(message.author.id, xuOut);
+
+        // Sau 4 giây, xóa thông báo hoạt ảnh và gửi kết quả
+        setTimeout(() => {
+            exchangeMessage.edit(`🔁 Bạn đã đổi **${moneyAmount} tiền → ${xuOut} xu** (phí ${feePercent}%) thành công!`);
+        }, 4000); // Đợi 4 giây
+
+        return;
+    }
+
+    message.reply("❗ Cách dùng: !doixu <số_xu> hoặc !doixu <số_tiền>");
 }
-
 // =====================
 // TUNG XU (v2 cải tiến) với hoạt ảnh
 // =====================
@@ -897,6 +955,8 @@ async function cmdHelp(message) {
 • !baucua — đặt cược bằng reaction
 • Mỗi reaction = 500 tiền
 • Trúng ăn theo số con xuất hiện
+• Mỗi người có thể đặt 2 con / 1 bàn 
+• Nếu đặt quá 2 con sẽ hủy bàn ( trừ tiền - tránh spam )
 
 ━━━━━━━━━━━━━━━━━━
 🎁 **BỐC THĂM**
