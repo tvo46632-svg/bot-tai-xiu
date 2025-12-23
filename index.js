@@ -510,25 +510,16 @@ function randomInt(min, max) {
     return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
-// Command !baucua <số tiền>
 async function cmdBaucua(message, args) {
     try {
-        // 1. Kiểm tra phiên đang chạy
+        // 1. Kiểm tra phiên (Tự xóa sau 5s)
         if (baucuaSession) {
-            const msgError = await message.reply("⚠️ Đang có phiên bầu cua khác. Vui lòng đợi!");
-            setTimeout(() => {
-                msgError.delete().catch(() => {});
+            const msgErr = await message.reply("⚠️ Đang có phiên bầu cua khác. Vui lòng đợi!");
+            return setTimeout(() => {
+                msgErr.delete().catch(() => {});
                 message.delete().catch(() => {});
             }, 5000);
-            return;
         }
-
-        baucuaSession = {
-            channelId: message.channel.id,
-            bets: {}, 
-            msg: null
-        };
-        userBetAmounts = {};
 
         let starterBet = 200;
         if (args.length > 0) {
@@ -536,112 +527,96 @@ async function cmdBaucua(message, args) {
             if (!isNaN(bet) && bet > 0) starterBet = bet;
         }
 
-        // 2. Kiểm tra tiền người khởi tạo
+        // 2. Kiểm tra tiền (Tự xóa sau 5s)
         const starterUserDb = await getUser(message.author.id);
         if (!starterUserDb || starterUserDb.money < starterBet) {
-            const msgError = await message.reply(`❌ Bạn không đủ tiền để đặt ${starterBet} tiền!`);
-            baucuaSession = null;
-            setTimeout(() => {
-                msgError.delete().catch(() => {});
+            const msgErr = await message.reply(`❌ Bạn không đủ tiền để đặt ${starterBet} tiền!`);
+            return setTimeout(() => {
+                msgErr.delete().catch(() => {});
                 message.delete().catch(() => {});
             }, 5000);
-            return;
         }
 
-        userBetAmounts[message.author.id] = starterBet;
+        // Khởi tạo phiên sau khi kiểm tra tiền thành công
+        baucuaSession = {
+            channelId: message.channel.id,
+            bets: {}, 
+            msg: null
+        };
 
         const betMessage = await message.channel.send(
             `🎯 **Bầu cua bắt đầu!**\n` +
-            `1️⃣ ${message.author.username} đã đặt ${starterBet} tiền sẵn.\n` +
-            `2️⃣ React vào con muốn cược (Mặc định 200 tiền)\n` +
-            `3️⃣ Thời gian đặt cược: 10 giây\n` +
-            `${BAUCUA_EMOJIS.join(" ")}`
+            `👤 **${message.author.username}** cược: **${starterBet}** tiền.\n` +
+            `👉 React emoji bên dưới để cược (Mặc định 200đ).\n` +
+            `⏱️ Thời gian: 10 giây.`
         );
 
         for (const emoji of BAUCUA_EMOJIS) await betMessage.react(emoji);
         baucuaSession.msg = betMessage;
 
-        // Animation lắc dĩa
+        // 3. Animation lắc dĩa (Tăng lên 1s để tránh lỗi Discord Rate Limit)
         const start = Date.now();
         while (Date.now() - start < 10000) {
-            const tempResults = [];
-            for (let i = 0; i < 3; i++)
-                tempResults.push(BAUCUA_EMOJIS[randomInt(0, BAUCUA_EMOJIS.length - 1)]);
-            await betMessage.edit(`🎲 **Bầu cua đang lắc dĩa!**\n${tempResults.join(" ")}`);
-            await delay(1000); // Tăng delay lên 1s để tránh bị Discord giới hạn (Rate limit)
+            const temp = [];
+            for (let i = 0; i < 3; i++) temp.push(BAUCUA_EMOJIS[randomInt(0, 5)]);
+            await betMessage.edit(`🎲 **Bầu cua đang lắc...**\n> ${temp.join(" ")}`).catch(() => {});
+            await delay(1000);
         }
 
-        // 3. QUAN TRỌNG: Lấy kết quả thật (Xóa dòng await db.read() bị lỗi)
+        // 4. Kết quả thật
         const results = [];
-        for (let i = 0; i < 3; i++)
-            results.push(BAUCUA_EMOJIS[randomInt(0, BAUCUA_EMOJIS.length - 1)]);
+        for (let i = 0; i < 3; i++) results.push(BAUCUA_EMOJIS[randomInt(0, 5)]);
 
-        // Tính toán thắng thua
-        const summary = {}; 
+        // Tính toán (Summary)
+        const summary = {};
         for (const userId in baucuaSession.bets) {
             const bets = baucuaSession.bets[userId];
             let totalWin = 0;
-            let totalBetValue = 0;
-            let matchedConCount = 0;
-
+            let totalBet = 0;
+            
             for (const [emoji, amount] of Object.entries(bets)) {
-                totalBetValue += amount;
-                const countInResults = results.filter(r => r === emoji).length;
-                if (countInResults > 0) {
-                    matchedConCount += countInResults;
-                    totalWin += amount * countInResults; 
-                }
+                totalBet += amount;
+                const count = results.filter(r => r === emoji).length;
+                if (count > 0) totalWin += amount * (count + 1); // Trả lại vốn + tiền thắng
             }
-
-            // Luật trả lại vốn + tiền thắng
-            if (matchedConCount > 0) {
-                summary[userId] = totalWin + totalBetValue; 
-            } else {
-                summary[userId] = 0;
-            }
+            summary[userId] = { win: totalWin, bet: totalBet };
         }
 
-        // Cập nhật Database
+        // Cộng tiền vào Database
         for (const userId in summary) {
-            if (summary[userId] > 0) await addMoney(userId, summary[userId]);
+            if (summary[userId].win > 0) await addMoney(userId, summary[userId].win);
         }
 
         // Hiển thị kết quả
-        let resultText = `🎉 **Kết quả bầu cua:** ${results.join(" ")}\n\n`;
-        const userIds = Object.keys(baucuaSession.bets);
+        let resultText = `🎉 **Kết quả:** ${results.join(" ")}\n\n`;
+        const players = Object.keys(baucuaSession.bets);
         
-        if (userIds.length === 0) {
+        if (players.length === 0) {
             resultText += "Không có ai đặt cược!";
         } else {
-            for (const userId of userIds) {
-                try {
-                    const u = await client.users.fetch(userId);
-                    const gain = summary[userId] || 0;
-                    const bets = baucuaSession.bets[userId];
-                    const tBet = Object.values(bets).reduce((a, b) => a + b, 0);
-                    
-                    if (gain > 0) resultText += `✅ **${u.username}** thắng **${gain.toLocaleString()}** tiền\n`;
-                    else resultText += `❌ **${u.username}** thua **${tBet.toLocaleString()}** tiền\n`;
-                } catch (e) { console.log("Lỗi fetch user"); }
+            for (const uid of players) {
+                const u = await client.users.fetch(uid).catch(() => ({ username: "Unknown" }));
+                const data = summary[uid];
+                if (data.win > 0) resultText += `✅ **${u.username}** nhận **+${data.win}** (Cược ${data.bet})\n`;
+                else resultText += `❌ **${u.username}** mất **-${data.bet}** tiền\n`;
             }
         }
 
-        await betMessage.edit(resultText);
+        await betMessage.edit(resultText).catch(() => {});
 
-        // 4. Dọn dẹp tin nhắn sau 30 giây
+        // 5. Dọn dẹp sau 30 giây
         setTimeout(() => {
             betMessage.delete().catch(() => {});
             message.delete().catch(() => {});
         }, 30000);
 
         baucuaSession = null;
-        userBetAmounts = {};
 
     } catch(err) {
-        console.error("Lỗi !baucua:", err);
+        console.error("Lỗi Bầu Cua:", err);
         baucuaSession = null;
-        const msgErr = await message.reply("❌ Có lỗi xảy ra khi xử lý hệ thống!");
-        setTimeout(() => msgErr.delete().catch(() => {}), 5000);
+        const e = await message.reply("❌ Lỗi hệ thống Bầu Cua, vui lòng thử lại!");
+        setTimeout(() => e.delete().catch(() => {}), 5000);
     }
 }
 // =====================
