@@ -1126,10 +1126,9 @@ client.on("messageCreate", async (message) => {
             case "diemdanh": await cmdDiemdanh(message); break;
             case "tien": await cmdTien(message); break;
             case "tungxu": await cmdTungxu(message, args); break;
-            case "taixiu": await cmdTaixiu(message, args); break; // Đảm bảo đã sửa hàm cmdTaixiu theo bản mới
-            case "baucua": 
-            const args = message.content.split(' ').slice(1); await cmdBaucua(message, args); break;
-            case "boctham": await cmdBoctham(message); break;
+            case "taixiu": await cmdTaixiu(message, args); break; 
+            case "baucua": await cmdBaucua(message, args); break;
+            case "boctham": await cmdBoctham(message, args); break;
             case "chuyentien": await cmdChuyentien(message, args); break;
             case "chuyenxu": await cmdChuyenxu(message, args); break;
             case "xidach": await cmdXidach(message, args); break;
