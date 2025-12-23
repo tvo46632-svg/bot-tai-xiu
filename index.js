@@ -190,28 +190,32 @@ async function cmdTien(message) {
 // =====================
 async function cmdDoi(message, args) {
     try {
-        // In ra các đối số nhận được từ người dùng để debug
+        // Debug: In ra các đối số nhận được
         console.log('Arguments received:', args);
 
+        // Kiểm tra nếu không có đủ 2 đối số
         if (args.length < 2) {
             message.reply("❗ Cách dùng: !doi <số_xu> xu hoặc !doi <số_tiền> tien");
             return;
         }
 
-        // Lấy số lượng và đơn vị (xu hoặc tien)
-        const amount = parseInt(args[0]);
-        const unit = args[1].toLowerCase();  // Đảm bảo chữ thường để tránh sai cú pháp
+        const amount = parseInt(args[0]);  // Số tiền hoặc xu
+        const unit = args[1].toLowerCase();  // Đơn vị xu/tien hoặc x/t
 
         console.log('Amount:', amount);  // Debug: kiểm tra số lượng nhận được
         console.log('Unit:', unit);      // Debug: kiểm tra đơn vị nhận được
 
+        // Kiểm tra nếu amount không phải là một số hợp lệ
         if (isNaN(amount) || amount <= 0) {
             message.reply("❌ Số lượng không hợp lệ!");
             return;
         }
 
-        // Lấy thông tin người dùng
         const user = await getUser(message.author.id);
+
+        // Kiểm tra số xu và tiền trong tài khoản người dùng
+        console.log('User xu:', user.xu);
+        console.log('User money:', user.money);
 
         // Kiểm tra cooldown (Tránh spam)
         const now = Date.now();
