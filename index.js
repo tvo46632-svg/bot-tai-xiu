@@ -12,6 +12,23 @@ const {
     ButtonBuilder,
     ButtonStyle
 } = require("discord.js");
+const { SlashCommandBuilder } = require('discord.js');
+
+const doiCommand = new SlashCommandBuilder()
+    .setName('doi')
+    .setDescription('Đổi Xu/Tiền ở chế độ ẩn (Chỉ bạn thấy)')
+    .addIntegerOption(option => 
+        option.setName('amount')
+            .setDescription('Số lượng muốn đổi')
+            .setRequired(true))
+    .addStringOption(option =>
+        option.setName('type')
+            .setDescription('Loại đơn vị muốn đổi')
+            .setRequired(true)
+            .addChoices(
+                { name: 'Xu sang Tiền', value: 'xu' },
+                { name: 'Tiền sang Xu', value: 'tien' }
+            ));
 
 const { Low, JSONFile } = require("lowdb");
 const path = require("path");
@@ -190,72 +207,83 @@ async function cmdTien(message) {
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 // =====================
-// ĐỔI XU ➔ TIỀN (Chờ 4s)
+// HÀM XỬ LÝ CHÍNH (Đã tích hợp tự xóa)
 // =====================
 async function handleExchange(message, amount, type) {
     try {
+        if (isNaN(amount) || amount <= 0) return message.reply("❌ Số lượng không hợp lệ!");
+
         const user = await getUser(message.author.id);
         if (!user) return message.reply("❌ Không tìm thấy dữ liệu người dùng!");
 
-        // TRƯỜNG HỢP: ĐỔI XU -> TIỀN (Chờ 4 giây)
+        // --- TRƯỜNG HỢP: ĐỔI XU -> TIỀN (4s) ---
         if (type === "xu") {
             if (user.xu < amount) return message.reply(`❌ Bạn không đủ xu! (Hiện có: ${user.xu.toLocaleString()})`);
-
-            let phi = 0;
-            if (amount < 5000) phi = 0;           // Dưới 5000: phí 0%
-            else if (amount < 20000) phi = 0.20; // 5000 - 19,999: phí 20%
-            else phi = 0.35;                     // Từ 20,000 trở lên: phí 35%
-
-            const moneyOut = Math.floor(amount * (1 - phi));
-            const msg = await message.reply(`⏳ Đang xử lý: **Xu ➔ Tiền** (Mức phí ${phi * 100}%)...`);
             
+            let phi = amount < 5000 ? 0 : (amount < 20000 ? 0.20 : 0.35);
+            const moneyOut = Math.floor(amount * (1 - phi));
+
+            const msg = await message.reply(`⏳ Đang xử lý: **Xu ➔ Tiền** (Phí ${phi * 100}%)...`);
             await sleep(2000);
-            await msg.edit("⏳ Đang xác nhận giao dịch hệ thống... [50%]");
+            await msg.edit("⏳ Đang xác nhận giao dịch... [50%]");
             await sleep(2000);
 
             await subXu(message.author.id, amount);
             await addMoney(message.author.id, moneyOut);
 
-            return await msg.edit(`✅ **THÀNH CÔNG**\n🔁 Đã đổi: **${amount.toLocaleString()} xu**\n💰 Nhận: **${moneyOut.toLocaleString()} tiền** (Trừ ${phi * 100}% phí)`);
+            const finalMsg = `✅ **THÀNH CÔNG**\n🔁 Đã đổi: **${amount.toLocaleString()} xu**\n💰 Nhận: **${moneyOut.toLocaleString()} tiền**\n*(Tin nhắn tự xóa sau 5s)*`;
+            
+            return await msg.edit(finalMsg).then(m => {
+                setTimeout(() => {
+                    m.delete().catch(() => {}); 
+                    message.delete().catch(() => {}); 
+                }, 5000);
+            });
         }
 
-        // TRƯỜNG HỢP: ĐỔI TIỀN -> XU (Chờ 3 giây)
+        // --- TRƯỜNG HỢP: ĐỔI TIỀN -> XU (3s) ---
         if (type === "tien" || type === "tiền") {
             if (user.money < amount) return message.reply(`❌ Bạn không đủ tiền! (Hiện có: ${user.money.toLocaleString()})`);
 
-            const msg = await message.reply("⏳ Đang xử lý: **Tiền ➔ Xu** (Tỷ lệ 1:1)...");
-            
+            const msg = await message.reply("⏳ Đang xử lý: **Tiền ➔ Xu**...");
             await sleep(1500);
-            await msg.edit("⏳ Đang nạp xu vào tài khoản... [60%]");
+            await msg.edit("⏳ Đang nạp xu vào ví... [60%]");
             await sleep(1500);
 
             await subMoney(message.author.id, amount);
             await addXu(message.author.id, amount);
 
-            return await msg.edit(`✅ **THÀNH CÔNG**\n🔁 Đã đổi: **${amount.toLocaleString()} tiền**\n💎 Nhận: **${amount.toLocaleString()} xu**`);
+            const finalMsg = `✅ **THÀNH CÔNG**\n🔁 Đã đổi: **${amount.toLocaleString()} tiền**\n💎 Nhận: **${amount.toLocaleString()} xu**\n*(Tin nhắn tự xóa sau 5s)*`;
+            
+            return await msg.edit(finalMsg).then(m => {
+                setTimeout(() => {
+                    m.delete().catch(() => {}); 
+                    message.delete().catch(() => {});
+                }, 5000);
+            });
         }
     } catch (e) {
-        console.error(e);
-        return message.reply("❌ Lỗi xử lý: " + e.message);
+        console.error("Lỗi đổi tiền:", e);
+        return message.reply("❌ Có lỗi xảy ra!");
     }
 }
+
+// =====================
+// CÁC HÀM GỌI LỆNH
+// =====================
 async function cmdDoi(message, args) {
-    if (args.length < 2) return message.reply("❗ Cách dùng: `!doi <số_lượng> <xu/tiền>`\nVí dụ: `!doi 5000 xu` hoặc `!doi 1000 tiền` ");
-    const amount = parseInt(args[0]);
-    const type = args[1].toLowerCase();
-    await handleExchange(message, amount, type);
+    if (args.length < 2) return message.reply("❗ Cách dùng: `!doi <số_lượng> <xu/tiền>`");
+    await handleExchange(message, parseInt(args[0]), args[1].toLowerCase());
 }
 
 async function cmdDoixu(message, args) {
     if (args.length < 1) return message.reply("❗ Cách dùng: `!doixu <số_xu>`");
-    const amount = parseInt(args[0]);
-    await handleExchange(message, amount, "xu");
+    await handleExchange(message, parseInt(args[0]), "xu");
 }
 
 async function cmdDoitien(message, args) {
     if (args.length < 1) return message.reply("❗ Cách dùng: `!doitien <số_tiền>`");
-    const amount = parseInt(args[0]);
-    await handleExchange(message, amount, "tien");
+    await handleExchange(message, parseInt(args[0]), "tien");
 }
 // =====================
 // TUNG XU (v2 cải tiến) với hoạt ảnh
@@ -972,8 +1000,7 @@ client.on("ready", async () => {
 });
 
 client.on("messageCreate", async (message) => {
-    if (message.author.bot) return;
-    if (!message.content.startsWith(PREFIX)) return;
+    if (message.author.bot || !message.content.startsWith(PREFIX)) return;
 
     const args = message.content.slice(PREFIX.length).trim().split(/ +/);
     const cmd = args.shift().toLowerCase();
@@ -993,20 +1020,28 @@ client.on("messageCreate", async (message) => {
             case "vay": await cmdVay(message, args); break;
             case "tralai": await cmdTralai(message, args); break;
             
-            // Các lệnh đổi tiền
+            // Lệnh đổi tiền (Công khai)
             case "doi": await cmdDoi(message, args); break;
             case "doixu": await cmdDoixu(message, args); break;
             case "doitien": await cmdDoitien(message, args); break;
             
             case "help": await cmdHelp(message); break;
-            
-            default: 
-                message.reply("❌ Lệnh không hợp lệ!");
-                break;
+            default: message.reply("❌ Lệnh không hợp lệ!"); break;
         }
     } catch (error) {
-        console.error("Lỗi thực thi lệnh:", error);
+        console.error("Lỗi lệnh chat:", error);
     }
+});
+// ... (phần code tính toán phí bên trên giữ nguyên)
+
+const finalMsg = `✅ **THÀNH CÔNG**\n🔁 Đã đổi: **${amount.toLocaleString()} xu**\n💰 Nhận: **${moneyOut.toLocaleString()} tiền**`;
+
+// Gửi tin nhắn và thiết lập tự xóa sau 5 giây
+return await msg.edit(finalMsg).then(m => {
+    setTimeout(() => {
+        m.delete().catch(() => {}); // Xóa tin nhắn của Bot
+        input.delete().catch(() => {}); // Xóa tin nhắn !doi của bạn
+    }, 5000); // 5000ms = 5 giây
 });
 // -------------------- BOT LOGIN --------------------
 client.login(process.env.TOKEN);
