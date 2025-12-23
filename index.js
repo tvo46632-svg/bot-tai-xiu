@@ -1058,6 +1058,36 @@ async function cmdTralai(message, args) {
 
     message.reply(replyText);
 } // <- Đóng cmdTralai
+// =====================
+//      QUYỀN HẠN ADMIN
+// =====================
+async function cmdAdmin(message, args) {
+    const ADMIN_ID = "ID_CUA_BAN"; // <--- THAY ID CỦA BẠN VÀO ĐÂY
+    if (message.author.id !== ADMIN_ID) return message.reply("❌ Bạn không có quyền Admin!");
+
+    const cmd = message.content.split(' ')[0].slice(1).toLowerCase();
+    const targetUser = message.mentions.users.first();
+
+    if (cmd === "addmoney") {
+        const amount = parseInt(args[1]);
+        const type = args[2]?.toLowerCase();
+        if (!targetUser || isNaN(amount)) return message.reply("⚠️ HD: `!addmoney @user 1000 tiền` (hoặc xu)");
+
+        if (type === "xu") {
+            await addXu(targetUser.id, amount);
+            message.reply(`✅ Đã thêm **${amount.toLocaleString()} xu** cho **${targetUser.username}**.`);
+        } else {
+            await addMoney(targetUser.id, amount);
+            message.reply(`✅ Đã thêm **${amount.toLocaleString()} tiền** cho **${targetUser.username}**.`);
+        }
+    } 
+    
+    if (cmd === "reset") {
+        if (!targetUser) return message.reply("⚠️ Tag người cần reset.");
+        await updateUser(targetUser.id, { money: 0, xu: 0 });
+        message.reply(`🧹 Đã reset tài sản của **${targetUser.username}** về 0.`);
+    }
+}
 
 // =====================
 //      HELP (FULL + BẢNG GIÁ)
@@ -1066,40 +1096,42 @@ async function cmdTralai(message, args) {
 async function cmdHelp(message) {
     const mainEmbed = new EmbedBuilder()
         .setTitle('🎮 TRUNG TÂM GIẢI TRÍ CASINO')
-        .setDescription('Chào mừng bạn! Vui lòng nhấn nút bên dưới để xem lệnh.\n> *Menu này sẽ tự đóng sau 60 giây.*')
-        .setColor('#FFD700');
+        .setDescription('Menu hướng dẫn dành cho tất cả người chơi.\n> *Menu này sẽ tự đóng sau 2 phút.*')
+        .setColor('#FFD700')
+        .setTimestamp();
 
     const row = new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setCustomId('h_eco').setLabel('Tiền & Xu').setStyle(ButtonStyle.Primary).setEmoji('💰'),
+        new ButtonBuilder().setCustomId('h_eco').setLabel('Kinh Tế').setStyle(ButtonStyle.Primary).setEmoji('💰'),
         new ButtonBuilder().setCustomId('h_game').setLabel('Trò Chơi').setStyle(ButtonStyle.Success).setEmoji('🎲'),
-        new ButtonBuilder().setCustomId('h_bank').setLabel('Chuyển & Vay').setStyle(ButtonStyle.Secondary).setEmoji('💸')
+        new ButtonBuilder().setCustomId('h_admin').setLabel('Admin').setStyle(ButtonStyle.Danger).setEmoji('🛠️')
     );
 
     const helpMsg = await message.reply({ embeds: [mainEmbed], components: [row] });
 
-    const filter = i => i.user.id === message.author.id;
-    const collector = helpMsg.createMessageComponentCollector({ filter, time: 60000 });
+    // Loại bỏ bộ lọc id để mọi người cùng bấm được
+    const collector = helpMsg.createMessageComponentCollector({ time: 120000 }); 
 
     collector.on('collect', async i => {
         const embed = new EmbedBuilder().setColor('#FFD700');
 
         if (i.customId === 'h_eco') {
-            embed.setTitle('💰 KINH TẾ & BẢNG GIÁ')
-                 .setDescription('• `!tien`: Xem tài sản\n• `!diemdanh`: Nhận xu hàng ngày\n• `!doixu <số xu>`: Đổi xu ➔ tiền\n\n**📊 BẢNG GIÁ ĐỔI:**\n- 100 xu ➔ 50 tiền\n- 500 xu ➔ 450 tiền\n- 1000 xu ➔ 900 tiền\n- >2000 xu ➔ x0.9');
+            embed.setTitle('💰 KINH TẾ & ĐỔI TIỀN')
+                 .setDescription('• `!tien`: Xem tài sản\n• `!diemdanh`: Nhận quà hàng ngày\n• `!doi <số xu>`: Đổi xu ➔ tiền');
         } 
         else if (i.customId === 'h_game') {
             embed.setTitle('🎲 TRÒ CHƠI CASINO')
-                 .setDescription('• `!taixiu`: Đặt cược bằng nút bấm\n• `!tungxu`: Sấp hoặc ngửa\n• `!baucua`: Cược theo emoji\n• `!boctham`: Thử vận may (200 tiền)\n• `!anxin`: Bốc túi mù nhận xu');
-        } 
-        else if (i.customId === 'h_bank') {
-            embed.setTitle('💸 NGÂN HÀNG & CHUYỂN TIỀN')
-                 .setDescription('• `!chuyentien`: Phí 5% (Cần xác nhận)\n• `!chuyenxu`: Phí 7% (Cần xác nhận)\n• `!vay`: Vay xu lãi 100%-200%\n• `!tralai`: Trả nợ cho bot');
+                 .setDescription('• `!baucua <mức>`: Cược bầu cua\n• `!taixiu <mức>`: Chơi tài xỉu\n• `!tungxu <mức>`: Tung đồng xu\n• `!anxin`: Nhận xu miễn phí');
+        }
+        else if (i.customId === 'h_admin') {
+            embed.setTitle('🛠️ QUYỀN HẠN ADMIN')
+                 .setDescription('• `!addmoney @user <số> <loại>`: Thêm tiền/xu\n• `!reset @user`: Xóa sạch tài sản của ai đó\n*(Chỉ chủ Bot mới có thể sử dụng)*');
         }
 
+        // Dùng i.reply({ ephemeral: true }) nếu muốn nội dung chỉ người bấm thấy
+        // Hoặc i.update nếu muốn thay đổi nội dung chung cho cả server xem
         await i.update({ embeds: [embed] });
     });
 
-    // Tự động xóa tin nhắn sau 60s để tránh spam
     collector.on('end', () => {
         helpMsg.delete().catch(() => {});
         message.delete().catch(() => {});
@@ -1109,11 +1141,6 @@ async function cmdHelp(message) {
 // =====================
 //      MAIN EVENTS
 // =====================
-
-client.on("ready", async () => {
-    await initDB();
-    console.log(`✅ Đã kết nối: ${client.user.tag}`);
-});
 
 client.on("messageCreate", async (message) => {
     if (message.author.bot || !message.content.startsWith(PREFIX)) return;
@@ -1135,20 +1162,30 @@ client.on("messageCreate", async (message) => {
             case "anxin": await cmdAnxin(message); break;
             case "vay": await cmdVay(message, args); break;
             case "tralai": await cmdTralai(message, args); break;
+
+            // TÁCH RIÊNG LỆNH ĐỔI TIỀN CHO NGƯỜI DÙNG
             case "doixu": 
             case "doi":
             case "doitien": 
-                await cmdDoixu(message, args); break;
+                await cmdDoixu(message, args); 
+                break;
+
+            // TÁCH RIÊNG LỆNH ADMIN (Chỉ bạn mới dùng được)
+            case "addmoney":
+            case "reset": 
+                await cmdAdmin(message, args); 
+                break; 
+
             case "help": await cmdHelp(message); break;
+
             default: 
                 const msg = await message.reply("❌ Lệnh không hợp lệ! Gõ `!help` để xem danh sách.");
-                setTimeout(() => msg.delete().catch(() => {}), 5000); // Tự xóa sau 5s cho sạch
+                setTimeout(() => msg.delete().catch(() => {}), 5000);
                 break;
         }
     } catch (error) {
         console.error("Lỗi lệnh chat:", error);
     }
 });
-
 // -------------------- BOT LOGIN --------------------
 client.login(process.env.TOKEN);
