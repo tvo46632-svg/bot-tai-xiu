@@ -240,39 +240,60 @@ async function handleExchange(message, amountInput, typeInput) {
         const type = typeInput ? typeInput.toString().trim().toLowerCase() : "";
 
         // --- TRƯỜNG HỢP 1: XU -> TIỀN ---
-if (type === "xu") {
-    // ... (logic tính tiền của bạn)
-    const msg = await message.reply(`⏳ Đang xử lý Xu ➔ Tiền...`);
-    await sleep(2000);
+async function handleExchange(message, amount, type) {
+    try {
+        if (!amount || isNaN(amount) || amount <= 0) {
+            return message.reply("❌ Số lượng không hợp lệ!").then(m => setTimeout(() => m.delete().catch(() => {}), 5000));
+        }
 
-    await addXu(message.author.id, -amount);
-    await addMoney(message.author.id, moneyOut);
+        const user = await getUser(message.author.id);
+        if (!user) return message.reply("❌ Không tìm thấy dữ liệu người dùng!");
 
-    return msg.edit(`✅ **THÀNH CÔNG**\n💰 Nhận: **${moneyOut.toLocaleString()} tiền**`).then(m => {
-        setTimeout(() => {
-            m.delete().catch(() => {}); 
-            message.delete().catch(() => {}); // Xóa luôn lệnh !doi của người dùng
-        }, 5000);
-    });
-}
+        // --- TRƯỜNG HỢP 1: XU -> TIỀN ---
+        if (type === "xu") {
+            if (user.xu < amount) return message.reply(`❌ Bạn không đủ xu! (Có: ${user.xu.toLocaleString()} xu)` ).then(m => setTimeout(() => m.edit(" "), 5000));
+            
+            let phi = amount < 5000 ? 0 : (amount < 20000 ? 0.20 : 0.35);
+            const moneyOut = Math.floor(amount * (1 - phi));
 
-// --- TRƯỜNG HỢP 2: TIỀN -> XU ---
-else if (["tien", "tiền", "money", "vnd"].includes(type)) {
-    // ... (logic check tiền của bạn)
-    const xuOut = Math.floor(amount * 0.9); // Thuế 10%
+            const msg = await message.reply(`⏳ Đang xử lý đổi: **${amount.toLocaleString()} Xu** ➔ **Tiền**...`);
+            await sleep(2000);
 
-    const msg = await message.reply(`⏳ Đang xử lý Tiền ➔ Xu...`);
-    await sleep(2000);
+            await addXu(message.author.id, -amount);
+            await addMoney(message.author.id, moneyOut);
 
-    await addMoney(message.author.id, -amount);
-    await addXu(message.author.id, xuOut);
+            const finalMsg = `✅ **ĐỔI THÀNH CÔNG**\n💰 Nhận: **${moneyOut.toLocaleString()} Tiền**\n🪙 Khấu trừ: **${amount.toLocaleString()} Xu**\n*(Tin nhắn sẽ tự biến mất sau 5s)*`;
+            
+            return await msg.edit(finalMsg).then(m => {
+                setTimeout(() => {
+                    m.delete().catch(() => {});
+                    message.delete().catch(() => {});
+                }, 5000);
+            });
+        }
 
-    return msg.edit(`✅ **THÀNH CÔNG**\n💎 Nhận: **${xuOut.toLocaleString()} xu**`).then(m => {
-        setTimeout(() => {
-            m.delete().catch(() => {}); 
-            message.delete().catch(() => {}); // Xóa luôn lệnh !doi của người dùng
-        }, 5000);
-    });
+        // --- TRƯỜNG HỢP 2: TIỀN -> XU ---
+        else if (["tien", "tiền", "money"].includes(type)) {
+            if (user.money < amount) return message.reply(`❌ Bạn không đủ tiền! (Có: ${user.money.toLocaleString()} tiền)` ).then(m => setTimeout(() => m.delete(), 5000));
+
+            const msg = await message.reply(`⏳ Đang xử lý đổi: **${amount.toLocaleString()} Tiền** ➔ **Xu**...`);
+            await sleep(1500);
+
+            await addMoney(message.author.id, -amount);
+            await addXu(message.author.id, amount);
+
+            const finalMsg = `✅ **ĐỔI THÀNH CÔNG**\n🪙 Nhận: **${amount.toLocaleString()} Xu**\n💰 Khấu trừ: **${amount.toLocaleString()} Tiền**\n*(Tin nhắn sẽ tự biến mất sau 5s)*`;
+            
+            return await msg.edit(finalMsg).then(m => {
+                setTimeout(() => {
+                    m.delete().catch(() => {});
+                    message.delete().catch(() => {});
+                }, 5000);
+            });
+        }
+    } catch (e) {
+        console.error("Lỗi tại handleExchange:", e);
+    }
 }
         // ======================================
         // TRƯỜNG HỢP 3: KHÔNG HIỂU LỆNH
