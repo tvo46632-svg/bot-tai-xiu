@@ -194,6 +194,8 @@ async function cmdDoixu(message, args) {
         return;
     }
 
+    console.log('Đang thực hiện lệnh doixu...'); // Kiểm tra xem bot có nhận lệnh không
+
     const amount = parseInt(args[0]);
     const user = await getUser(message.author.id);
 
@@ -286,12 +288,6 @@ async function cmdDoixu(message, args) {
     }
 
     message.reply("❗ Cách dùng: !doixu <số_xu> hoặc !doixu <số_tiền>");
-}
-
-// Hàm cập nhật thời gian giao dịch cuối cùng của người dùng
-async function updateUserLastExchange(userId, time) {
-    // Cập nhật thời gian giao dịch cuối cùng của người dùng vào cơ sở dữ liệu
-    await setUser(userId, { lastExchange: time });
 }
 // =====================
 // TUNG XU (v2 cải tiến) với hoạt ảnh
@@ -1034,6 +1030,7 @@ client.on("messageCreate", async (message) => {
         default: message.reply("❌ Lệnh không hợp lệ!");
     }
 });
+console.log('Đang thực hiện lệnh doixu...');
 
 // -------------------- BOT LOGIN --------------------
 client.login(process.env.TOKEN);
