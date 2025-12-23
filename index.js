@@ -186,6 +186,8 @@ async function cmdTien(message) {
 }
 
 // =====================
+//    ĐỔI XU <=> TIỀN
+// =====================
 async function cmdDoi(message, args) {
     try {
         // In ra các đối số nhận được từ người dùng để debug
