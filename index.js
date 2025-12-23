@@ -673,114 +673,187 @@ client.on("messageCreate", async message => {
 async function cmdBoctham(message) {
     await db.read();
     const userId = message.author.id;
-
     db.data.boctham[userId] ||= { lastDate: 0, count: 0 };
     const info = db.data.boctham[userId];
 
     const today = new Date().toISOString().slice(0, 10);
-    if (info.lastDate !== today) {
-        info.lastDate = today;
-        info.count = 3;
-    }
-
+    if (info.lastDate !== today) { info.lastDate = today; info.count = 3; }
     if (info.count <= 0) return message.reply("> ❌ Bạn đã hết lượt bốc thăm hôm nay!");
 
     const user = await getUser(userId);
     if (user.money < 200) return message.reply("> ❌ Cần **200 tiền** để bốc thăm!");
 
-    // Trừ tiền và lượt
     await subMoney(userId, 200);
     info.count--;
-    await db.write();
 
-    // 1. Tính toán phần thưởng trước
+    // 1. Tính toán phần thưởng
     const rand = Math.random() * 100;
     let reward = 0;
-    let tier = { name: "SẮT", emoji: "⚪", color: "🥈" };
+    if (rand <= 40) reward = Math.floor(Math.random() * 51) + 50; 
+    else if (rand <= 70) reward = Math.floor(Math.random() * 501) + 100;
+    else if (rand <= 90) reward = Math.floor(Math.random() * 501) + 500;
+    else if (rand <= 98) reward = Math.floor(Math.random() * 1501) - 1000;
+    else reward = 4000;
 
-    if (rand <= 40) {
-        reward = Math.floor(Math.random() * 51) + 50;
-        tier = { name: "SẮT", emoji: "⚪", color: "🥈" };
-    } else if (rand <= 70) {
-        reward = Math.floor(Math.random() * 201) + 100;
-        tier = { name: "VÀNG", emoji: "🟡", color: "🥇" };
-    } else if (rand <= 90) {
-        reward = Math.floor(Math.random() * 301) + 300;
-        tier = { name: "KIM CƯƠNG", emoji: "💎", color: "💎" };
-    } else if (rand <= 98) {
-        reward = Math.floor(Math.random() * 1501) - 1000;
-        tier = { name: "RÁC", emoji: "🗑️", color: "🥀" }; // Tỷ lệ âm tiền của bạn
-    } else {
-        reward = 4000;
-        tier = { name: "THẦN THOẠI", emoji: "🌟", color: "👑" };
-    }
+    // 2. Phân loại Tier
+    let tier = { name: "GỖ", emoji: "🪵", color: "🟫" };
+    if (reward < 0) tier = { name: "RÁC", emoji: "🗑️", color: "🥀" };
+    else if (reward === 4000) tier = { name: "THẦN THOẠI", emoji: "🌟", color: "👑" };
+    else if (reward >= 1000) tier = { name: "KIM CƯƠNG", emoji: "💎", color: "🔹" };
+    else if (reward >= 500) tier = { name: "VÀNG", emoji: "🟡", color: "🥇" };
+    else if (reward >= 200) tier = { name: "SẮT", emoji: "⚪", color: "🥈" };
 
-    // 2. Gửi tin nhắn bắt đầu animation
+    // 3. Animation
     const msg = await message.reply("### 🎁 Đang mở hộp quà may mắn...");
-
-    // 3. Hiệu ứng bốc thăm nhảy Tier
     const allTiers = ["⚪ SẮT", "🟡 VÀNG", "💎 KIM CƯƠNG", "👑 THẦN THOẠI"];
-    for (let i = 0; i < 4; i++) {
-        await new Promise(res => setTimeout(res, 400));
-        const randomTier = allTiers[Math.floor(Math.random() * allTiers.length)];
-        await msg.edit(`### 🎁 Đang bốc thăm...\n> ✨ Đang tìm thấy: **${randomTier}**`);
+    for (let i = 0; i < 3; i++) {
+        await new Promise(res => setTimeout(res, 500));
+        await msg.edit(`### 🎁 Đang bốc thăm...\n> ✨ Đang tìm thấy: **${allTiers[Math.floor(Math.random() * allTiers.length)]}**`);
     }
 
-    // 4. Cộng lời/lỗ vào tài khoản
     await addMoney(userId, reward);
     await db.write();
 
-    // 5. Kết quả cuối cùng (Chữ nhỏ gọn)
-    const resultText = reward >= 0 ? `Nhận được: **+${reward} tiền**` : `Bị mất: **${reward} tiền** (Xui quá!)`;
-    
-    await new Promise(res => setTimeout(res, 300));
-    return await msg.edit(`### ${tier.emoji} HỘP QUÀ ${tier.name} ${tier.emoji}\n> ${tier.color} ${resultText}\n> 🎫 Lượt còn lại: \`${info.count}\``);
+    const statusText = reward >= 0 ? `Nhận: **+${reward.toLocaleString()}**` : `Mất: **${reward.toLocaleString()}**`;
+    return await msg.edit(`### ${tier.emoji} HỘP QUÀ ${tier.name} ${tier.emoji}\n> ${tier.color} ${statusText} tiền\n> 🎫 Còn lại: \`${info.count}\` lượt`);
 }
 // ===================== CHUYỂN TIỀN =====================
+const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require("discord.js");
+
 async function cmdChuyentien(message, args) {
-    if (args.length < 2) {
-        message.reply("❗ Cách dùng: !chuyentien @user <số tiền>");
-        return;
-    }
-
     const target = message.mentions.users.first();
-    if (!target) return message.reply("❌ Bạn phải tag người nhận!");
-
     const amount = parseInt(args[1]);
-    if (isNaN(amount) || amount <= 0) return message.reply("❌ Số tiền không hợp lệ!");
-    if (target.id === message.author.id) return message.reply("❌ Không thể tự chuyển tiền cho chính mình!");
 
-    const sender = await getUser(message.author.id);
-    if (sender.money < amount) return message.reply("❌ Bạn không đủ tiền!");
+    // 1. Kiểm tra đầu vào
+    if (!target || isNaN(amount) || amount <= 0) 
+        return message.reply("> ❗ HD: `!chuyentien @user <số tiền>`");
+    
+    if (target.id === message.author.id) 
+        return message.reply("> ❌ Bạn không thể tự chuyển tiền cho chính mình!");
 
-    await subMoney(message.author.id, amount);
-    await addMoney(target.id, amount);
-    message.reply(`💸 Bạn đã chuyển **${amount} tiền** cho **${target.username}**`);
+    const senderData = await getUser(message.author.id);
+    if (senderData.money < amount) 
+        return message.reply("> ❌ Bạn không đủ tiền trong tài khoản!");
+
+    // 2. Tính toán phí chuyển (5%)
+    const fee = Math.floor(amount * 0.05);
+    const totalDeduction = amount; // Tổng trừ người gửi (đã bao gồm phí trong số tiền gửi hoặc trừ thêm tùy bạn, ở đây là trừ đúng số tiền gửi)
+    const netAmount = amount - fee; // Số tiền người nhận thực tế nhận được
+
+    // 3. Tạo nút xác nhận
+    const row = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+            .setCustomId('confirm_transfer')
+            .setLabel('Nhận tiền')
+            .setStyle(ButtonStyle.Success),
+        new ButtonBuilder()
+            .setCustomId('cancel_transfer')
+            .setLabel('Từ chối')
+            .setStyle(ButtonStyle.Danger)
+    );
+
+    const mainMsg = await message.reply({
+        content: `### 💸 Yêu cầu chuyển tiền\n> 👤 **Người gửi:** ${message.author}\n> 👤 **Người nhận:** ${target}\n> 💰 **Số tiền:** \`${netAmount.toLocaleString()}\` (Đã trừ phí 5%)\n> ⏳ *Hết hạn sau 60 giây. ${target}, vui lòng xác nhận bên dưới!*`,
+        components: [row]
+    });
+
+    // 4. Bộ thu thập phản hồi (Collector) trong 1 phút
+    const filter = i => (i.customId === 'confirm_transfer' || i.customId === 'cancel_transfer') && i.user.id === target.id;
+    const collector = mainMsg.createMessageComponentCollector({ filter, time: 60000 });
+
+    collector.on('collect', async i => {
+        if (i.customId === 'confirm_transfer') {
+            // Kiểm tra lại tiền người gửi một lần nữa trước khi thực hiện
+            const finalCheck = await getUser(message.author.id);
+            if (finalCheck.money < amount) {
+                return i.update({ content: "> ❌ Giao dịch thất bại: Người gửi không còn đủ tiền!", components: [] });
+            }
+
+            // Thực hiện chuyển tiền
+            await subMoney(message.author.id, amount);
+            await addMoney(target.id, netAmount);
+
+            await i.update({
+                content: `### ✅ Giao dịch thành công\n> 💸 **${target.username}** đã nhận **${netAmount.toLocaleString()}** tiền từ **${message.author.username}**.\n> 🏛️ Phí hệ thống: \`${fee.toLocaleString()}\``,
+                components: []
+            });
+        } else {
+            await i.update({ content: `> ❌ **${target.username}** đã từ chối nhận tiền. Giao dịch bị hủy.`, components: [] });
+        }
+        collector.stop();
+    });
+
+    collector.on('end', collected => {
+        if (collected.size === 0) {
+            mainMsg.edit({ content: "> ⏳ Giao dịch đã hết hạn (60s) và tự động hủy bỏ.", components: [] }).catch(() => {});
+        }
+    });
 }
 
 // ===================== CHUYỂN XU =====================
 async function cmdChuyenxu(message, args) {
-    if (args.length < 2) {
-        message.reply("❗ Cách dùng: !chuyenxu @user <số xu>");
-        return;
-    }
-
     const target = message.mentions.users.first();
-    if (!target) return message.reply("❌ Bạn phải tag người nhận!");
-
     const amount = parseInt(args[1]);
-    if (isNaN(amount) || amount <= 0) return message.reply("❌ Số xu không hợp lệ!");
-    if (target.id === message.author.id) return message.reply("❌ Không thể tự chuyển xu cho chính mình!");
 
-    const sender = await getUser(message.author.id);
-    if (sender.xu < amount) return message.reply("❌ Bạn không đủ xu!");
+    // 1. Kiểm tra đầu vào gọn gàng
+    if (!target || isNaN(amount) || amount <= 0) 
+        return message.reply("> ### ❗ HD: `!chuyenxu @user <số xu>`");
+    
+    if (target.id === message.author.id) 
+        return message.reply("> ❌ Không thể tự chuyển xu cho chính mình!");
 
-    await subXu(message.author.id, amount);
-    await addXu(target.id, amount);
-    message.reply(`🔁 Bạn đã chuyển **${amount} xu** cho **${target.username}**`);
+    const senderData = await getUser(message.author.id);
+    if (senderData.xu < amount) 
+        return message.reply("> ❌ Bạn không đủ xu để thực hiện giao dịch!");
+
+    // 2. Tính toán phí 7%
+    const fee = Math.floor(amount * 0.07);
+    const netXu = amount - fee;
+
+    // 3. Tạo nút xác nhận
+    const row = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId('confirm_xu').setLabel('Nhận Xu').setStyle(ButtonStyle.Success),
+        new ButtonBuilder().setCustomId('cancel_xu').setLabel('Từ chối').setStyle(ButtonStyle.Danger)
+    );
+
+    const mainMsg = await message.reply({
+        content: `### 🔁 Yêu cầu chuyển Xu\n> 👤 **Gửi:** ${message.author.username} ➔ **Nhận:** ${target.username}\n> 💰 **Thực nhận:** \`${netXu.toLocaleString()}\` xu (Phí 7%: ${fee})\n> ⏳ *Hết hạn sau 60s. ${target}, hãy xác nhận!*`,
+        components: [row]
+    });
+
+    // 4. Bộ thu thập xác nhận từ người nhận
+    const filter = i => i.user.id === target.id;
+    const collector = mainMsg.createMessageComponentCollector({ filter, time: 60000 });
+
+    collector.on('collect', async i => {
+        if (i.customId === 'confirm_xu') {
+            // Kiểm tra lại xu người gửi lần cuối
+            const finalCheck = await getUser(message.author.id);
+            if (finalCheck.xu < amount) {
+                return i.update({ content: "> ❌ Giao dịch thất bại: Người gửi không còn đủ xu!", components: [] });
+            }
+
+            // Thực hiện trừ/cộng xu
+            await subXu(message.author.id, amount);
+            await addXu(target.id, netXu);
+
+            await i.update({
+                content: `### ✅ Chuyển Xu thành công\n> 🔁 **${target.username}** đã nhận được **${netXu.toLocaleString()}** xu từ **${message.author.username}**.\n> 🏛️ Phí giao dịch: \`${fee.toLocaleString()}\` xu`,
+                components: []
+            });
+        } else {
+            await i.update({ content: `> ❌ **${target.username}** đã từ chối nhận xu.`, components: [] });
+        }
+        collector.stop();
+    });
+
+    collector.on('end', collected => {
+        if (collected.size === 0) {
+            mainMsg.edit({ content: "> ⏳ Giao dịch chuyển xu đã hết hạn.", components: [] }).catch(() => {});
+        }
+    });
 }
 
-// =====================
 // ===================== XÌ DÁCH (BLACKJACK KIỂU MỚI) =====================
 let blackjackSession = {};
 function calcPoint(hand) {
