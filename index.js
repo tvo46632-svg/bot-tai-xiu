@@ -666,11 +666,6 @@ client.on("messageCreate", async message => {
     const args = message.content.trim().split(/ +/).slice(1);
     await cmdBaucua(message, args);
 });
-Để làm animation bốc thăm "xịn" như bạn muốn, mình sẽ chia phần thưởng ra làm 4 cấp độ: Sắt, Vàng, Kim Cương, và Thần Thoại. Mỗi cấp độ sẽ có màu sắc và emoji riêng để người chơi dễ phân biệt độ hiếm.
-
-Dưới đây là bản code đã được tối ưu, chữ nhỏ gọn (###) và có hiệu ứng hồi hộp:
-
-JavaScript
 
 // =====================
 //      BỐC THĂM MAY MẮN
