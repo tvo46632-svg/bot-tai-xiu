@@ -131,36 +131,51 @@ async function setUserDebt(userId, amount) {
 // ===================== COMMANDS =====================
 
 // =====================
-//         ĐIỂM DANH
+//      ĐIỂM DANH JACKPOT
 // =====================
 async function cmdDiemdanh(message) {
-
     const userId = message.author.id;
-
     await db.read();
 
     const today = new Date().toISOString().slice(0, 10);
 
+    // Kiểm tra xem đã điểm danh chưa
     if (db.data.daily[userId] === today) {
-        message.reply("Bạn đã điểm danh hôm nay rồi!");
-        return;
+        return message.reply("❌ Bạn đã điểm danh hôm nay rồi! Hãy quay lại vào ngày mai.");
     }
 
+    // Tỷ lệ bạn đã cho sẵn
     const rand = Math.random() * 100;
-
     let xuReward = 0;
-
     if (rand <= 50) xuReward = 1000;
     else if (rand <= 75) xuReward = 2000;
     else if (rand <= 90) xuReward = 2500;
     else if (rand <= 98) xuReward = 3000;
     else xuReward = 3200;
 
-    db.data.daily[userId] = today;
+    // --- BẮT ĐẦU ANIMATION ---
+    const msg = await message.reply("🎰 **ĐANG QUAY THƯỞNG...** 🎰\n`[ ▓▓▓▓▓▓▓▓▓▓ ]` 0%");
 
+    const frames = ["1,000", "2,000", "3,200", "500", "1,500", "2,500", "3,000"];
+    
+    // Giả lập hiệu ứng nhảy số (3 bước)
+    await new Promise(resolve => setTimeout(resolve, 800));
+    await msg.edit(`🎰 **ĐANG QUAY THƯỞNG...** 🎰\n\`[ 🎰 ${frames[Math.floor(Math.random() * frames.length)]} 🎰 ]\` 30%`);
+    
+    await new Promise(resolve => setTimeout(resolve, 800));
+    await msg.edit(`🎰 **ĐANG QUAY THƯỞNG...** 🎰\n\`[ 🎰 ${frames[Math.floor(Math.random() * frames.length)]} 🎰 ]\` 65%`);
+
+    await new Promise(resolve => setTimeout(resolve, 800));
+    await msg.edit(`🎰 **ĐANG QUAY THƯỞNG...** 🎰\n\`[ 🎰 ${frames[Math.floor(Math.random() * frames.length)]} 🎰 ]\` 99%`);
+
+    // Lưu dữ liệu vào database
+    db.data.daily[userId] = today;
     await addXu(userId, xuReward);
 
-    message.reply(`🎉 Điểm danh thành công! Bạn nhận được ${xuReward} xu.`);
+    // Kết quả cuối cùng
+    const finalEmoji = xuReward >= 3000 ? "🌟 JACKPOT! 🌟" : "🎉";
+    
+    return await msg.edit(`${finalEmoji} **ĐIỂM DANH THÀNH CÔNG** ${finalEmoji}\n━━━━━━━━━━━━━━━━━━\n👤 Người chơi: **${message.author.username}**\n💰 Phần thưởng: \` ${xuReward.toLocaleString()} xu \`\n━━━━━━━━━━━━━━━━━━\n*Hãy quay lại vào ngày mai!*`);
 }
 
 // =====================
