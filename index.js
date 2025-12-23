@@ -1074,5 +1074,7 @@ client.on("messageCreate", async (message) => {
     } catch (error) {
         console.error("Lỗi lệnh chat:", error);
     }
+}); // <--- ĐÂY LÀ DẤU QUAN TRỌNG BẠN BỊ THIẾU
+
 // -------------------- BOT LOGIN --------------------
 client.login(process.env.TOKEN);
