@@ -350,61 +350,66 @@ client.on("interactionCreate", async (interaction) => {
     }
 });
 // =====================
-// =====================
-// TUNG XU (v4 - Búng xu cao cấp)
+// TUNG XU (v5 - Ngửa/Sấp Viết Tắt)
 // =====================
 async function cmdTungxu(message, args) {
     if (args.length < 2) {
-        return message.reply("❗ Cách dùng: `!tungxu <số_xu> <mặt/không>`");
+        return message.reply("❗ Cách dùng: `!tungxu <số_xu> <ngửa/sấp>` (hoặc n/s)");
     }
 
     const betXu = parseInt(args[0]);
     let userChoice = args[1].toLowerCase();
 
-    // Chuẩn hóa lựa chọn
-    if (userChoice === "m") userChoice = "mặt";
-    if (userChoice === "k") userChoice = "không";
+    // Hỗ trợ viết tắt n/s hoặc ngửa/sấp
+    if (userChoice === "n" || userChoice === "ngửa") userChoice = "ngửa";
+    if (userChoice === "s" || userChoice === "sấp") userChoice = "sấp";
 
     if (isNaN(betXu) || betXu <= 0) return message.reply("❌ Số xu không hợp lệ!");
-    if (!["mặt", "không"].includes(userChoice)) return message.reply("❌ Bạn phải chọn: `mặt` (có hình) hoặc `không` (vàng óng)!");
+    if (!["ngửa", "sấp"].includes(userChoice)) return message.reply("❌ Bạn phải chọn: `ngửa` (n) hoặc `sấp` (s)!");
 
     const user = await getUser(message.author.id);
-    if (user.xu < betXu) return message.reply("❌ Bạn không đủ xu!");
+    if (user.xu < betXu) return message.reply("❌ Bạn không đủ xu để cược!");
 
     await subXu(message.author.id, betXu);
 
-    // Cấu hình Emoji (Bạn có thể thay ID emote server bạn vào đây)
-    const EMOTE_MAT = "🏛️"; // Mặt có hình thư viện
-    const EMOTE_KHONG = "🟡"; // Mặt vàng óng ánh
-    const EMOTE_XOAY = "🔄";
+    // Cấu hình Emoji hiển thị
+    const EMOTE_NGUA = "🏛️"; // Mặt ngửa (có hình)
+    const EMOTE_SAP = "🟡";  // Mặt sấp (vàng óng)
 
-    // 1. Gửi tin nhắn khởi đầu
-    const msg = await message.reply(`🪙 **Vút...** ${message.author.username} đã búng một đồng xu vàng lên không trung!`);
+    // 1. Khởi động búng xu
+    const msg = await message.reply(`🪙 **Vút...** ${message.author.username} đã búng đồng xu lên không trung!`);
 
-    // 2. Hiệu ứng búng xu (Animation nhảy số và xoay)
-    const spinFrames = ["🟡", "➖", "🏛️", "➖", "🟡", "➖", "🏛️"]; 
+    // 2. Hoạt ảnh xoay lật (Animation)
+    const spinFrames = [
+        EMOTE_SAP, 
+        "➖", // Cạnh xu
+        EMOTE_NGUA, 
+        "➖", 
+        EMOTE_SAP, 
+        "✨"
+    ]; 
     
     for (let i = 0; i < spinFrames.length; i++) {
-        await new Promise(res => setTimeout(res, 350)); // Tốc độ xoay
+        // Tốc độ 300ms để animation mượt và nhanh giống búng tay
+        await new Promise(res => setTimeout(res, 300)); 
         await msg.edit(`✨ **ĐANG XOAY...** ✨\n>        ${spinFrames[i]}        \n[ ▒▒▒▒▒▒▒▒▒▒ ]`);
     }
 
-    // 3. Tính toán kết quả ngẫu nhiên
-    const isMat = Math.random() < 0.5;
-    const result = isMat ? "mặt" : "không";
-    const resultEmoji = isMat ? EMOTE_MAT : EMOTE_KHONG;
+    // 3. Kết quả ngẫu nhiên 50/50
+    const result = Math.random() < 0.5 ? "ngửa" : "sấp";
+    const resultEmoji = (result === "ngửa") ? EMOTE_NGUA : EMOTE_SAP;
 
-    // 4. Delay một chút trước khi hiện kết quả cuối cùng cho kịch tính
+    // Tạm dừng ngắn để tăng độ hồi hộp
     await new Promise(res => setTimeout(res, 500));
 
-    // 5. Xử lý thắng thua
+    // 4. Kiểm tra kết quả và trả thưởng
     if (result === userChoice) {
         const rewardXu = betXu * 2;
         await addXu(message.author.id, rewardXu);
         
-        return await msg.edit(`🪙 **ĐỒNG XU ĐÃ RƠI!**\n━━━━━━━━━━━━━━━━━━\n> Kết quả: **${resultEmoji} (${result.toUpperCase()})**\n\n🎉 **CHÚC MỪNG!** Bạn đoán đúng và nhận **+${rewardXu.toLocaleString()} xu**.`);
+        return await msg.edit(`🪙 **ĐỒNG XU ĐÃ RƠI!**\n━━━━━━━━━━━━━━━━━━\n> Kết quả: **${resultEmoji} (${result.toUpperCase()})**\n\n🎉 **BẠN THẮNG!** Chúc mừng bạn nhận được **+${rewardXu.toLocaleString()} xu**.`);
     } else {
-        return await msg.edit(`🪙 **ĐỒNG XU ĐÃ RƠI!**\n━━━━━━━━━━━━━━━━━━\n> Kết quả: **${resultEmoji} (${result.toUpperCase()})**\n\n💸 **RẤT TIẾC!** Bạn đã mất **-${betXu.toLocaleString()} xu**.`);
+        return await msg.edit(`🪙 **ĐỒNG XU ĐÃ RƠI!**\n━━━━━━━━━━━━━━━━━━\n> Kết quả: **${resultEmoji} (${result.toUpperCase()})**\n\n💸 **BẠN THUA!** Bạn đã mất **-${betXu.toLocaleString()} xu**.`);
     }
 }
 // =====================
