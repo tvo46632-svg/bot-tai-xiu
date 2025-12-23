@@ -963,23 +963,29 @@ client.on("messageCreate", async (message) => {
     switch (cmd) {
         case "diemdanh": await cmdDiemdanh(message); break;
         case "tien": await cmdTien(message); break;
-        case "tungxu": await cmdTungxu(message,args); break;
-        case "taixiu": await cmdTaixiu(message,args); break;
+        case "tungxu": await cmdTungxu(message, args); break;
+        case "taixiu": await cmdTaixiu(message, args); break;
         case "baucua": await cmdBaucua(message); break;
         case "boctham": await cmdBoctham(message); break;
-        case "chuyentien": await cmdChuyentien(message,args); break;
-        case "chuyenxu": await cmdChuyenxu(message,args); break;
-        case "xidach": await cmdXidach(message,args); break;
+        case "chuyentien": await cmdChuyentien(message, args); break;
+        case "chuyenxu": await cmdChuyenxu(message, args); break;
+        case "xidach": await cmdXidach(message, args); break;
         case "anxin": await cmdAnxin(message); break;
         case "vay": await cmdVay(message, args); break;
         case "tralai": await cmdTralai(message, args); break;
-        case "doi":await cmdDoi(message, args); break;
-        case "doixu":await cmdDoixu(message, args); break;
-        case "doitien":await cmdDoitien(message, args); break;
-        case "help": await cmdHelp(message); break;switch (command) {
-        default: message.reply("❌ Lệnh không hợp lệ!");
-    }
-});
+        
+        // Nhóm lệnh đổi tiền
+        case "doi": await cmdDoi(message, args); break;
+        case "doixu": await cmdDoixu(message, args); break;
+        case "doitien": await cmdDoitien(message, args); break;
+        
+        case "help": await cmdHelp(message); break;
+        
+        default: 
+            message.reply("❌ Lệnh không hợp lệ!");
+            break;
+    } // Đóng ngoặc switch
+}); // Đóng ngoặc client.on
 
 // -------------------- BOT LOGIN --------------------
 client.login(process.env.TOKEN);
