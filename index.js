@@ -1094,41 +1094,63 @@ async function cmdTralai(message, args) {
 // =====================
 //      HELP COMMAND (Bản Xịn)
 // =====================
-collector.on('collect', async i => {
+async function cmdHelp(message) {
+    let timeLeft = 60; // Thiết lập 60 giây
+
+    const generateEmbed = (seconds) => {
+        return new EmbedBuilder()
+            .setTitle('🎮 TRUNG TÂM GIẢI TRÍ CASINO')
+            .setDescription(`Chào mừng bạn! Hãy chọn mục bên dưới để xem chi tiết.\n\n⏳ **Tự động đóng và dọn dẹp sau:** \`${seconds} giây\``)
+            .setColor('#FFD700')
+            .setTimestamp();
+    };
+
+    const row = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId('h_eco').setLabel('Kinh Tế').setStyle(ButtonStyle.Primary).setEmoji('💰'),
+        new ButtonBuilder().setCustomId('h_game').setLabel('Trò Chơi').setStyle(ButtonStyle.Success).setEmoji('🎲'),
+        new ButtonBuilder().setCustomId('h_bank').setLabel('Ngân Hàng').setStyle(ButtonStyle.Danger).setEmoji('🏦')
+    );
+
+    const helpMsg = await message.reply({ embeds: [generateEmbed(timeLeft)], components: [row] });
+
+    // --- BỘ ĐẾM NGƯỢC ---
+    const timer = setInterval(async () => {
+        timeLeft -= 5; // Cập nhật mỗi 5 giây để tránh bị Discord giới hạn (rate limit)
+        if (timeLeft <= 0) {
+            clearInterval(timer);
+        } else {
+            const updatedEmbed = EmbedBuilder.from(helpMsg.embeds[0]).setDescription(`Chào mừng bạn! Hãy chọn mục bên dưới để xem chi tiết.\n\n⏳ **Tự động đóng và dọn dẹp sau:** \`${timeLeft} giây\``);
+            await helpMsg.edit({ embeds: [updatedEmbed] }).catch(() => {});
+        }
+    }, 5000);
+
+    const collector = helpMsg.createMessageComponentCollector({ time: 60000 }); 
+
+    collector.on('collect', async i => {
         if (i.user.id !== message.author.id) return i.reply({ content: "Nút này không dành cho bạn!", ephemeral: true });
         
         const embed = new EmbedBuilder().setColor('#FFD700');
+        const descSuffix = `\n\n⏳ **Tự động đóng sau:** \`${timeLeft} giây\``;
 
         if (i.customId === 'h_eco') {
-            embed.setTitle('💰 HỆ THỐNG KINH TẾ')
-                 .setDescription(
-                    '• `!tien`       : Xem số dư & Nợ\n' +
-                    '• `!diemdanh`   : Nhận lương mỗi ngày\n' +
-                    '• `!chuyentien` : Chuyển tiền sạch ($)\n' +
-                    '• `!chuyenxu`   : Chuyển xu cá cược (🪙)'
-                 );
+            embed.setTitle('💰 HỆ THỐNG KINH TẾ').setDescription('• `!tien`       : Xem số dư & Nợ\n• `!diemdanh`   : Nhận lương\n• `!chuyentien` : Chuyển tiền ($)\n• `!chuyenxu`   : Chuyển xu (🪙)' + descSuffix);
         } else if (i.customId === 'h_game') {
-            embed.setTitle('🎲 KHO TRÒ CHƠI')
-                 .setDescription(
-                    '• `!taixiu`  : Cá cược Tài Xỉu\n' +
-                    '• `!baucua`  : Cá cược Bầu Cua\n' +
-                    '• `!xidach`  : Chơi bài Xì Dách\n' +
-                    '• `!tungxu`  : Đoán mặt đồng xu\n' +
-                    '• `!boctham` : Thử vận may mắn\n' +
-                    '• `!anxin`   : Xin tiền đại gia'
-                 );
+            embed.setTitle('🎲 KHO TRÒ CHƠI').setDescription('• `!taixiu`, `!baucua`, `!xidach`, `!tungxu`, `!boctham`, `!anxin`' + descSuffix);
         } else if (i.customId === 'h_bank') {
-            embed.setTitle('🏦 NGÂN HÀNG CASINO')
-                 .setDescription(
-                    '• `!doi`    : Đổi Xu ↔ Tiền ($)\n' +
-                    '• `!vay`    : Vay vốn làm ăn\n' +
-                    '• `!tralai` : Thanh toán nợ nần'
-                 );
+            embed.setTitle('🏦 NGÂN HÀNG CASINO').setDescription('• `!doi`    : Đổi Xu ↔ Tiền ($)\n• `!vay`    : Vay vốn\n• `!tralai` : Trả nợ' + descSuffix);
         }
 
-        // QUAN TRỌNG: Phải có components: [row] để nút không bị biến mất
         await i.update({ embeds: [embed], components: [row] });
     });
+
+    collector.on('end', async () => {
+        clearInterval(timer);
+        // Xóa tin nhắn của Bot
+        await helpMsg.delete().catch(() => {});
+        // Xóa tin nhắn lệnh !help của người dùng
+        await message.delete().catch(() => {});
+    });
+}
 
 // =====================
 //      MAIN EVENTS 
