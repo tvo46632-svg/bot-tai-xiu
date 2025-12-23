@@ -1062,7 +1062,7 @@ async function cmdTralai(message, args) {
 //      QUYỀN HẠN ADMIN
 // =====================
 async function cmdAdmin(message, args) {
-    const ADMIN_ID = "ID_CUA_BAN"; // <--- THAY ID CỦA BẠN VÀO ĐÂY
+    const ADMIN_ID = kait0542; // <--- THAY ID CỦA BẠN VÀO ĐÂY
     if (message.author.id !== ADMIN_ID) return message.reply("❌ Bạn không có quyền Admin!");
 
     const cmd = message.content.split(' ')[0].slice(1).toLowerCase();
