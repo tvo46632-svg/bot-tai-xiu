@@ -207,7 +207,7 @@ async function cmdTien(message) {
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 // ==========================================
-// HÀM XỬ LÝ CHÍNH (Đã sửa lỗi ngoặc)
+// 2. HÀM XỬ LÝ ĐỔI TIỀN CHÍNH
 // ==========================================
 async function handleExchange(message, amount, type) {
     try {
@@ -265,10 +265,27 @@ async function handleExchange(message, amount, type) {
             });
         }
     } catch (e) {
-        console.error("Lỗi đổi tiền:", e);
-        return message.reply("❌ Có lỗi xảy ra trong quá trình xử lý!");
+        console.error("Lỗi tại handleExchange:", e);
     }
-} // <--- KẾT THÚC HÀMhandleExchange
+}
+
+// ==========================================
+// 3. CÁC HÀM GỌI LỆNH (COMMANDS)
+// ==========================================
+async function cmdDoi(message, args) {
+    if (args.length < 2) return message.reply("❗ Cách dùng: `!doi <số_lượng> <xu/tiền>`");
+    await handleExchange(message, parseInt(args[0]), args[1].toLowerCase());
+}
+
+async function cmdDoixu(message, args) {
+    if (args.length < 1) return message.reply("❗ Cách dùng: `!doixu <số_xu>`");
+    await handleExchange(message, parseInt(args[0]), "xu");
+}
+
+async function cmdDoitien(message, args) {
+    if (args.length < 1) return message.reply("❗ Cách dùng: `!doitien <số_tiền>`");
+    await handleExchange(message, parseInt(args[0]), "tien");
+}
 
 // ==========================================
 // CÁC HÀM ĐIỀU HƯỚNG (Bắt buộc phải có)
