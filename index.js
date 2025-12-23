@@ -512,16 +512,16 @@ async function cmdBaucua(message, args = []) {
         }
 
         // 1. LẤY MỨC CƯỢC (Mặc định 200 hoặc theo lệnh)
-        let baseBet = 200; 
+        let baseBet = 200;
         if (args.length > 0) {
             const bet = parseInt(args[0]);
             if (!isNaN(bet) && bet > 0) baseBet = bet;
         }
 
         // 2. KIỂM TRA TIỀN NGƯỜI TẠO (Nếu thiếu báo lỗi và xóa sau 5s)
-        const starterUserDb = await getUser(message.author.id);
-        if (!starterUserDb || starterUserDb.money < baseBet) {
-            const msgErr = await message.reply(`❌ Bạn không đủ tiền để cược mức ${baseBet.toLocaleString()}! (Ví của bạn: ${starterUserDb?.money || 0})`);
+        const baseUserDb = await getUser(message.author.id);
+        if (!baseUserDb || baseUserDb.money < baseBet) {
+            const msgErr = await message.reply(`❌ Bạn không đủ tiền để cược mức ${baseBet.toLocaleString()}! (Ví của bạn: ${baseUserDb?.money || 0})`);
             // Xóa tin nhắn báo lỗi và tin nhắn lệnh sau 5 giây
             setTimeout(() => { 
                 msgErr.delete().catch(() => {}); 
