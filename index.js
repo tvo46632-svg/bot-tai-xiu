@@ -305,6 +305,67 @@ async function cmdDoitien(message, args) {
     if (args.length < 1) return message.reply("❗ Cách dùng: `!doitien <số_tiền>`");
     await handleExchange(message, parseInt(args[0]), "tien");
 }
+// ... (Các khai báo require và SlashCommandBuilder bạn đã có)
+
+// 1. Khai báo lệnh Slash
+const doiCommand = new SlashCommandBuilder()
+    .setName('doi')
+    .setDescription('Đổi Xu/Tiền ở chế độ ẩn (Chỉ bạn thấy)')
+    .addIntegerOption(option => 
+        option.setName('amount').setDescription('Số lượng').setRequired(true))
+    .addStringOption(option =>
+        option.setName('type').setDescription('Loại').setRequired(true)
+            .addChoices({ name: 'Xu sang Tiền', value: 'xu' }, { name: 'Tiền sang Xu', value: 'tien' }));
+
+// 2. Sự kiện Ready (Đăng ký lệnh và Online)
+client.on("ready", async () => {
+    try {
+        await initDB(); // Khởi tạo database
+        
+        // Dòng này cực kỳ quan trọng để lệnh /doi hiện lên Discord
+        await client.application.commands.set([doiCommand]); 
+        
+        console.log(`✅ Bot đã online: ${client.user.tag}`);
+    } catch (e) {
+        console.error("Lỗi khi khởi động:", e);
+    }
+});
+
+// 3. Xử lý Slash Command (Lệnh gạch chéo)
+client.on("interactionCreate", async (interaction) => {
+    if (!interaction.isChatInputCommand()) return;
+
+    if (interaction.commandName === 'doi') {
+        const amount = interaction.options.getInteger('amount');
+        const type = interaction.options.getString('type');
+
+        // Phản hồi ẩn (chỉ người dùng thấy)
+        await interaction.deferReply({ ephemeral: true });
+
+        try {
+            const user = await getUser(interaction.user.id);
+            if (!user) return interaction.editReply("❌ Bạn chưa có dữ liệu!");
+
+            if (type === 'xu') {
+                if (user.xu < amount) return interaction.editReply("❌ Không đủ xu!");
+                let phi = amount < 5000 ? 0 : (amount < 20000 ? 0.20 : 0.35);
+                const moneyOut = Math.floor(amount * (1 - phi));
+                
+                await subXu(interaction.user.id, amount);
+                await addMoney(interaction.user.id, moneyOut);
+                await interaction.editReply(`✅ Thành công! Đã đổi **${amount} xu** lấy **${moneyOut} tiền**.`);
+            } else {
+                if (user.money < amount) return interaction.editReply("❌ Không đủ tiền!");
+                await subMoney(interaction.user.id, amount);
+                await addXu(interaction.user.id, amount);
+                await interaction.editReply(`✅ Thành công! Đã đổi **${amount} tiền** lấy **${amount} xu**.`);
+            }
+        } catch (err) {
+            console.error(err);
+            await interaction.editReply("❌ Lỗi hệ thống!");
+        }
+    }
+});
 // =====================
 // TUNG XU (v2 cải tiến) với hoạt ảnh
 // =====================
@@ -1051,10 +1112,5 @@ client.on("messageCreate", async (message) => {
     } catch (error) {
         console.error("Lỗi lệnh chat:", error);
     }
-});
-// ... (phần code tính toán phí bên trên giữ nguyên)
-
-const finalMsg = `✅ **THÀNH CÔNG**\n🔁 Đã đổi: **${amount.toLocaleString()} xu**\n💰 Nhận: **${moneyOut.toLocaleString()} tiền**`;
-
 // -------------------- BOT LOGIN --------------------
 client.login(process.env.TOKEN);
