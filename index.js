@@ -963,12 +963,6 @@ client.on("interactionCreate", async (interaction)=>{
     }
 });
 
-Để thêm tính năng tự động xóa tin nhắn sau 5 giây để tránh spam, bạn chỉ cần sử dụng hàm setTimeout sau khi đã hiển thị kết quả cuối cùng.
-
-Dưới đây là đoạn code đã được cập nhật:
-
-JavaScript
-
 // =====================
 //      ĂN XIN (BỐC TÚI MÙ)
 // =====================
