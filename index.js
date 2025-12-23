@@ -497,14 +497,6 @@ async function cmdTaixiu(message) {
 // =====================
 // BẦU CUA CÓ HIỆU ỨNG "SỐC DĨA" + TUỲ Ý TIỀN
 // =====================
-
-Lỗi hiện tại bạn gặp phải (như trong hình image_a1b224.png) là do Bot nhảy vào khối catch(err) khi đang chạy bộ thu thập (collector). Nguyên nhân lớn nhất là bạn đang trừ tiền cược nhưng chưa khởi tạo đối tượng cược cho người chơi mới trong baucuaSession.bets.
-
-Đây là bản code đã được tinh chỉnh lại cực kỳ cẩn thận, xử lý đúng logic: Trừ tiền người vi phạm (đặt > 2 con), hoàn tiền cho người hợp lệ, và không còn lỗi "Reset bàn".
-
-🎮 Code Bầu Cua Hoàn Chỉnh (Fix lỗi Collector)
-JavaScript
-
 async function cmdBaucua(message, args = []) {
     try {
         if (!args || typeof args.length === 'undefined') args = [];
