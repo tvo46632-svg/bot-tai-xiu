@@ -666,14 +666,18 @@ client.on("messageCreate", async message => {
     const args = message.content.trim().split(/ +/).slice(1);
     await cmdBaucua(message, args);
 });
+Để làm animation bốc thăm "xịn" như bạn muốn, mình sẽ chia phần thưởng ra làm 4 cấp độ: Sắt, Vàng, Kim Cương, và Thần Thoại. Mỗi cấp độ sẽ có màu sắc và emoji riêng để người chơi dễ phân biệt độ hiếm.
+
+Dưới đây là bản code đã được tối ưu, chữ nhỏ gọn (###) và có hiệu ứng hồi hộp:
+
+JavaScript
+
 // =====================
-//       BỐC THĂM
+//      BỐC THĂM MAY MẮN
 // =====================
 async function cmdBoctham(message) {
-
     await db.read();
     const userId = message.author.id;
-    const now = Date.now();
 
     db.data.boctham[userId] ||= { lastDate: 0, count: 0 };
     const info = db.data.boctham[userId];
@@ -684,33 +688,58 @@ async function cmdBoctham(message) {
         info.count = 3;
     }
 
-    if (info.count <= 0) {
-        message.reply("❌ Bạn đã hết lượt bốc thăm hôm nay!");
-        return;
-    }
+    if (info.count <= 0) return message.reply("> ❌ Bạn đã hết lượt bốc thăm hôm nay!");
 
     const user = await getUser(userId);
-    if (user.money < 200) {
-        message.reply("❌ Bạn cần 200 tiền để bốc thăm!");
-        return;
-    }
+    if (user.money < 200) return message.reply("> ❌ Cần **200 tiền** để bốc thăm!");
 
+    // Trừ tiền và lượt
     await subMoney(userId, 200);
     info.count--;
+    await db.write();
 
+    // 1. Tính toán phần thưởng trước
     const rand = Math.random() * 100;
     let reward = 0;
+    let tier = { name: "SẮT", emoji: "⚪", color: "🥈" };
 
-    if (rand <= 40) reward = Math.floor(Math.random() * 51) + 50; 
-    else if (rand <= 70) reward = Math.floor(Math.random() * 201) + 100;
-    else if (rand <= 90) reward = Math.floor(Math.random() * 301) + 300;
-    else if (rand <= 98) reward = Math.floor(Math.random() * 1501) - 1000;
-    else reward = 4000;
+    if (rand <= 40) {
+        reward = Math.floor(Math.random() * 51) + 50;
+        tier = { name: "SẮT", emoji: "⚪", color: "🥈" };
+    } else if (rand <= 70) {
+        reward = Math.floor(Math.random() * 201) + 100;
+        tier = { name: "VÀNG", emoji: "🟡", color: "🥇" };
+    } else if (rand <= 90) {
+        reward = Math.floor(Math.random() * 301) + 300;
+        tier = { name: "KIM CƯƠNG", emoji: "💎", color: "💎" };
+    } else if (rand <= 98) {
+        reward = Math.floor(Math.random() * 1501) - 1000;
+        tier = { name: "RÁC", emoji: "🗑️", color: "🥀" }; // Tỷ lệ âm tiền của bạn
+    } else {
+        reward = 4000;
+        tier = { name: "THẦN THOẠI", emoji: "🌟", color: "👑" };
+    }
 
+    // 2. Gửi tin nhắn bắt đầu animation
+    const msg = await message.reply("### 🎁 Đang mở hộp quà may mắn...");
+
+    // 3. Hiệu ứng bốc thăm nhảy Tier
+    const allTiers = ["⚪ SẮT", "🟡 VÀNG", "💎 KIM CƯƠNG", "👑 THẦN THOẠI"];
+    for (let i = 0; i < 4; i++) {
+        await new Promise(res => setTimeout(res, 400));
+        const randomTier = allTiers[Math.floor(Math.random() * allTiers.length)];
+        await msg.edit(`### 🎁 Đang bốc thăm...\n> ✨ Đang tìm thấy: **${randomTier}**`);
+    }
+
+    // 4. Cộng lời/lỗ vào tài khoản
     await addMoney(userId, reward);
     await db.write();
 
-    message.reply(`🎁 Bạn bốc thăm được ${reward} tiền. Lượt còn lại: ${info.count}`);
+    // 5. Kết quả cuối cùng (Chữ nhỏ gọn)
+    const resultText = reward >= 0 ? `Nhận được: **+${reward} tiền**` : `Bị mất: **${reward} tiền** (Xui quá!)`;
+    
+    await new Promise(res => setTimeout(res, 300));
+    return await msg.edit(`### ${tier.emoji} HỘP QUÀ ${tier.name} ${tier.emoji}\n> ${tier.color} ${resultText}\n> 🎫 Lượt còn lại: \`${info.count}\``);
 }
 // ===================== CHUYỂN TIỀN =====================
 async function cmdChuyentien(message, args) {
