@@ -1131,103 +1131,49 @@ async function cmdTralai(message, args) {
 } // <- Đóng cmdTralai
 
 // =====================
-//      HELP (FULL + BẢNG GIÁ + VAY)
+//      HELP COMMAND (Bản Xịn)
 // =====================
-
 async function cmdHelp(message) {
-    // Tạo Embed giới thiệu ban đầu
     const mainEmbed = new EmbedBuilder()
         .setTitle('🎮 TRUNG TÂM GIẢI TRÍ CASINO')
         .setDescription('Chào mừng bạn đến với sòng bạc! Hãy chọn mục bên dưới để xem chi tiết.\n> *Menu này sẽ tự đóng sau 2 phút.*')
         .setColor('#FFD700')
         .setTimestamp();
 
-    // Tạo hàng nút bấm
     const row = new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-            .setCustomId('h_eco')
-            .setLabel('Kinh Tế')
-            .setStyle(ButtonStyle.Primary)
-            .setEmoji('💰'),
-        
-        new ButtonBuilder()
-            .setCustomId('h_game')
-            .setLabel('Trò Chơi')
-            .setStyle(ButtonStyle.Success)
-            .setEmoji('🎲'),
-
-        new ButtonBuilder()
-            .setCustomId('h_bank')
-            .setLabel('Ngân Hàng & Đổi Xu') 
-            .setStyle(ButtonStyle.Danger)
-            .setEmoji('🏦')
+        new ButtonBuilder().setCustomId('h_eco').setLabel('Kinh Tế').setStyle(ButtonStyle.Primary).setEmoji('💰'),
+        new ButtonBuilder().setCustomId('h_game').setLabel('Trò Chơi').setStyle(ButtonStyle.Success).setEmoji('🎲'),
+        new ButtonBuilder().setCustomId('h_bank').setLabel('Ngân Hàng & Đổi Xu').setStyle(ButtonStyle.Danger).setEmoji('🏦')
     );
 
     const helpMsg = await message.reply({ embeds: [mainEmbed], components: [row] });
-
-    // Tạo collector
     const collector = helpMsg.createMessageComponentCollector({ time: 120000 }); 
 
     collector.on('collect', async i => {
+        if (i.user.id !== message.author.id) return i.reply({ content: "Nút này không dành cho bạn!", ephemeral: true });
+        
         const embed = new EmbedBuilder().setColor('#FFD700');
-
         if (i.customId === 'h_eco') {
-            embed.setTitle('💰 KINH TẾ CƠ BẢN')
-                 .setDescription(
-                    'Các lệnh quản lý tài sản cá nhân:\n\n' +
-                    '• `!tien`: Xem số dư hiện tại\n' +
-                    '• `!diemdanh`: Nhận lương hàng ngày\n' +
-                    '• `!chuyentien @user <số>`: Chuyển tiền cho người khác'
-                 );
-        } 
-        else if (i.customId === 'h_game') {
-            embed.setTitle('🎲 DANH SÁCH TRÒ CHƠI')
-                 .setDescription(
-                    'Thử vận may của bạn với các trò chơi:\n\n' +
-                    '• `!baucua <mức>`: Bầu Cua Tôm Cá\n' +
-                    '• `!taixiu <mức>`: Tài Xỉu (Chẵn/Lẻ)\n' +
-                    '• `!tungxu <mức>`: Tung đồng xu 50/50\n' +
-                    '• `!anxin`: Xin tiền khi trắng tay'
-                 );
-        } 
-        else if (i.customId === 'h_bank') {
-            embed.setTitle('🏦 NGÂN HÀNG & TỶ GIÁ')
-                 .addFields(
-                    { 
-                        name: '💸 Chính Sách Vay Nợ (`!vay <số tiền>`)', 
-                        value: '> **Hạn mức:** Tối đa gấp đôi (x2) số dư.\n' +
-                               '> **Hỗ trợ:** Số dư < 11k ➔ Hạn mức cố định 10k.\n' +
-                               '> **Lãi suất:**\n' +
-                               '- Mặc định: **100%** (Vay 1 trả 2).\n' +
-                               '- Vay lớn: **200%** (Vay 1 trả 3).' 
-                    },
-                    { 
-                        name: '💱 Bảng Giá Đổi Xu (`!doi <số xu>`)', 
-                        value: 'Tỷ lệ quy đổi từ **Xu** sang **Tiền**:\n' +
-                               '• `100 xu`  ➔ **50 $**\n' +
-                               '• `200 xu`  ➔ **150 $**\n' +
-                               '• `500 xu`  ➔ **450 $**\n' +
-                               '• `1000 xu` ➔ **900 $**\n' +
-                               '• `Từ 2000 xu` ➔ **x0.9** giá trị\n' +
-                               '*(Ví dụ: 2000 xu = 1800 $)*' 
-                    }
-                 )
-                 .setFooter({ text: 'Lưu ý: Vay không trả sẽ bị nợ xấu và khóa tính năng!' });
+            embed.setTitle('💰 KINH TẾ CƠ BẢN').setDescription('• `!tien`: Xem số dư\n• `!diemdanh`: Nhận lương\n• `!chuyentien`: Chuyển tiền');
+        } else if (i.customId === 'h_game') {
+            embed.setTitle('🎲 TRÒ CHƠI').setDescription('• `!baucua`, `!taixiu`, `!tungxu`, `!anxin`');
+        } else if (i.customId === 'h_bank') {
+            embed.setTitle('🏦 NGÂN HÀNG').addFields(
+                { name: '💸 Vay Nợ', value: '`!vay <số>`: Vay 1 trả 2.' },
+                { name: '💱 Tỷ Giá', value: 'Đổi từ Xu sang Tiền (!doi).' }
+            );
         }
-
         await i.update({ embeds: [embed] });
     });
 
     collector.on('end', () => {
-        helpMsg.delete().catch(() => {});
-        message.delete().catch(() => {});
+        helpMsg.edit({ components: [] }).catch(() => {});
     });
 }
 
 // =====================
 //      MAIN EVENTS 
 // =====================
-
 client.on("messageCreate", async (message) => {
     if (message.author.bot || !message.content.startsWith(PREFIX)) return;
 
@@ -1241,19 +1187,14 @@ client.on("messageCreate", async (message) => {
             case "doi": await handleExchange(message, args[0], args[1]); break;
             case "doixu": await handleExchange(message, args[0], "xu"); break;
             case "doitien": await handleExchange(message, args[0], "tien"); break;
-
-            case "addmoney":
+            case "addmoney": 
             case "reset": 
                 if (typeof cmdAdmin !== 'undefined') await cmdAdmin(message, args); 
                 break; 
-
             case "tungxu": if(typeof cmdTungxu !== 'undefined') await cmdTungxu(message, args); break;
             case "taixiu": if(typeof cmdTaixiu !== 'undefined') await cmdTaixiu(message, args); break;
             case "baucua": if(typeof cmdBaucua !== 'undefined') await cmdBaucua(message, args); break;
             case "help": await cmdHelp(message); break;
-
-            default: 
-                break;
         }
     } catch (error) {
         console.error("Lỗi lệnh chat:", error);
