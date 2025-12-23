@@ -510,8 +510,13 @@ function randomInt(min, max) {
     return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
-async function cmdBaucua(message, args) {
+async function cmdBaucua(message, args = []) { // Thêm mảng trống mặc định cho args
     try {
+        // Đảm bảo args luôn là một mảng trước khi kiểm tra .length
+        if (!args || typeof args.length === 'undefined') {
+            args = [];
+        }
+
         // 1. Kiểm tra phiên (Tự xóa sau 5s)
         if (baucuaSession) {
             const msgErr = await message.reply("⚠️ Đang có phiên bầu cua khác. Vui lòng đợi!");
@@ -520,7 +525,8 @@ async function cmdBaucua(message, args) {
                 message.delete().catch(() => {});
             }, 5000);
         }
-
+        
+        // Dòng này giờ sẽ không còn gây lỗi
         let starterBet = 200;
         if (args.length > 0) {
             const bet = parseInt(args[0]);
