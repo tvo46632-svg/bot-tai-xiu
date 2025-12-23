@@ -1123,9 +1123,9 @@ async function cmdHelp(message) {
         
         const embed = new EmbedBuilder().setColor('#FFD700');
         if (i.customId === 'h_eco') {
-            embed.setTitle('💰 KINH TẾ CƠ BẢN').setDescription('• `!tien`: Xem số dư\n• `!diemdanh`: Nhận lương\n• `!chuyentien`: Chuyển tiền');
+            embed.setTitle('💰 KINH TẾ ').setDescription('• `!tien`: Xem số dư\n• `!diemdanh`: Nhận lương\n• `!chuyentien`: Chuyển tiền - xu - tien');
         } else if (i.customId === 'h_game') {
-            embed.setTitle('🎲 TRÒ CHƠI').setDescription('• `!baucua`, `!taixiu`, `!tungxu`, `!anxin`');
+            embed.setTitle('🎲 TRÒ CHƠI').setDescription('• `!baucua`, `!taixiu`, `!tungxu`, `!anxin`, `!boctham`');
         } else if (i.customId === 'h_bank') {
             embed.setTitle('🏦 NGÂN HÀNG').addFields(
                 { name: '💸 Vay Nợ', value: '`!vay <số>`: Vay 1 trả 2.' },
@@ -1156,6 +1156,9 @@ client.on("messageCreate", async (message) => {
             case "doi": await handleExchange(message, args[0], args[1]); break;
             case "doixu": await handleExchange(message, args[0], "xu"); break;
             case "doitien": await handleExchange(message, args[0], "tien"); break;
+            case "boctham": await cmdBoctham(message);  break;
+            case "anxin": await cmdAnxin(message); break;
+                
             case "addmoney": 
             case "reset": 
                 if (typeof cmdAdmin !== 'undefined') await cmdAdmin(message, args); 
