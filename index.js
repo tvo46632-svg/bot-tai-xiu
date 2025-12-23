@@ -214,80 +214,80 @@ async function cmdTien(message) {
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 // ==========================================
-// 2. HÀM XỬ LÝ ĐỔI TIỀN (ĐÃ FIX & THÊM LOG)
+// 2. HÀM XỬ LÝ ĐỔI TIỀN (ĐÃ FIX LỖI 0 XU)
 // ==========================================
 async function handleExchange(message, amountInput, typeInput) {
     try {
-        // 1. Log ra xem Bot nhận được gì (Xem trong Terminal/Console)
-        console.log(`Debug đổi tiền: User=${message.author.id}, Amount=${amountInput}, Type=${typeInput}`);
-
-        // 2. Kiểm tra số lượng hợp lệ
-        const amount = parseInt(amountInput); // Ép về số nguyên
-        if (!amount || isNaN(amount) || amount <= 0) {
-            return message.reply("❌ Số lượng không hợp lệ! Ví dụ: `!doi 10000 xu`");
-        }
-
+        // 1. Lấy dữ liệu user
         const user = await getUser(message.author.id);
         if (!user) return message.reply("❌ Không tìm thấy ví của bạn!");
 
-        // 3. Ép kiểu dữ liệu trong ví về số (Tránh lỗi String < Number)
-        // LƯU Ý: Kiểm tra kỹ xem database của bạn lưu là 'xu' hay 'Xu' hay 'coins'
-        const currentXu = Number(user.xu || 0); 
-        const currentMoney = Number(user.money || 0);
+        // --- BƯỚC QUAN TRỌNG: DEBUG & TỰ SỬA TÊN BIẾN ---
+        // Dòng này giúp bot đọc được xu dù database lưu tên gì (xu, Xu, coins...)
+        // Bạn hãy nhìn xem lệnh !tien dùng biến gì thì điền vào đầu tiên
+        const currentXu = Number(user.xu || user.Xu || user.coins || user.balance || 0); 
+        const currentMoney = Number(user.money || user.Money || user.cash || 0);
 
-        // Chuẩn hóa loại tiền (xóa khoảng trắng, về chữ thường)
-        const type = typeInput.trim().toLowerCase();
+        console.log(`Debug ví: Xu=${currentXu} | Tiền=${currentMoney}`); // Xem log này nếu vẫn lỗi
+
+        // 2. Xử lý đầu vào
+        const amount = parseInt(amountInput);
+        if (!amount || isNaN(amount) || amount <= 0) {
+            return message.reply("❌ Số lượng sai! Ví dụ: `!doi 10000 xu`");
+        }
+
+        // Chuẩn hóa loại tiền (xóa khoảng trắng thừa, về chữ thường)
+        const type = typeInput ? typeInput.toString().trim().toLowerCase() : "";
 
         // ======================================
-        // CASE 1: ĐỔI XU -> TIỀN
+        // TRƯỜNG HỢP 1: ĐỔI XU -> TIỀN
         // ======================================
-        if (type === "xu") {
-            // Kiểm tra số dư
+        if (type === "xu" || type === "coin" || type === "coins") {
             if (currentXu < amount) {
-                return message.reply(`❌ Bạn không đủ Xu! (Có: ${currentXu.toLocaleString()} xu)`);
+                return message.reply(`❌ Bạn không đủ Xu! (Có: **${currentXu.toLocaleString()}** xu)`);
             }
 
-            // Tính phí
+            // Logic tính phí
             let phi = amount < 5000 ? 0 : (amount < 20000 ? 0.20 : 0.35);
             const moneyOut = Math.floor(amount * (1 - phi));
-
-            const msg = await message.reply(`⏳ Đang đổi **${amount.toLocaleString()} Xu** ➔ **Tiền**...`);
             
-            // Thực hiện trừ/cộng trong DB
+            const msg = await message.reply(`⏳ Đang đổi **${amount.toLocaleString()} Xu** sang Tiền...`);
+            
+            // --- CẬP NHẬT DATABASE ---
+            // Đảm bảo hàm subXu/addMoney của bạn hoạt động đúng
             await subXu(message.author.id, amount);
             await addMoney(message.author.id, moneyOut);
 
-            return msg.edit(`✅ **THÀNH CÔNG**\n➖ Trừ: **${amount.toLocaleString()} Xu**\n➕ Nhận: **${moneyOut.toLocaleString()} Tiền**`);
+            return msg.edit(`✅ **ĐỔI THÀNH CÔNG**\n➖ Trừ: **${amount.toLocaleString()} Xu**\n➕ Nhận: **${moneyOut.toLocaleString()} Tiền**`);
         }
 
         // ======================================
-        // CASE 2: ĐỔI TIỀN -> XU
+        // TRƯỜNG HỢP 2: ĐỔI TIỀN -> XU
         // ======================================
-        // Chấp nhận nhiều cách viết: tien, tiền, money
-        else if (["tien", "tiền", "money"].includes(type)) {
+        else if (["tien", "tiền", "money", "vnd"].includes(type)) {
             if (currentMoney < amount) {
-                return message.reply(`❌ Bạn không đủ Tiền! (Có: ${currentMoney.toLocaleString()} tiền)`);
+                return message.reply(`❌ Bạn không đủ Tiền! (Có: **${currentMoney.toLocaleString()}** tiền)`);
             }
 
-            const msg = await message.reply(`⏳ Đang đổi **${amount.toLocaleString()} Tiền** ➔ **Xu**...`);
+            const msg = await message.reply(`⏳ Đang đổi **${amount.toLocaleString()} Tiền** sang Xu...`);
 
-            // Thực hiện trừ/cộng trong DB
+            // --- CẬP NHẬT DATABASE ---
             await subMoney(message.author.id, amount);
             await addXu(message.author.id, amount);
 
-            return msg.edit(`✅ **THÀNH CÔNG**\n➖ Trừ: **${amount.toLocaleString()} Tiền**\n➕ Nhận: **${amount.toLocaleString()} Xu**`);
-        } 
+            return msg.edit(`✅ **ĐỔI THÀNH CÔNG**\n➖ Trừ: **${amount.toLocaleString()} Tiền**\n➕ Nhận: **${amount.toLocaleString()} Xu**`);
+        }
         
         // ======================================
-        // CASE 3: KHÔNG HIỂU LỆNH (nó bị "0 th" - im lặng)
+        // TRƯỜNG HỢP 3: KHÔNG HIỂU LỆNH
         // ======================================
         else {
-            return message.reply(`❌ Loại tiền không hợp lệ!\nDùng: \`!doi <số> xu\` hoặc \`!doi <số> tien\``);
+            return message.reply(`❓ Bot không hiểu bạn muốn đổi gì.\n👉 Dùng: \`!doi 10000 xu\` hoặc \`!doi 10000 tien\``);
         }
 
     } catch (e) {
-        console.error("Lỗi Crash tại handleExchange:", e);
-        return message.reply(`❌ Lỗi hệ thống: ${e.message}`);
+        console.error("Lỗi:", e);
+        return message.reply("❌ Có lỗi code, vui lòng xem console log.");
     }
 }
 // ==========================================
