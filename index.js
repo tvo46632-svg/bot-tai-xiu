@@ -262,21 +262,26 @@ async function handleExchange(message, amountInput, typeInput) {
         }
 
         // ======================================
-        // TRƯỜNG HỢP 2: ĐỔI TIỀN -> XU
+        // TRƯỜNG HỢP 2: ĐỔI TIỀN -> XU (THUẾ 10%)
         // ======================================
         else if (["tien", "tiền", "money", "vnd"].includes(type)) {
             if (currentMoney < amount) {
                 return message.reply(`❌ Bạn không đủ Tiền! (Có: **${currentMoney.toLocaleString()}** tiền)`);
             }
 
-            const msg = await message.reply(`⏳ Đang đổi **${amount.toLocaleString()} Tiền** sang Xu...`);
+            // --- TÍNH THUẾ 10% ---
+            let thue = 0.10; 
+            // Số Xu thực nhận sau khi trừ 10% thuế
+            const xuOut = Math.floor(amount * (1 - thue));
+
+            const msg = await message.reply(`⏳ Đang đổi **${amount.toLocaleString()} Tiền** sang Xu... (Thuế 10%)`);
 
             // --- CẬP NHẬT DATABASE ---
-            await subMoney(message.author.id, amount);
-            await addXu(message.author.id, amount);
+            await subMoney(message.author.id, amount); // Trừ đủ số tiền người dùng nhập
+            await addXu(message.author.id, xuOut);     // Chỉ cộng số Xu sau thuế
 
-            return msg.edit(`✅ **ĐỔI THÀNH CÔNG**\n➖ Trừ: **${amount.toLocaleString()} Tiền**\n➕ Nhận: **${amount.toLocaleString()} Xu**`);
-        }
+            return msg.edit(`✅ **ĐỔI THÀNH CÔNG**\n➖ Trừ: **${amount.toLocaleString()} Tiền**\n➕ Nhận: **${xuOut.toLocaleString()} Xu** (Đã trừ 10% thuế)`);
+        }}
         
         // ======================================
         // TRƯỜNG HỢP 3: KHÔNG HIỂU LỆNH
@@ -798,8 +803,8 @@ async function cmdChuyenxu(message, args) {
     if (senderData.xu < amount) 
         return message.reply("> ❌ Bạn không đủ xu!");
 
-    // 3. Tính toán phí 7%
-    const fee = Math.floor(amount * 0.07);
+    // 3. Tính toán phí 10%
+    const fee = Math.floor(amount * 0.10);
     const netXu = amount - fee;
 
     const row = new ActionRowBuilder().addComponents(
