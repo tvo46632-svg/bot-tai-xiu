@@ -634,32 +634,49 @@ async function cmdBaucua(message, args = []) {
         if (!baucuaSession || baucuaSession.isCancelled) return;
 
         // 5. KẾT QUẢ & CHỐNG LẠM PHÁT (Tiền thắng tính riêng từng người)
-        const results = Array.from({length: 3}, () => BAUCUA_EMOJIS[Math.floor(Math.random() * 6)]);
-        const summaryText = [];
+const results = Array.from({length: 3}, () => BAUCUA_EMOJIS[Math.floor(Math.random() * 6)]);
+const summaryText = [];
 
-        for (const userId in baucuaSession.bets) {
-            const uBets = baucuaSession.bets[userId];
-            let winAmount = 0; 
-            let totalBet = 0;
+// Chốt dữ liệu cược để tính toán
+const allBets = { ...baucuaSession.bets };
 
-            for (const [e, a] of Object.entries(uBets)) {
-                totalBet += a; // Tổng tiền thực tế người chơi đã bỏ ra
-                const matchCount = results.filter(r => r === e).length;
-                if (matchCount > 0) {
-                    winAmount += a * (matchCount + 1); // Trả lại vốn + thưởng (Vốn * mặt trúng)
-                }
-            }
+for (const userId in allBets) {
+    const uBets = allBets[userId];
+    let totalWin = 0;  // Tổng tiền bot sẽ trả về ví người chơi
+    let totalBet = 0;  // Tổng tiền người chơi đã bỏ ra trong phiên này
 
-            if (winAmount > 0) await addMoney(userId, winAmount);
-            const u = await client.users.fetch(userId).catch(() => ({ username: "Người chơi" }));
-            
-            if (winAmount > 0) {
-                summaryText.push(`✅ **${u.username}** thắng **+${winAmount.toLocaleString()}** (Cược ${totalBet.toLocaleString()})`);
-            } else {
-                summaryText.push(`❌ **${u.username}** thua **-${totalBet.toLocaleString()}**`);
-            }
+    // Duyệt qua từng con người chơi đã đặt
+    for (const [emoji, amount] of Object.entries(uBets)) {
+        totalBet += amount;
+        const matchCount = results.filter(r => r === emoji).length;
+
+        if (matchCount > 0) {
+            // CƠ CHẾ CHUẨN: Hoàn vốn + Thưởng theo số mặt trúng
+            // Ví dụ: Đặt 200 vào Cá, về 2 con Cá -> Nhận lại 200 (vốn) + 400 (thưởng) = 600
+            totalWin += amount + (amount * matchCount);
         }
+    }
 
+    const u = await client.users.fetch(userId).catch(() => ({ username: "Người chơi" }));
+    const netResult = totalWin - totalBet; // Số tiền lãi hoặc lỗ thực tế
+
+    if (totalWin > 0) {
+        // Trả tiền vào ví (Chỉ trả tiền thắng + vốn của những con trúng)
+        await addMoney(userId, totalWin);
+        
+        if (netResult > 0) {
+            summaryText.push(`✅ **${u.username}** thắng **+${netResult.toLocaleString()}**`);
+        } else if (netResult === 0) {
+            summaryText.push(`🤝 **${u.username}** hòa vốn`);
+        } else {
+            // Trường hợp đặt 2 con nhưng chỉ trúng 1 con thấp điểm hơn tổng cược
+            summaryText.push(`❌ **${u.username}** thua **${netResult.toLocaleString()}** (Trúng không đủ bù cược)`);
+        }
+    } else {
+        // Không trúng con nào, đã bị trừ tiền từ lúc đặt nên không cần addMoney âm nữa
+        summaryText.push(`❌ **${u.username}** thua **-${totalBet.toLocaleString()}**`);
+    }
+}
         // 6. DỌN DẸP TỰ ĐỘNG SAU 30S
         let finalMsg = `🎉 **Kết quả:** ${results.join(" ")}\n\n` + (summaryText.length > 0 ? summaryText.join("\n") : "Không ai đặt cược!");
         await betMessage.edit(finalMsg).catch(() => {});
