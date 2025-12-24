@@ -1234,3 +1234,4 @@ client.on("messageCreate", async (message) => {
 
 // -------------------- BOT LOGIN --------------------
 client.login(process.env.TOKEN);
+
