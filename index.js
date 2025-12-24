@@ -1170,11 +1170,13 @@ async function cmdHelp(message) {
         } else if (i.customId === 'h_bank') {
             embed.setTitle('🏦 NGÂN HÀNG & QUY ĐỔI')
                  .addFields(
-                    { 
-                        name: '🏦 Chính sách Vay (Vay 1 Trả 2)', 
-                        value: '• Số dư < 11k : Vay cố định tối đa `10,000`\n• Số dư > 11k : Vay tối đa `x2` tài khoản', 
-                        inline: false 
-                    },
+                    {
+    name: '🏦 Chính sách Vay (Vay 1 Trả 2)', 
+    value: '• Số dư < 11k : Vay cố định tối đa `10,000` xu\n' +
+           '• Số dư > 11k : Vay tối đa `x2` tài khoản\n' +
+           '👉 **Lệnh:** `!vay [số tiền]` hoặc `!vay` để vay tối đa.', 
+    inline: false 
+},
                     { 
                         name: '💱 Quy đổi & Thuế phí', 
                         value: '• `!doi` : Đổi Xu ↔ Tiền (Có phí rút %)\n• Thuế chuyển Xu : 7% - 10% tùy mốc', 
@@ -1211,6 +1213,7 @@ client.on("messageCreate", async (message) => {
             case "doitien": await handleExchange(message, args[0], "tien"); break;
             case "boctham": await cmdBoctham(message);  break;
             case "anxin": await cmdAnxin(message); break;
+            case "vay": await cmdVay(message, args); break;
             case "xidach": await cmdXidach(message, args); break;
             case "chuyentien": await cmdChuyentien(message, args); break;
             case "chuyenxu": await cmdChuyenxu(message, args); break;
