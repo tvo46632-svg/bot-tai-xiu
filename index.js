@@ -1170,11 +1170,12 @@ async function cmdHelp(message) {
         } else if (i.customId === 'h_bank') {
             embed.setTitle('🏦 NGÂN HÀNG & QUY ĐỔI')
                  .addFields(
-                    {
-    name: '🏦 Chính sách Vay (Vay 1 Trả 2)', 
-    value: '• Số dư < 11k : Vay cố định tối đa `10,000` xu\n' +
-           '• Số dư > 11k : Vay tối đa `x2` tài khoản\n' +
-           '👉 **Lệnh:** `!vay [số tiền]` hoặc `!vay` để vay tối đa.', 
+                  {
+    name: '🏦 Chính sách Vay & Trả (Lãi x2)', 
+    value: '• **Vay:** Số dư < 11k vay tối đa `10,000` xu. Số dư > 11k vay tối đa `x2` tài khoản.\n' +
+           '• **Trả:** Hệ thống tính nợ gấp đôi số tiền đã vay.\n' +
+           '👉 **Lệnh vay:** `!vay [số tiền]` hoặc `!vay` (vay tối đa).\n' +
+           '👉 **Lệnh trả:** `!tralai [số tiền]`, `!tralai all` hoặc `!tralai half`.', 
     inline: false 
 },
                     { 
@@ -1211,6 +1212,7 @@ client.on("messageCreate", async (message) => {
             case "doi": await handleExchange(message, args[0], args[1]); break;
             case "doixu": await handleExchange(message, args[0], "xu"); break;
             case "doitien": await handleExchange(message, args[0], "tien"); break;
+            case "tralai": await cmdTralai(message, args); break;
             case "boctham": await cmdBoctham(message);  break;
             case "anxin": await cmdAnxin(message); break;
             case "vay": await cmdVay(message, args); break;
