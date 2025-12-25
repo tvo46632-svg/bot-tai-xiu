@@ -67,7 +67,7 @@ function delay(ms) {
 // ---------------- USER DATA FUNCTIONS ----------------
 // QUYỀN ADMIN
 async function cmdAdmin(message, args) {
-    const ADMIN_ID = "ID_CUA_BAN_O_DAY"; // THAY ID CỦA BẠN VÀO ĐÂY
+    const ADMIN_ID = "1414458785841549342"; // THAY ID CỦA BẠN VÀO ĐÂY
     if (message.author.id !== ADMIN_ID) return message.reply("❌ Bạn không phải Admin!");
 
     const subCmd = message.content.slice(PREFIX.length).trim().split(/ +/)[0].toLowerCase();
@@ -1313,12 +1313,12 @@ client.on("interactionCreate", async (interaction) => {
     // NÚT THAM GIA
     if (interaction.customId === 'join_baicao') {
         if (game.status !== 'joining') return interaction.reply({ content: "Ván bài đã bắt đầu!", ephemeral: true });
-        const pData = db.data.users.find(u => u.id === interaction.user.id);
-        if (!pData || pData.balance < game.bet) return interaction.reply({ content: "Bạn không đủ tiền!", ephemeral: true });
+       const pData = await getUser(interaction.user.id);
+        if (!pData || pData.money < game.bet) return interaction.reply({ content: "Bạn không đủ tiền!", ephemeral: true });
         if (game.players.find(p => p.id === interaction.user.id)) return interaction.reply({ content: "Bạn đã vào sòng rồi!", ephemeral: true });
         if (game.players.length >= 10) return interaction.reply({ content: "Sòng đầy!", ephemeral: true });
 
-        pData.balance -= game.bet;
+        pData.money -= game.bet;
         await db.write();
         game.players.push({ id: interaction.user.id, name: interaction.user.username, hand: [], revealed: false });
 
@@ -1353,10 +1353,10 @@ client.on("interactionCreate", async (interaction) => {
 
         // 5. Tính toán kết quả và cộng tiền
         const result = solveGame(player, game.botHand, game.bet);
-        const pDB = db.data.users.find(u => u.id === player.id);
+        const pDB = await getUser(player.id);
         
         if (pDB) {
-            pDB.balance += result.receive;
+            pDB.money += result.receive;
             await db.write();
         }
 
@@ -1378,8 +1378,8 @@ async function handleBaiCaoCommand(message, args) {
     const betAmount = parseInt(args[0]);
     if (isNaN(betAmount) || betAmount <= 0) return message.reply("❌ Vui lòng nhập số tiền cược hợp lệ!");
 
-    const userData = db.data.users.find(u => u.id === message.author.id);
-    if (!userData || userData.balance < betAmount) return message.reply("❌ Bạn không đủ tiền!");
+    const userData = await getUser(message.author.id);
+    if (!userData || userData.money < betAmount) return message.reply("❌ Bạn không đủ tiền!");
     if (activeGames.has(message.channel.id)) return message.reply("❌ Đang có ván bài diễn ra ở kênh này!");
 
     const gameState = { 
@@ -1391,7 +1391,7 @@ async function handleBaiCaoCommand(message, args) {
     };
 
     // Chủ sòng tham gia luôn
-    userData.balance -= betAmount;
+    userData.money;
     gameState.players.push({ id: message.author.id, name: message.author.username, hand: [], revealed: false });
     await db.write();
     activeGames.set(message.channel.id, gameState);
@@ -1431,8 +1431,8 @@ async function handleXetBaiCommand(message) {
     target.revealed = true;
 
     const result = solveGame(target, game.botHand, game.bet);
-    const pDB = db.data.users.find(u => u.id === target.id);
-    pDB.balance += result.receive;
+    const pDB = await getUser(player.id);
+    pDB.money += result.receive;
     await db.write();
 
     message.channel.send(`🎲 **Bot xét bài ngẫu nhiên:**\n👤 **${target.name}**: ${target.hand.join(' ')}\n➜ **Kết quả:** ${result.msg}`);
