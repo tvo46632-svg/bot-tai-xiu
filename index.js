@@ -1110,29 +1110,34 @@ async function cmdTralai(message, args) {
 } // <- Đóng cmdTralai
 
 // ==========================================
-//      HELP COMMAND (BẢN FIX HIỂN THỊ GIF)
+//      HELP COMMAND (GIAO DIỆN BIG SIZE & GIF XỊN)
 // ==========================================
 async function cmdHelp(message) {
+    // 1. Định nghĩa các link GIF xịn (Direct Link)
+    const GIFS = {
+        home: 'https://i.pinimg.com/originals/f3/0e/42/f30e42f9b87050221381372d3f443b87.gif', // GIF sòng bài lung linh
+        poker: 'https://i.pinimg.com/originals/82/3a/0d/823a0d58852e1f66014389280d8591a3.gif', // GIF chia bài Poker chuyên nghiệp
+        bank: 'https://i.pinimg.com/originals/60/79/10/6079103e622b7a0d4251737f59f63583.gif'    // GIF đếm tiền cinematic
+    };
+
     const generateHomeEmbed = () => {
         return new EmbedBuilder()
-            .setTitle('🎰 SÒNG BẠC MACAO & CASINO ROYAL 🎰')
+            .setTitle('🎰 CASINO ROYAL - SẢNH CHỜ CAO CẤP 🎰')
             .setDescription(
-                `Chào mừng **${message.author.username}** và các dân chơi!\n` +
-                `Vui lòng chọn danh mục bên dưới để xem hướng dẫn chi tiết.\n\n` +
-                `> ⚠️ **Lưu ý:** Menu này sẽ tự đóng sau **60 giây**.`
+                `Chào mừng Thần Bài **${message.author.username}**!\n\n` +
+                `🏰 Bạn đang ở sảnh chờ trung tâm. Hãy chọn các phân khu chức năng phía dưới để bắt đầu cuộc chơi.\n\n` +
+                `> 💡 *Sử dụng các nút bấm để di chuyển giữa các khu vực.*`
             )
-            .setImage('https://img.pikbest.com/origin/10/14/49/86dpIkbEsTcqF.jpg') 
-            .setColor('#FFD700')
-            .setFooter({ text: 'Bot Casino System', iconURL: message.client.user.displayAvatarURL() })
-            .setTimestamp();
+            .setImage(GIFS.home) // Sử dụng ảnh to
+            .setColor('#f1c40f') // Vàng Gold
+            .setFooter({ text: 'Hệ thống tự động đóng sau 60s', iconURL: message.client.user.displayAvatarURL() });
     };
 
     const getRow = () => {
         return new ActionRowBuilder().addComponents(
-            new ButtonBuilder().setCustomId('h_home').setLabel('Trang Chủ').setStyle(ButtonStyle.Secondary).setEmoji('🏠'),
-            new ButtonBuilder().setCustomId('h_eco').setLabel('Kinh Tế').setStyle(ButtonStyle.Primary).setEmoji('💰'),
-            new ButtonBuilder().setCustomId('h_game').setLabel('Trò Chơi').setStyle(ButtonStyle.Success).setEmoji('🎲'),
-            new ButtonBuilder().setCustomId('h_bank').setLabel('Ngân Hàng').setStyle(ButtonStyle.Danger).setEmoji('🏦')
+            new ButtonBuilder().setCustomId('h_home').setLabel('Sảnh Chờ').setStyle(ButtonStyle.Secondary).setEmoji('🏠'),
+            new ButtonBuilder().setCustomId('h_game').setLabel('Casino Game').setStyle(ButtonStyle.Success).setEmoji('🃏'),
+            new ButtonBuilder().setCustomId('h_bank').setLabel('Ngân Hàng').setStyle(ButtonStyle.Danger).setEmoji('💰')
         );
     };
 
@@ -1144,59 +1149,40 @@ async function cmdHelp(message) {
     const collector = helpMsg.createMessageComponentCollector({ time: 60000 });
 
     collector.on('collect', async i => {
-        // Kiểm tra quyền: Chỉ người gọi lệnh mới được bấm
-        if (i.user.id !== message.author.id) {
-            return i.reply({ content: "Đây không phải menu của bạn!", ephemeral: true });
-        }
+        if (i.user.id !== message.author.id) return i.reply({ content: "Menu này không dành cho bạn!", ephemeral: true });
 
-        const embed = new EmbedBuilder().setColor('#FFD700').setTimestamp();
+        const embed = new EmbedBuilder().setColor('#f1c40f').setTimestamp();
 
         if (i.customId === 'h_home') {
-             await i.update({ embeds: [generateHomeEmbed()], components: [getRow()] });
-             return;
-        } 
-        
-        else if (i.customId === 'h_eco') {
-            embed.setTitle('💰 HỆ THỐNG TÀI CHÍNH')
-                 // Đổi sang link GIF trực tiếp hơn
-                 .setThumbnail('https://i.pinimg.com/originals/de/7a/21/de7a213988636402287c2c9d2f624d77.gif')
-                 .setDescription(
-                    `**Lệnh Cơ Bản:**\n` +
-                    `\`!tien\` : Kiểm tra số dư.\n` +
-                    `\`!diemdanh\` : Nhận lương hàng ngày.\n` +
-                    `\`!top\` : Bảng xếp hạng.\n\n` +
-                    `**Giao Dịch:**\n` +
-                    `\`!chuyentien <@user> <số>\` : Phí 5%.\n` +
-                    `\`!chuyenxu\` : Quy đổi tiền tệ.`
-                 );
+             return await i.update({ embeds: [generateHomeEmbed()], components: [getRow()] });
         } 
         
         else if (i.customId === 'h_game') {
-            embed.setTitle('🎲 SẢNH TRÒ CHƠI CASINO')
-                 .setThumbnail('https://i.gifer.com/C60P.gif')
+            embed.setTitle('🃏 CASINO GAME - SÒNG BÀI ĐẲNG CẤP')
+                 .setImage(GIFS.poker) // Ảnh to cho Poker
                  .addFields(
                     { 
-                        name: '🃏 BÀI CÀO (3 Cây)', 
-                        value: `> \`!baicao <cược>\`: Tham gia ván bài.\n> \`!nguabai\`: Xem bài.\n> \`!xetbai\`: Buộc xét bài.`
+                        name: '🎴 BÀI CÀO (3 Cây)', 
+                        value: `\`!baicao <cược>\`: Vào sòng bài cào.\n\`!nguabai\`: Hạ bài.\n\`!xetbai\`: Ép lật bài.`
                     },
                     { 
-                        name: '🎲 CÁC GAME KHÁC', 
-                        value: `• \`!taixiu\`, \`!baucua\`, \`!xidach\`, \`!tungxu\`, \`!boctham\`, \`!anxin\``
+                        name: '🎲 TRÒ CHƠI KHÁC', 
+                        value: `\`!taixiu\`, \`!baucua\`, \`!xidach\`, \`!tungxu\`, \`!boctham\``
                     }
                  );
         } 
         
         else if (i.customId === 'h_bank') {
-            embed.setTitle('🏦 NGÂN HÀNG & TÍN DỤNG')
-                 .setThumbnail('https://i.gifer.com/PY8q.gif')
+            embed.setTitle('💰 NGÂN HÀNG TRUNG ƯƠNG')
+                 .setImage(GIFS.bank) // Ảnh to cho Ngân hàng
                  .addFields(
                   {
-                    name: '💸 VAY VỐN', 
-                    value: '• \`!vay <số tiền>\` : Thủ tục vay vốn.\n• \`!vay\` : Vay tối đa hạn mức.'
+                    name: '🏦 TÍN DỤNG', 
+                    value: `\`!vay <số>\`: Vay vốn kinh doanh.\n\`!tralai\`: Thanh toán khoản nợ.`
                   },
                   {
-                    name: '💳 TRẢ NỢ & RÚT TIỀN',
-                    value: '• \`!tralai <số tiền>\` : Trả nợ.\n• \`!tralai all\` : Trả sạch nợ.'
+                    name: '📉 TÀI CHÍNH',
+                    value: `\`!tien\`: Xem ví.\n\`!top\`: Bảng vinh danh đại gia.`
                   }
                  );
         }
