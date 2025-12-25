@@ -1879,4 +1879,4 @@ client.on('interactionCreate', async (interaction) => {
             }
         });
         // Khởi động Bot (Phải nằm ngoài tất cả các dấu ngoặc nhọn)
-        client.login(process.env.TOKEN).then(() => {
+        client.login(process.env.TOKEN);
