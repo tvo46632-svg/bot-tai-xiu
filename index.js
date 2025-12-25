@@ -2006,12 +2006,11 @@ async function finishBaicao(channel, game) {
             msg: `🟢 **Thắng** (+\`${bet.toLocaleString()}\`)` 
         };
     }
-    // Trường hợp thua: Không dùng đầu lâu, dùng màu đỏ đơn giản
     return { 
         receive: 0, 
         msg: `🔴 **Thua** (-\`${bet.toLocaleString()}\`)` 
     };
-        }
+} // KẾT THÚC HÀM solveGame
     
 // =====================
 //      MAIN EVENTS 
@@ -2057,4 +2056,3 @@ client.on("messageCreate", async (message) => {
 
 // -------------------- BOT LOGIN --------------------
 client.login(process.env.TOKEN);
-
