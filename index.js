@@ -1097,20 +1097,32 @@ async function cmdXidach(message, args) {
     session.msg = await message.channel.send({ embeds: [embed], components: [row] });
     blackjackSession[message.channel.id] = session;
 }
+// --- NGU LINH ---
+function calcPoint(hand) {
+    let score = 0;
+    let aces = 0;
+    for (let card of hand) {
+        let val = card.replace(/:/g, '').slice(0, -1);
+        if (val === 'A') { aces++; score += 11; }
+        else if (['J', 'Q', 'K', '10'].includes(val)) { score += 10; }
+        else { score += parseInt(val); }
+    }
+    while (score > 21 && aces > 0) { score -= 10; aces--; }
+    return score;
+}   
 
 // --- XỬ LÝ NÚT BẤM (Rút / Dằn) ---
 client.on("interactionCreate", async (interaction) => {
     if (!interaction.isButton()) return;
     
+    // Chỉ xử lý nếu là nút Xì Dách
+    if (!interaction.customId.startsWith('hit_') && !interaction.customId.startsWith('stand_')) return;
+
     const [action, userId] = interaction.customId.split("_");
-    const session = blackjackSession[interaction.channel.id];
+    const session = blackjackSession[interaction.channelId];
 
-   // 2. Nếu là nút của XÌ DÁCH (Blackjack)
-    if (interaction.customId.startsWith('hit_') || interaction.customId.startsWith('stand_')) {
-        const session = blackjackSession[interaction.channelId];
-        if (!session) return interaction.reply({ content: "Phiên xì dách đã hết hạn.", ephemeral: true });
-    }
-
+    if (!session) return interaction.reply({ content: "❌ Phiên xì dách đã kết thúc hoặc không tồn tại.", ephemeral: true });
+    if (interaction.user.id !== userId) return interaction.reply({ content: "🚫 Đây không phải ván bài của bạn!", ephemeral: true });
     if (action === "hit") {
         session.playerHand.push(dealCard());
         const total = calcPoint(session.playerHand);
