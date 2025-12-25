@@ -172,6 +172,17 @@ async function setUserDebt(userId, amount) {
     user.debt = amount;
     await db.write();
 }
+async function getAllUsers() {
+    await db.read();
+    // Nếu bạn lưu người dùng trong db.data.users (dạng Object { id: {money, xu} })
+    if (db.data && db.data.users) {
+        return Object.keys(db.data.users).map(id => ({
+            id: id,
+            ...db.data.users[id]
+        }));
+    }
+    return []; // Trả về mảng rỗng nếu chưa có ai
+}
 
 // ===================== COMMANDS =====================
 
