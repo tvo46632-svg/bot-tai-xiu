@@ -1426,7 +1426,9 @@ client.on("interactionCreate", async (interaction) => {
     activeGames.delete(interaction.channelId);
     // Hiện thêm bài của Bot để minh bạch
     await interaction.channel.send(`🎴 **Nhà cái (Bot) hạ bài:** ${game.botHand.join(' ')}\n🏁 **Ván bài kết thúc!** Mọi người có thể mở ván mới.`);
-}
+            }
+} // Đóng if (flip_hand)
+}); // Đóng client.on
 // =====================
 // ham khoi tao nut !baicao
 // =====================
