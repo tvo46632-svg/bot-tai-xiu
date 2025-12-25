@@ -939,9 +939,9 @@ async function cmdChuyenxu(message, args) {
         setTimeout(() => mainMsg.delete().catch(() => {}), 10000);
     });
 }
-//-------- XI DACH -----------
-//--------- PHIEN BAN CO HINH ANH HOAN THIEN ------------------
+//-------- XI DACH VIP (CÓ ẢNH + LUẬT VN: XÌ BÀN, XÌ DÁCH, NGŨ LINH) -----------
 
+// 1. BẢNG EMOJI (ĐÃ FIX LÁ ÚP)
 const cardEmojis = {
     // Chất Bích (s)
     ':As:': '<:As:1453654015882821693>', ':2s:': '<:2s:1453654034467651636>', ':3s:': '<:3s:1453654192873934888>', ':4s:': '<:4s:1453654318417711105>', ':5s:': '<:5s:1453654339762651198>', 
@@ -963,31 +963,12 @@ const cardEmojis = {
     ':6d:': '<:6d:1453652804701782161>', ':7d:': '<:7d:1453652862998413342>', ':8d:': '<:8d:1453652890626424842>', ':9d:': '<:9d:1453652911992078469>', ':10d:': '<:10d:1453652933248811008>', 
     ':Jd:': '<:Jd:1453652955956904070>', ':Qd:': '<:Qd:1453652979235291197>', ':Kd:': '<:Kd:1453653001029030008>',
 
-    '🂠': '<:back:1453657459507073074>'
+    // Lá Úp (Back Card) - Đã fix key
+    ':back:': '<:back:1453657459507073074>'
 };
 
-function formatHandWithImages(hand, isHidden = false) {
-    if (isHidden) { 
-        return `${cardEmojis['🂠']} ${cardEmojis[hand[1]] || hand[1]}`;
-    }
-    return hand.map(card => cardEmojis[card] || card).join(" ");
-}
-
-function calcPoint(hand) {
-    let score = 0;
-    let aces = 0;
-    for (let card of hand) {
-        // Cần xóa bỏ cả dấu : và chữ cái cuối cùng để lấy phần số
-        let cleanName = card.replace(/:/g, ''); // Ví dụ: ":10s:" -> "10s"
-        let val = cleanName.slice(0, -1);       // "10s" -> "10"
-        
-        if (val === 'A') { aces++; score += 11; }
-        else if (['J', 'Q', 'K'].includes(val)) { score += 10; }
-        else { score += parseInt(val); }
-    }
-    while (score > 21 && aces > 0) { score -= 10; aces--; }
-    return score;
-}
+// --- HÀM HỖ TRỢ ---
+function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
 
 function dealCard() {
     const suits = ['s', 'c', 'h', 'd'];
@@ -997,17 +978,60 @@ function dealCard() {
     return `:${value}${suit}:`; 
 }
 
+function formatHandWithImages(hand, isHidden = false) {
+    if (isHidden) { 
+        return `${cardEmojis[':back:']} ${cardEmojis[hand[1]] || hand[1]}`;
+    }
+    return hand.map(card => cardEmojis[card] || card).join(" ");
+}
+
+function calcPoint(hand) {
+    let score = 0;
+    let aces = 0;
+    for (let card of hand) {
+        let cleanName = card.replace(/:/g, ''); 
+        let val = cleanName.slice(0, -1);       
+        
+        if (val === 'A') { aces++; score += 11; }
+        else if (['J', 'Q', 'K'].includes(val)) { score += 10; }
+        else { score += parseInt(val); }
+    }
+    while (score > 21 && aces > 0) { score -= 10; aces--; }
+    return score;
+}
+
 function cardToImageUrl(card) {
-    if (card === '🂠') return 'https://i.imgur.com/89S9OQ3.png';
-    let cleanName = card.replace(/:/g, ''); // Xóa dấu :
+    if (card === '🂠' || card === ':back:') return 'https://i.imgur.com/89S9OQ3.png';
+    let cleanName = card.replace(/:/g, ''); 
     const val = cleanName.slice(0, -1);
     const suit = cleanName.slice(-1).toUpperCase();
     const finalVal = val === '10' ? '0' : val;
     return `https://deckofcardsapi.com/static/img/${finalVal}${suit}.png`;
 }
 
+// --- HÀM KIỂM TRA ĐẶC BIỆT (XÌ BÀN / XÌ DÁCH) ---
+function checkSpecialHand(hand) {
+    if (hand.length !== 2) return null;
+    
+    // Lấy giá trị bài: :As: -> A, :10s: -> 10
+    const values = hand.map(c => c.replace(/:/g, '').slice(0, -1));
+
+    // 1. Xì Bàn (2 con A)
+    if (values[0] === 'A' && values[1] === 'A') return "XI_BAN";
+
+    // 2. Xì Dách (1 A + 1 con 10/J/Q/K)
+    const tenCards = ['10', 'J', 'Q', 'K'];
+    const hasAce = values.includes('A');
+    const hasTen = values.some(v => tenCards.includes(v));
+    
+    if (hasAce && hasTen) return "XI_DACH";
+
+    return null;
+}
+
 let blackjackSession = {};
 
+// --- LỆNH CHÍNH (!xidach) ---
 async function cmdXidach(message, args) {
     if (args.length < 1) return message.reply("💡 Cách dùng: `!xidach <số tiền>`");
     const bet = parseInt(args[0]);
@@ -1026,6 +1050,33 @@ async function cmdXidach(message, args) {
         bet: bet,
         msg: null
     };
+
+    // --- KIỂM TRA ĂN NGAY (XÌ BÀN / XÌ DÁCH) ---
+    const specialType = checkSpecialHand(session.playerHand);
+    if (specialType) {
+        let winAmount = bet * 3; // Nhận lại vốn + Thắng gấp đôi (x2)
+        let title = "";
+        
+        if (specialType === "XI_BAN") title = "✨ XÌ BÀN (2 XÌ) ✨";
+        else title = "✨ XÌ DÁCH ✨";
+
+        await addMoney(message.author.id, winAmount);
+        const finalUser = await getUser(message.author.id);
+
+        const winEmbed = new EmbedBuilder()
+            .setTitle(`🎉 ${title} - THẮNG GẤP ĐÔI!`)
+            .setColor("#e67e22") // Màu vàng cam
+            .setThumbnail(cardToImageUrl(session.playerHand[0]))
+            .addFields(
+                { name: `👤 Bài bạn`, value: `${formatHandWithImages(session.playerHand)}`, inline: false },
+                { name: `🤖 Nhà cái`, value: `${formatHandWithImages(session.dealerHand)}`, inline: false }
+            )
+            .setDescription(`Bạn có **${title}**! Ăn trọn **${winAmount.toLocaleString()}** 💰`)
+            .setFooter({ text: `💰 Số dư mới: ${finalUser.money.toLocaleString()}` });
+
+        return message.channel.send({ embeds: [winEmbed] });
+    }
+    // --- NẾU KHÔNG CÓ GÌ ĐẶC BIỆT THÌ CHƠI TIẾP ---
 
     const embed = new EmbedBuilder()
         .setTitle("🃏 SÒNG BÀI XÌ DÁCH")
@@ -1047,6 +1098,7 @@ async function cmdXidach(message, args) {
     blackjackSession[message.channel.id] = session;
 }
 
+// --- XỬ LÝ NÚT BẤM (Rút / Dằn) ---
 client.on("interactionCreate", async (interaction) => {
     if (!interaction.isButton()) return;
     const [action, userId] = interaction.customId.split("_");
@@ -1062,6 +1114,25 @@ client.on("interactionCreate", async (interaction) => {
         const total = calcPoint(session.playerHand);
         const userData = await getUser(userId);
 
+        // 1. KIỂM TRA NGŨ LINH (5 lá <= 21)
+        if (session.playerHand.length === 5 && total <= 21) {
+             const winAmount = session.bet * 3; // Thắng gấp đôi
+             await addMoney(userId, winAmount);
+             
+             const ngulinhEmbed = EmbedBuilder.from(interaction.message.embeds[0])
+                .setColor("#9b59b6") // Màu tím mộng mơ
+                .setFields(
+                    { name: `👤 Bạn (${total}) - ✨ NGŨ LINH ✨`, value: `${formatHandWithImages(session.playerHand)}`, inline: false },
+                    { name: `🤖 Nhà cái`, value: `${formatHandWithImages(session.dealerHand)}`, inline: false }
+                )
+                .setDescription(`🔥 **NGŨ LINH!** Bạn rút 5 lá không quắc! Ăn **${winAmount.toLocaleString()}**!`)
+                .setFooter({ text: `💰 Số dư: ${(userData.money + winAmount).toLocaleString()}` });
+
+            await interaction.update({ embeds: [ngulinhEmbed], components: [] });
+            return finishGame(interaction.channel.id);
+        }
+
+        // 2. KIỂM TRA QUẮC (> 21)
         if (total > 21) {
             const failEmbed = EmbedBuilder.from(interaction.message.embeds[0])
                 .setColor("#ff4d4d")
@@ -1074,7 +1145,10 @@ client.on("interactionCreate", async (interaction) => {
 
             await interaction.update({ embeds: [failEmbed], components: [] });
             return finishGame(interaction.channel.id);
-        } else {
+        } 
+        
+        // 3. CHƯA QUẮC, CHƯA NGŨ LINH -> UPDATE BÀI
+        else {
             const updateEmbed = EmbedBuilder.from(interaction.message.embeds[0])
                 .setFields(
                     { name: `👤 Bạn (${total})`, value: `${formatHandWithImages(session.playerHand)}`, inline: false },
@@ -1088,6 +1162,7 @@ client.on("interactionCreate", async (interaction) => {
         await interaction.deferUpdate();
         let dealerHand = session.dealerHand;
         
+        // Nhà cái rút nếu < 17
         while (calcPoint(dealerHand) < 17) {
             dealerHand.push(dealCard());
             const drawEmbed = EmbedBuilder.from(interaction.message.embeds[0])
@@ -1098,7 +1173,7 @@ client.on("interactionCreate", async (interaction) => {
                 .setFooter({ text: "🤖 Nhà cái đang rút bài... 🃏" });
 
             await interaction.editReply({ embeds: [drawEmbed], components: [] });
-            await sleep(1500);
+            await sleep(1500); // Đợi 1.5s cho hồi hộp
         }
 
         const playerTotal = calcPoint(session.playerHand);
@@ -1107,11 +1182,11 @@ client.on("interactionCreate", async (interaction) => {
         let finalColor = "#2f3136";
 
         if (dealerTotal > 21 || playerTotal > dealerTotal) {
-            await addMoney(userId, session.bet * 2);
+            await addMoney(userId, session.bet * 2); // Thắng thường (x1)
             resultText = `🎉 **THẮNG!** Bạn nhận \`+${session.bet.toLocaleString()}\``;
             finalColor = "#2ecc71";
         } else if (playerTotal === dealerTotal) {
-            await addMoney(userId, session.bet);
+            await addMoney(userId, session.bet); // Hòa
             resultText = `⚖️ **HÒA!** Hoàn lại \`${session.bet.toLocaleString()}\``;
             finalColor = "#f1c40f";
         } else {
@@ -1139,7 +1214,7 @@ function finishGame(channelId) {
         setTimeout(() => {
             session.msg.delete().catch(() => {});
             delete blackjackSession[channelId];
-        }, 20000);
+        }, 20000); // Tự xóa sau 20s
     } else {
         delete blackjackSession[channelId];
     }
