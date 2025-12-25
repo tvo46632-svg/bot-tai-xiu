@@ -1113,116 +1113,106 @@ async function cmdTralai(message, args) {
 //      HELP COMMAND (BẢN ỔN ĐỊNH - NO LAG)
 // ==========================================
 async function cmdHelp(message) {
-    const TIME_LIMIT = 60000; // 60 Giây (Dành cho người dùng lệnh)
-
-    // --- 1. CHUẨN BỊ GIAO DIỆN (EMBEDS) ---
-    // Để code gọn, ta tạo sẵn các Embed mẫu
-    
-    const footerData = { 
-        text: `⏳ Menu tự hủy sau 60 giây | Chỉ dành cho ${message.author.username}`, 
-        iconURL: message.author.displayAvatarURL() 
+    // --- HÀM TẠO EMBED GỐC (TRANG CHỦ) ---
+    const generateHomeEmbed = () => {
+        return new EmbedBuilder()
+            .setTitle('🎰 SÒNG BẠC MACAO & CASINO ROYAL 🎰')
+            .setDescription(
+                `Chào mừng **${message.author.username}** và các dân chơi!\n` +
+                `Vui lòng chọn danh mục bên dưới để xem hướng dẫn chi tiết.\n\n` +
+                `> ⚠️ **Lưu ý:** Menu này sẽ tự đóng sau **60 giây**.`
+            )
+            .setImage('https://img.pikbest.com/origin/10/14/49/86dpIkbEsTcqF.jpg') 
+            .setColor('#FFD700')
+            .setFooter({ text: 'Bot Casino System', iconURL: message.client.user.displayAvatarURL() })
+            .setTimestamp();
     };
 
-    // Trang Chủ
-    const embedHome = new EmbedBuilder()
-        .setTitle('🎰 CỜ BẠC ROYAL GOLD 24K 🎰')
-        .setDescription(
-            `Chào mừng **${message.author.username}**!\n` +
-            `Vui lòng chọn danh mục bên dưới để xem lệnh.\n\n` +
-            `> 🔒 **Quyền hạn:** Chỉ **${message.author.username}** mới bấm được nút.`
-        )
-        .setImage('https://img.pikbest.com/origin/10/14/49/86dpIkbEsTcqF.jpg') 
-        .setColor('#FFD700')
-        .setFooter(footerData)
-        .setTimestamp();
-
-    // Trang Kinh Tế
-    const embedEco = new EmbedBuilder()
-        .setTitle('💰 HỆ THỐNG TÀI CHÍNH')
-        .setColor('#3498db')
-        .setThumbnail('https://cdn-icons-png.flaticon.com/512/2485/2485519.png')
-        .setDescription(
-            `**Lệnh Cơ Bản:**\n` +
-            `\`!tien\` : Xem số dư.\n\`!diemdanh\` : Nhận lương.\n\`!top\` : BXH Đại gia.\n\n` +
-            `**Giao Dịch:**\n` +
-            `\`!chuyentien <@user> <số>\` : Phí 5%.\n\`!chuyenxu\` : Đổi xu sang tiền.`
-        )
-        .setFooter(footerData);
-
-    // Trang Game
-    const embedGame = new EmbedBuilder()
-        .setTitle('🎲 SẢNH CASINO')
-        .setColor('#2ecc71')
-        .setThumbnail('https://cdn-icons-png.flaticon.com/512/1067/1067357.png')
-        .addFields(
-            { name: '🃏 BÀI CÀO (HOT)', value: '`!baicao <cược>`\n`!nguabai`, `!xetbai`' },
-            { name: '🎲 KHÁC', value: '`!taixiu`, `!baucua`, `!xidach`, `!tungxu`, `!boctham`' }
-        )
-        .setFooter(footerData);
-
-    // Trang Bank
-    const embedBank = new EmbedBuilder()
-        .setTitle('🏦 NGÂN HÀNG & TÍN DỤNG')
-        .setColor('#e74c3c')
-        .setThumbnail('https://cdn-icons-png.flaticon.com/512/2830/2830284.png')
-        .addFields(
-            { name: '💸 VAY NÓNG', value: '`!vay <số tiền>` (Lãi cắt cổ x2)' },
-            { name: '💳 THANH TOÁN', value: '`!tralai <số tiền>`, `!tralai all`' }
-        )
-        .setFooter(footerData);
-
-    // --- 2. TẠO HÀNG NÚT ---
-    const getRow = (disabled = false) => {
+    // --- HÀM TẠO NÚT BẤM ---
+    const getRow = () => {
         return new ActionRowBuilder().addComponents(
-            new ButtonBuilder().setCustomId('h_home').setEmoji('🏠').setStyle(ButtonStyle.Secondary).setDisabled(disabled),
-            new ButtonBuilder().setCustomId('h_eco').setEmoji('💰').setStyle(ButtonStyle.Primary).setDisabled(disabled),
-            new ButtonBuilder().setCustomId('h_game').setEmoji('🎲').setStyle(ButtonStyle.Success).setDisabled(disabled),
-            new ButtonBuilder().setCustomId('h_bank').setEmoji('🏦').setStyle(ButtonStyle.Danger).setDisabled(disabled)
+            new ButtonBuilder().setCustomId('h_home').setLabel('Trang Chủ').setStyle(ButtonStyle.Secondary).setEmoji('🏠'),
+            new ButtonBuilder().setCustomId('h_eco').setLabel('Kinh Tế').setStyle(ButtonStyle.Primary).setEmoji('💰'),
+            new ButtonBuilder().setCustomId('h_game').setLabel('Trò Chơi').setStyle(ButtonStyle.Success).setEmoji('🎲'),
+            new ButtonBuilder().setCustomId('h_bank').setLabel('Ngân Hàng').setStyle(ButtonStyle.Danger).setEmoji('🏦')
         );
     };
 
-    // --- 3. GỬI TIN NHẮN ---
+    // Gửi tin nhắn Help ban đầu
     const helpMsg = await message.reply({ 
-        embeds: [embedHome], 
+        embeds: [generateHomeEmbed()], 
         components: [getRow()] 
     });
 
-    // --- 4. XỬ LÝ SỰ KIỆN BẤM NÚT ---
-    // Filter: Chỉ người gõ lệnh (message.author.id) mới được bấm
+    // --- XỬ LÝ SỰ KIỆN BẤM NÚT ---
     const collector = helpMsg.createMessageComponentCollector({ 
-        componentType: ComponentType.Button, 
-        time: TIME_LIMIT 
+        time: 60000 // Tồn tại 60 giây
     });
 
     collector.on('collect', async i => {
-        // Nếu người bấm KHÔNG PHẢI chủ lệnh -> Báo lỗi ẩn
-        if (i.user.id !== message.author.id) {
-            return i.reply({ content: `🚫 Menu này của **${message.author.username}**. Hãy tự gõ \`!help\` nhé!`, ephemeral: true });
+        // Tạo Embed mới dựa trên nút bấm
+        const embed = new EmbedBuilder().setColor('#FFD700').setTimestamp();
+
+        if (i.customId === 'h_home') {
+             await i.update({ embeds: [generateHomeEmbed()], components: [getRow()] });
+             return;
+        } 
+        
+        else if (i.customId === 'h_eco') {
+            embed.setTitle('💰 HỆ THỐNG TÀI CHÍNH')
+                 .setThumbnail('https://cdn-icons-png.flaticon.com/512/2485/2485519.png')
+                 .setDescription(
+                    `**Lệnh Cơ Bản:**\n` +
+                    `\`!tien\` : Kiểm tra số dư.\n` +
+                    `\`!diemdanh\` : Nhận lương hàng ngày.\n` +
+                    `\`!top\` : Bảng xếp hạng.\n\n` +
+                    `**Giao Dịch:**\n` +
+                    `\`!chuyentien <@user> <số>\` : Phí 5%.\n` +
+                    `\`!chuyenxu\` : Quy đổi tiền tệ.`
+                 );
+        } 
+        
+        else if (i.customId === 'h_game') {
+            embed.setTitle('🎲 SẢNH TRÒ CHƠI CASINO')
+                 .setThumbnail('https://cdn-icons-png.flaticon.com/512/1067/1067357.png')
+                 .addFields(
+                    { 
+                        name: '🃏 BÀI CÀO (3 Cây)', 
+                        value: `> \`!baicao <cược>\`: Tham gia ván bài.\n> \`!nguabai\`: Xem bài.\n> \`!xetbai\`: Buộc xét bài.`
+                    },
+                    { 
+                        name: '🎲 CÁC GAME KHÁC', 
+                        value: `• \`!taixiu\`, \`!baucua\`, \`!xidach\`, \`!tungxu\`, \`!boctham\`, \`!anxin\``
+                    }
+                 );
+        } 
+        
+        else if (i.customId === 'h_bank') {
+            embed.setTitle('🏦 NGÂN HÀNG & TÍN DỤNG')
+                 .setThumbnail('https://cdn-icons-png.flaticon.com/512/2830/2830284.png')
+                 .addFields(
+                  {
+                    name: '💸 VAY VỐN', 
+                    value: '• \`!vay <số tiền>\` : Thủ tục vay vốn.\n• \`!vay\` : Vay tối đa hạn mức.'
+                  },
+                  {
+                    name: '💳 TRẢ NỢ & RÚT TIỀN',
+                    value: '• \`!tralai <số tiền>\` : Trả nợ.\n• \`!tralai all\` : Trả sạch nợ.'
+                  }
+                 );
         }
 
-        // Xử lý chuyển trang
-        let targetEmbed;
-        switch (i.customId) {
-            case 'h_home': targetEmbed = embedHome; break;
-            case 'h_eco': targetEmbed = embedEco; break;
-            case 'h_game': targetEmbed = embedGame; break;
-            case 'h_bank': targetEmbed = embedBank; break;
-            default: targetEmbed = embedHome;
-        }
-
-        // Update tin nhắn (Không có timer chạy ngầm nên sẽ rất mượt)
-        await i.update({ embeds: [targetEmbed], components: [getRow()] });
+        // Cập nhật ngay lập tức không delay
+        await i.update({ embeds: [embed], components: [getRow()] });
     });
 
-    // --- 5. TỰ ĐỘNG XÓA KHI HẾT GIỜ ---
     collector.on('end', async () => {
+        // Tự động xóa sau 60s cho sạch box chat
         try {
-            // Xóa tin nhắn Help
-            await helpMsg.delete().catch(() => {});
-            // Xóa luôn lệnh gọi của người dùng cho sạch box chat
-            await message.delete().catch(() => {});
+            await helpMsg.delete();
+            await message.delete();
         } catch (e) {
-            // Bỏ qua lỗi nếu tin nhắn đã bị xóa trước đó
+            // Chống lỗi nếu tin nhắn đã bị xóa trước đó
         }
     });
 }
