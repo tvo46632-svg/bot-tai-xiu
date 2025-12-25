@@ -714,6 +714,7 @@ async function cmdBoctham(message) {
 
     await subMoney(userId, 200);
     info.count--;
+}
 
     // 1. Tính toán phần thưởng
     const rand = Math.random() * 100;
