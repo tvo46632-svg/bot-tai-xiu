@@ -997,6 +997,41 @@ let blackjackSession = {};
 
 // Hàm calcPoint và dealCard giữ nguyên như bạn đã có
 // Vui lòng đảm bảo đã thêm hàm `sleep` và `cardToImageUrl` ở trên cùng
+// 2. DI CHUYỂN CÁC HÀM LOGIC RA NGOÀI ĐỂ TẤT CẢ LỆNH ĐỀU DÙNG ĐƯỢC
+function calcPoint(hand) {
+    let score = 0;
+    let aces = 0;
+    for (let card of hand) {
+        let val = card.slice(0, -2);
+        if (val === 'A') { aces++; score += 11; }
+        else if (['J', 'Q', 'K'].includes(val)) { score += 10; }
+        else { score += parseInt(val); }
+    }
+    while (score > 21 && aces > 0) { score -= 10; aces--; }
+    return score;
+}
+
+function dealCard() {
+    const suits = ['♠️', '♣️', '♥️', '♦️'];
+    const values = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+    const suit = suits[Math.floor(Math.random() * suits.length)];
+    const value = values[Math.floor(Math.random() * values.length)];
+    return value + suit;
+}
+
+function cardToImageUrl(card) {
+    if (card === '🂠') return 'https://i.imgur.com/89S9OQ3.png';
+    const mapSuit = { '♠️': 'S', '♣️': 'C', '♥️': 'H', '♦️': 'D' };
+    const val = card.slice(0, -2);
+    const suit = card.slice(-2);
+    const finalVal = val === '10' ? '0' : val;
+    return `https://deckofcardsapi.com/static/img/${finalVal}${mapSuit[suit]}.png`;
+}
+
+// 3. Lệnh khởi tạo game
+async function cmdXidach(message, args) {
+    // ... code giữ nguyên ...
+}
 
 async function cmdXidach(message, args) {
     if (args.length < 1) return message.reply("💡 Cách dùng: `!xidach <số tiền>`");
@@ -1049,6 +1084,7 @@ if (!interaction.customId.startsWith('h_')) {
         return interaction.reply({ content: "❌ Không phải phiên của bạn!", ephemeral: true });
     }
 }
+   
 
     // --- NÚT RÚT BÀI ---
     if (action === "hit") {
