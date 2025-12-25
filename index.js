@@ -941,18 +941,21 @@ async function cmdChuyenxu(message, args) {
 }
 // ====== THÊM HÀM NÀY Ở ĐẦU FILE CỦA BẠN (CÙNG VỚI `sleep` và `calcPoint`) ======
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-// Hàm này sẽ tạo ra một chuỗi các URL ảnh để Discord có thể hiển thị
-// Discord thường chỉ hiển thị ảnh của URL đầu tiên trong Embed.
-// Để hiện nhiều ảnh, cách tốt nhất là dùng một hàm render ảnh (canvas)
-// hoặc đơn giản là hiển thị chúng dưới dạng link ảnh clickable.
-// TÔI SẼ DÙNG CÁCH DÁN CÁC LINK ẢNH VÀO DESCRIPTION/FIELDS.
+// 1. Tạo một bảng chuyển đổi từ lá bài sang Emoji
+const cardEmojis = {
+    'A♠️': '🂡', '2♠️': '🂢', '3♠️': '🂣', '4♠️': '🂤', '5♠️': '🂥', '6♠️': '🂦', '7♠️': '🂧', '8♠️': '🂨', '9♠️': '🂩', '10♠️': '🂪', 'J♠️': '🂫', 'Q♠️': '🂭', 'K♠️': '🂮',
+    'A♥️': '🂱', '2♥️': '🂲', '3♥️': '🂳', '4♥️': '🂴', '5♥️': '🂵', '6♥️': '🂶', '7♥️': '🂷', '8♥️': '🂸', '9♥️': '🂹', '10♥️': '🂺', 'J♥️': '🂻', 'Q♥️': '🂽', 'K♥️': '🂾',
+    'A♣️': '🃑', '2♣️': '🃒', '3♣️': '🃓', '4♣️': '🃔', '5♣️': '🃕', '6♣️': '🃖', '7♣️': '🃗', '8♣️': '🃘', '9♣️': '🃙', '10♣️': '🃚', 'J♣️': '🃛', 'Q♣️': '🃝', 'K♣️': '🃞',
+    'A♦️': '🃁', '2♦️': '🃂', '3♦️': '🃃', '4♦️': '🃄', '5♦️': '🃅', '6♦️': '🃆', '7♦️': '🃇', '8♦️': '🃈', '9♦️': '🃉', '10♦️': '🃊', 'J♦️': '🃋', 'Q♦️': '🃍', 'K♦️': '🃎',
+    '🂠': '🂠' // Lá bài úp
+};
+
+// 2. Thay đổi hàm format để dùng Emoji
 function formatHandWithImages(hand, isHidden = false) {
     if (isHidden) { 
-        // Thêm dấu chấm vào giữa [] để Discord chắc chắn phải hiện ảnh bài nhà cái
-        return `[.](${cardToImageUrl('🂠')}) [.](${cardToImageUrl(hand[1])})`;
+        return `${cardEmojis['🂠']} ${cardEmojis[hand[1]] || hand[1]}`;
     }
-    // Thêm dấu chấm vào giữa [.] cho tất cả các lá bài của người chơi
-    return hand.map(card => `[.](${cardToImageUrl(card)})`).join(" ");
+    return hand.map(card => cardEmojis[card] || card).join(" ");
 }
 
 // Nếu bạn muốn dùng Emoji (cần phải upload lên server và có ID)
