@@ -1692,7 +1692,7 @@ game.players.push({
 client.on('interactionCreate', async (interaction) => {
     if (!interaction.isButton()) return;
 
-    // Lấy thông tin ván game từ Map
+    // LẤY THÔNG TIN VÁN GAME TẠI KÊNH HIỆN TẠI
     const game = activeGames.get(interaction.channelId);
     if (!game) {
         return interaction.reply({ content: "⚠️ Ván bài này đã kết thúc hoặc không tồn tại.", ephemeral: true });
