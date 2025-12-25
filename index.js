@@ -356,7 +356,6 @@ client.on("ready", async () => {
 // ===============================================
 client.on("interactionCreate", async (interaction) => {
     try {
-        // 1. XỬ LÝ LỆNH SLASH /DOI
         if (interaction.isChatInputCommand()) {
             if (interaction.commandName === 'doi') {
                 const amount = interaction.options.getInteger('amount');
@@ -379,13 +378,13 @@ client.on("interactionCreate", async (interaction) => {
                     await addXu(interaction.user.id, amount);
                     await interaction.editReply(`✅ **ĐỔI THÀNH CÔNG**\n🪙 Nhận: **${amount.toLocaleString()} Xu**`);
                 }
-            } // <--- Đóng của: if (interaction.commandName === 'doi')
+            }
             return; 
-        } // <--- Đóng của: if (interaction.isChatInputCommand())
-        } catch (error) {
+        }
+    } catch (error) {
         console.error("Lỗi Interaction:", error);
     }
-}); // <--- ĐÂY LÀ DẤU CHẤT DỨT NỖI ĐAU
+}); // NGOẶC CHUẨN KẾT THÚC HÀM
 // =====================
 //      TUNG XU
 // =====================
