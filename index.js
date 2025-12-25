@@ -807,6 +807,70 @@ async function cmdChuyentien(message, args) {
         setTimeout(() => mainMsg.delete().catch(() => {}), 10000);
     });
 }
+// ==================== TOP BXH ====================
+async function cmdTop(message) {
+    let allUsers = await getAllUsers(); 
+
+    // 2. Tính tổng giá trị và chuẩn bị dữ liệu
+    let leaderboard = allUsers.map(u => {
+        return {
+            id: u.id,
+            totalValue: (u.money || 0) + (u.xu || 0),
+            money: u.money || 0,
+            xu: u.xu || 0,
+            // Thử lấy tên từ cache của bot hoặc dùng ID nếu không có
+            tag: client.users.cache.get(u.id)?.username || `Người dùng ${u.id.slice(-4)}`
+        };
+    });
+
+    // 3. Sắp xếp: Ai có tổng (Tien + Xu) cao hơn thì đứng trên
+    leaderboard.sort((a, b) => b.totalValue - a.totalValue);
+
+    // 4. Lấy Top 10 người đứng đầu
+    let top10 = leaderboard.slice(0, 10);
+
+    const embed = new EmbedBuilder()
+        .setTitle("🏆 BẢNG XẾP HẠNG ĐẠI GIA SERVER")
+        .setColor("#FFD700") // Màu vàng kim
+        .setThumbnail("https://i.imgur.com/k9vE873.png") // Có thể thay bằng icon vương miện
+        .setDescription("Tổng giá trị được tính bằng: `Tiền + Xu`")
+        .setTimestamp();
+
+    let description = "";
+
+    top10.forEach((user, index) => {
+        let rank = index + 1;
+        let title = "";
+        let emoji = "";
+
+        // Gán danh hiệu theo yêu cầu
+        if (rank === 1) {
+            title = "💎 **TÀI PHIỆT**";
+            emoji = "👑";
+        } else if (rank === 2) {
+            title = "💰 **TỶ PHÚ**";
+            emoji = "🥈";
+        } else if (rank === 3) {
+            title = "💵 **ĐẠI GIA**";
+            emoji = "🥉";
+        } else {
+            title = `**Top ${rank}**`;
+            emoji = "🔹";
+        }
+
+        description += `${emoji} ${title}: ${user.tag}\n`;
+        description += `╰─> 💹 Tổng: \`${user.totalValue.toLocaleString()}\` (💵 ${user.money.toLocaleString()} | 🪙 ${user.xu.toLocaleString()})\n\n`;
+    });
+
+    embed.setDescription(description || "Chưa có dữ liệu xếp hạng.");
+
+    const msg = await message.channel.send({ embeds: [embed] });
+
+    // 5. Tự động xóa sau 15 giây
+    setTimeout(() => {
+        msg.delete().catch(() => {});
+    }, 15000);
+}
 
 // ===================== CHUYỂN XU =====================
 async function cmdChuyenxu(message, args) {
