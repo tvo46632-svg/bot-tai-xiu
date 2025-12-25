@@ -352,17 +352,17 @@ client.on("ready", async () => {
 });
 
 // ===============================================
-//   XỬ LÝ INTERACTION (SỬA LỖI NGOẶC & CHẶN HELP)
+//   XỬ LÝ INTERACTION (FIX CỨNG NGOẶC & HELP)
 // ===============================================
 client.on("interactionCreate", async (interaction) => {
-    try {
-        // 1. XỬ LÝ LỆNH SLASH (/doi)
-        if (interaction.isChatInputCommand()) {
-            if (interaction.commandName === 'doi') {
-                const amount = interaction.options.getInteger('amount');
-                const type = interaction.options.getString('type');
-                await interaction.deferReply({ ephemeral: true });
+    // 1. XỬ LÝ LỆNH SLASH /DOI
+    if (interaction.isChatInputCommand()) {
+        if (interaction.commandName === 'doi') {
+            const amount = interaction.options.getInteger('amount');
+            const type = interaction.options.getString('type');
+            await interaction.deferReply({ ephemeral: true });
 
+            try {
                 const user = await getUser(interaction.user.id);
                 if (!user) return interaction.editReply("❌ Bạn chưa có dữ liệu!");
 
@@ -379,9 +379,12 @@ client.on("interactionCreate", async (interaction) => {
                     await addXu(interaction.user.id, amount);
                     await interaction.editReply(`✅ **ĐỔI THÀNH CÔNG**\n🪙 Nhận: **${amount.toLocaleString()} Xu**\n💰 Khấu trừ: **${amount.toLocaleString()} Tiền**`);
                 }
+            } catch (err) {
+                if (interaction.deferred) await interaction.editReply("❌ Lỗi hệ thống!");
             }
-            return; // Kết thúc lệnh Slash
         }
+        return; 
+    }
 // =====================
 //      TUNG XU
 // =====================
