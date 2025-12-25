@@ -1391,7 +1391,7 @@ async function handleBaiCaoCommand(message, args) {
     };
 
     // Chủ sòng tham gia luôn
-    userData.money;
+    userData.money -= betAmount;
     gameState.players.push({ id: message.author.id, name: message.author.username, hand: [], revealed: false });
     await db.write();
     activeGames.set(message.channel.id, gameState);
@@ -1431,7 +1431,7 @@ async function handleXetBaiCommand(message) {
     target.revealed = true;
 
     const result = solveGame(target, game.botHand, game.bet);
-    const pDB = await getUser(player.id);
+    const pDB = await getUser(target.id);
     pDB.money += result.receive;
     await db.write();
 
