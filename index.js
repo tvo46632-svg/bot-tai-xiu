@@ -5,6 +5,7 @@
 
 // ---------------- IMPORT MODULES ----------------
 const activeGames = new Map();
+const blackjackSession = {};
 const {
     Client,
     GatewayIntentBits,
