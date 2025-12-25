@@ -233,9 +233,6 @@ async function cmdTien(message) {
     message.reply(replyText); // Chỉ gọi 1 lần
 }
 
-// =====================
-// 1. Phải đảm bảo có hàm tạo độ trễ này
-const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 // ==========================================
 // HÀM ĐỔI TIỀN (BẢN FIX LỖI ELSE - THUẾ 10%)
@@ -929,26 +926,64 @@ async function cmdChuyenxu(message, args) {
         setTimeout(() => mainMsg.delete().catch(() => {}), 10000);
     });
 }
-// ===================== XÌ DÁCH (BLACKJACK KIỂU MỚI) =====================
+// ====== THÊM HÀM NÀY Ở ĐẦU FILE CỦA BẠN (CÙNG VỚI `sleep` và `calcPoint`) ======
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+// Map để chuyển đổi tên lá bài sang URL hình ảnh (Ví dụ)
+// Bạn cần tự tìm hoặc host các hình ảnh này.
+// ĐÂY LÀ VÍ DỤ DÙNG DECKOFCAREDSAPI.COM - BẠN CÓ THỂ THAY BẰNG NGUỒN KHÁC
+const cardToImageUrl = (card) => {
+    if (card === '🂠') return "https://deckofcardsapi.com/static/img/back.png"; // Lá bài úp
+    
+    let value = card.slice(0, -1);
+    let suit = card.slice(-1);
+
+    // Chuyển đổi suit để phù hợp với API (nếu cần)
+    if (suit === '♠️') suit = 'S';
+    if (suit === '♥️') suit = 'H';
+    if (suit === '♦️') suit = 'D';
+    if (suit === '♣️') suit = 'C';
+
+    // Chuyển đổi value để phù hợp với API (nếu cần)
+    if (value === '10') value = '0'; // API này dùng '0' cho 10
+    if (value === 'J') value = 'J';
+    if (value === 'Q') value = 'Q';
+    if (value === 'K') value = 'K';
+    if (value === 'A') value = 'A';
+
+    return `https://deckofcardsapi.com/static/img/${value}${suit}.png`;
+};
+
+// Hàm này sẽ tạo ra một chuỗi các URL ảnh để Discord có thể hiển thị
+// Discord thường chỉ hiển thị ảnh của URL đầu tiên trong Embed.
+// Để hiện nhiều ảnh, cách tốt nhất là dùng một hàm render ảnh (canvas)
+// hoặc đơn giản là hiển thị chúng dưới dạng link ảnh clickable.
+// TÔI SẼ DÙNG CÁCH DÁN CÁC LINK ẢNH VÀO DESCRIPTION/FIELDS.
+function formatHandWithImages(hand, isHidden = false) {
+    if (isHidden) { 
+        // Dùng ký tự tàng hình \u200b để "ép" Discord bung ảnh nhúng
+        return `[\u200b](${cardToImageUrl('🂠')}) [\u200b](${cardToImageUrl(hand[1])})`;
+    }
+    return hand.map(card => `[\u200b](${cardToImageUrl(card)})`).join(" ");
+}
+
+// Nếu bạn muốn dùng Emoji (cần phải upload lên server và có ID)
+// const emojiMap = {
+//     "A♠️": "<:A_spade:ID_EMOJI>",
+//     "2♠️": "<:2_spade:ID_EMOJI>",
+//     // ... và tương tự cho tất cả 52 lá
+//     "🂠": "<:card_back:ID_EMOJI>"
+// };
+// function formatHandWithEmojis(hand, isHidden = false) {
+//     if (isHidden) return `${emojiMap['🂠']} ${emojiMap[hand[1]]}`;
+//     return hand.map(card => emojiMap[card]).join(" ");
+// }
+
+// ===================== XÌ DÁCH (BLACKJACK KIỂU MỚI) - PHIÊN BẢN HÌNH ẢNH =====================
 let blackjackSession = {};
 
-function calcPoint(hand) {
-    let total = 0, ace = 0;
-    for (const card of hand) {
-        const v = card.slice(0, -1);
-        if (["J", "Q", "K"].includes(v)) total += 10;
-        else if (v === "A") { total += 11; ace++; }
-        else total += parseInt(v);
-    }
-    while (total > 21 && ace > 0) { total -= 10; ace--; }
-    return total;
-}
-
-function dealCard() {
-    const values = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
-    const suits = ["♠️", "♥️", "♦️", "♣️"];
-    return values[Math.floor(Math.random() * values.length)] + suits[Math.floor(Math.random() * suits.length)];
-}
+// Hàm calcPoint và dealCard giữ nguyên như bạn đã có
+// Vui lòng đảm bảo đã thêm hàm `sleep` và `cardToImageUrl` ở trên cùng
 
 async function cmdXidach(message, args) {
     if (args.length < 1) return message.reply("💡 Cách dùng: `!xidach <số tiền>`");
@@ -959,6 +994,7 @@ async function cmdXidach(message, args) {
     if (user.money < bet) return message.reply("💸 Bạn không đủ tiền!");
     
     await subMoney(message.author.id, bet);
+    const currentUser = await getUser(message.author.id); // Lấy số dư sau khi trừ
 
     const session = {
         userId: message.author.id,
@@ -970,16 +1006,17 @@ async function cmdXidach(message, args) {
 
     const embed = new EmbedBuilder()
         .setTitle("🃏 SÒNG BÀI XÌ DÁCH")
-        .setColor("#2f3136")
-        .setDescription(`💰 Tiền cược: **${bet.toLocaleString()}**`)
+        .setColor("#2f3136") // Màu nền Embed (có thể thay đổi)
+        .setThumbnail(cardToImageUrl(session.playerHand[0])) // Hiện lá bài đầu tiên của người chơi làm thumbnail
         .addFields(
-            { name: `👤 Bạn (${calcPoint(session.playerHand)})`, value: `> ${session.playerHand.join(" ")}`, inline: true },
-            { name: `🤖 Nhà cái`, value: `> 🂠 ${session.dealerHand[1]}`, inline: true }
+            { name: `👤 Bạn (${calcPoint(session.playerHand)})`, value: `${formatHandWithImages(session.playerHand)}`, inline: false }, // Đặt inline false để ảnh không bị bóp
+            { name: `🤖 Nhà cái`, value: `${formatHandWithImages(session.dealerHand, true)}`, inline: false } // Ẩn 1 lá của nhà cái
         )
-        .setFooter({ text: "Đang trong lượt chơi..." });
+        .setDescription(`💵 Tiền cược: **${bet.toLocaleString()}**`)
+        .setFooter({ text: `💰 Số dư: ${currentUser.money.toLocaleString()} | Đang chờ bạn...` });
 
     const row = new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setCustomId(`hit_${message.author.id}`).setLabel("Rút Bài").setEmoji("🃏").setStyle(ButtonStyle.Primary),
+        new ButtonBuilder().setCustomId(`hit_${message.author.id}`).setLabel("Rút Bài").setEmoji("➕").setStyle(ButtonStyle.Primary),
         new ButtonBuilder().setCustomId(`stand_${message.author.id}`).setLabel("Dằn Bài").setEmoji("🛑").setStyle(ButtonStyle.Secondary)
     );
 
@@ -1001,64 +1038,65 @@ client.on("interactionCreate", async (interaction) => {
     if (action === "hit") {
         session.playerHand.push(dealCard());
         const total = calcPoint(session.playerHand);
+        const userData = await getUser(userId);
 
         if (total > 21) {
-            const userData = await getUser(userId);
             const failEmbed = EmbedBuilder.from(interaction.message.embeds[0])
-                .setColor("#ff4136")
+                .setColor("#ff4d4d") // Đỏ khi thua
                 .setFields(
-                    { name: `👤 Bạn (${total})`, value: `> ${session.playerHand.join(" ")}`, inline: true },
-                    { name: `🤖 Nhà cái`, value: `> ${session.dealerHand.join(" ")}`, inline: true }
+                    { name: `👤 Bạn (${total}) - QUẮC!`, value: `${formatHandWithImages(session.playerHand)}`, inline: false },
+                    { name: `🤖 Nhà cái (${calcPoint(session.dealerHand)})`, value: `${formatHandWithImages(session.dealerHand)}`, inline: false } // Hiện bài nhà cái
                 )
-                .setDescription(`❌ **QUẮC!** Bạn thua **${session.bet.toLocaleString()}**\n💰 Số dư: **${userData.money.toLocaleString()}**`)
-                .setFooter({ text: "Ván đấu kết thúc - Tự xóa sau 20s" });
+                .setDescription(`❌ **QUẮC!** Bạn thua **${session.bet.toLocaleString()}**!`)
+                .setFooter({ text: `💰 Số dư: ${userData.money.toLocaleString()} | Tự xóa sau 20s` });
 
             await interaction.update({ embeds: [failEmbed], components: [] });
             return finishGame(channelId);
         } else {
             const updateEmbed = EmbedBuilder.from(interaction.message.embeds[0])
                 .setFields(
-                    { name: `👤 Bạn (${total})`, value: `> ${session.playerHand.join(" ")}`, inline: true },
-                    { name: `🤖 Nhà cái`, value: `> 🂠 ${session.dealerHand[1]}`, inline: true }
-                );
+                    { name: `👤 Bạn (${total})`, value: `${formatHandWithImages(session.playerHand)}`, inline: false },
+                    { name: `🤖 Nhà cái`, value: `${formatHandWithImages(session.dealerHand, true)}`, inline: false }
+                )
+                .setFooter({ text: `💰 Số dư: ${userData.money.toLocaleString()} | Đang đợi bạn...` });
             await interaction.update({ embeds: [updateEmbed] });
         }
     }
 
-    // --- NÚT DẰN BÀI (ANIMATION) ---
+    // --- NÚT DẰN BÀI (CÓ HOẠT ẢNH RÚT TỪNG LÁ VÀ HÌNH ẢNH) ---
     if (action === "stand") {
-        await interaction.deferUpdate();
+        await interaction.deferUpdate(); // Giữ bot đang xử lý
         let dealerHand = session.dealerHand;
         
-        // Hoạt ảnh rút bài từng lá
+        // Hoạt ảnh rút bài từng lá cho Nhà cái
         while (calcPoint(dealerHand) < 17) {
             dealerHand.push(dealCard());
             const drawEmbed = EmbedBuilder.from(interaction.message.embeds[0])
                 .setFields(
-                    { name: `👤 Bạn (${calcPoint(session.playerHand)})`, value: `> ${session.playerHand.join(" ")}`, inline: true },
-                    { name: `🤖 Nhà cái (${calcPoint(dealerHand)})`, value: `> ${dealerHand.join(" ")}`, inline: true }
+                    { name: `👤 Bạn (${calcPoint(session.playerHand)})`, value: `${formatHandWithImages(session.playerHand)}`, inline: false },
+                    { name: `🤖 Nhà cái (${calcPoint(dealerHand)})`, value: `${formatHandWithImages(dealerHand)}`, inline: false } // Hiện bài nhà cái
                 )
-                .setFooter({ text: "🤖 Nhà cái đang rút bài..." });
+                .setFooter({ text: "🤖 Nhà cái đang rút bài... 🃏" });
 
             await interaction.editReply({ embeds: [drawEmbed], components: [] });
-            await sleep(1200);
+            await sleep(1500); // Chờ 1.5 giây mỗi lá bài
         }
 
         const playerTotal = calcPoint(session.playerHand);
         const dealerTotal = calcPoint(dealerHand);
-        let statusText = "";
+        let resultText = "";
         let finalColor = "#2f3136";
 
         if (dealerTotal > 21 || playerTotal > dealerTotal) {
             await addMoney(userId, session.bet * 2);
-            statusText = `✅ **THẮNG!** Bạn nhận \`+${session.bet.toLocaleString()}\``;
+            resultText = `🎉 **THẮNG!** Bạn nhận \`+${session.bet.toLocaleString()}\``;
             finalColor = "#2ecc71"; // Xanh lá
         } else if (playerTotal === dealerTotal) {
             await addMoney(userId, session.bet);
-            statusText = `⚖️ **HÒA!** Hoàn lại \`${session.bet.toLocaleString()}\``;
+            resultText = `⚖️ **HÒA!** Hoàn lại \`${session.bet.toLocaleString()}\``;
             finalColor = "#f1c40f"; // Vàng
         } else {
-            statusText = `❌ **THUA!** Bạn mất \`${session.bet.toLocaleString()}\``;
+            resultText = `❌ **THUA!** Bạn mất \`${session.bet.toLocaleString()}\``;
             finalColor = "#e74c3c"; // Đỏ
         }
 
@@ -1066,10 +1104,10 @@ client.on("interactionCreate", async (interaction) => {
         const finalEmbed = EmbedBuilder.from(interaction.message.embeds[0])
             .setColor(finalColor)
             .setFields(
-                { name: `👤 Bạn (${playerTotal})`, value: `> ${session.playerHand.join(" ")}`, inline: true },
-                { name: `🤖 Nhà cái (${dealerTotal})`, value: `> ${dealerHand.join(" ")}`, inline: true }
+                { name: `👤 Bạn (${playerTotal})`, value: `${formatHandWithImages(session.playerHand)}`, inline: false },
+                { name: `🤖 Nhà cái (${dealerTotal})`, value: `${formatHandWithImages(dealerHand)}`, inline: false }
             )
-            .setDescription(`${statusText}\n💰 Số dư hiện tại: **${userData.money.toLocaleString()}**`)
+            .setDescription(`${resultText}\n💵 Số dư hiện tại: **${userData.money.toLocaleString()}**`)
             .setFooter({ text: "Ván đấu kết thúc - Tự xóa sau 20s" });
 
         await interaction.editReply({ embeds: [finalEmbed], components: [] });
