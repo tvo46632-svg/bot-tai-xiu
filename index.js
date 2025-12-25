@@ -943,27 +943,22 @@ async function cmdChuyenxu(message, args) {
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 // 1. Tạo một bảng chuyển đổi từ lá bài sang Emoji
 const cardEmojis = {
-    // Chất Bích (Spades)
     'A♠️': '<:As:1453654015882821693>', '2♠️': '<:2s:1453654034467651636>', '3♠️': '<:3s:1453654192873934888>', '4♠️': '<:4s:1453654318417711105>', '5♠️': '<:5s:1453654339762651198>', 
     '6♠️': '<:6s:1453654363883962370>', '7♠️': '<:7s:1453654387359744063>', '8♠️': '<:8s:1453654406787760201>', '9♠️': '<:9s:1453654426400329728>', '10♠️': '<:10s:1453654450395811840>', 
     'J♠️': '<:Js:1453657192065663087>', 'Q♠️': '<:Qs:1453657012884733983>', 'K♠️': '<:Ks:1453657038360940625>',
 
-    // Chất Cơ (Hearts)
     'A♥️': '<:Ah:1453651025364914270>', '2♥️': '<:2h:1453651133619896360>', '3♥️': '<:3h:1453651817488711741>', '4♥️': '<:4h:1453651882881978388>', '5♥️': '<:5h:1453651964926627882>', 
     '6♥️': '<:6h:1453652020098764932>', '7♥️': '<:7h:1453652050670911533>', '8♥️': '<:8h:1453652088679563274>', '9♥️': '<:9h:1453652126407458970>', '10♥️': '<:10h:1453652157911011339>', 
     'J♥️': '<:Jh:1453652343567683755>', 'Q♥️': '<:Qh:1453652372181094513>', 'K♥️': '<:Kh:1453652398441500704>',
 
-    // Chất Chuồn/Nhép (Clubs)
     'A♣️': '<:Ac:1453653137079668857>', '2♣️': '<:2c:1453653161180135464>', '3♣️': '<:3c:1453653324539625488>', '4♣️': '<:4c:1453653609202843789>', '5♣️': '<:5c:1453653672536969338>', 
     '6♣️': '<:6c:1453653695567888406>', '7♣️': '<:7c:1453653722445119543>', '8♣️': '<:8c:1453653745136046202>', '9♣️': '<:9c:1453653769181986930>', '10♣️': '<:10c:1453653791047155763>', 
     'J♣️': '<:Jc:1453653814866608210>', 'Q♣️': '<:Qc:1453653838484476027>', 'K♣️': '<:Kc:1453653888564461679>',
 
-    // Chất Rô (Diamonds)
     'A♦️': '<:Ad:1453652431627092082>', '2♦️': '<:2d:1453652489004912806>', '3♦️': '<:3d:1453652679665385484>', '4♦️': '<:4d:1453652758744924224>', '5♦️': '<:5d:1453652783847706655>', 
     '6♦️': '<:6d:1453652804701782161>', '7♦️': '<:7d:1453652862998413342>', '8♦️': '<:8d:1453652890626424842>', '9♦️': '<:9d:1453652911992078469>', '10♦️': '<:10d:1453652933248811008>', 
     'J♦️': '<:Jd:1453652955956904070>', 'Q♦️': '<:Qd:1453652979235291197>', 'K♦️': '<:Kd:1453653001029030008>',
 
-    // Lá bài úp
     '🂠': '<:back:1453657459507073074>'
 };
 
@@ -976,17 +971,6 @@ function formatHandWithImages(hand, isHidden = false) {
     // Chuyển toàn bộ lá bài sang Emoji màu sắc và nối lại bằng dấu cách
     return hand.map(card => cardEmojis[card] || card).join(" ");
 }
-// Nếu bạn muốn dùng Emoji (cần phải upload lên server và có ID)
-// const emojiMap = {
-//     "A♠️": "<:A_spade:ID_EMOJI>",
-//     "2♠️": "<:2_spade:ID_EMOJI>",
-//     // ... và tương tự cho tất cả 52 lá
-//     "🂠": "<:card_back:ID_EMOJI>"
-// };
-// function formatHandWithEmojis(hand, isHidden = false) {
-//     if (isHidden) return `${emojiMap['🂠']} ${emojiMap[hand[1]]}`;
-//     return hand.map(card => emojiMap[card]).join(" ");
-// }
 
 // ===================== XÌ DÁCH (BLACKJACK KIỂU MỚI) - PHIÊN BẢN HÌNH ẢNH =====================
 let blackjackSession = {};
@@ -998,14 +982,24 @@ function calcPoint(hand) {
     let score = 0;
     let aces = 0;
     for (let card of hand) {
-        let val = card.slice(0, -2);
-        if (val === 'A') { aces++; score += 11; }
-        else if (['J', 'Q', 'K'].includes(val)) { score += 10; }
-        else { score += parseInt(val); }
+        // Lấy tất cả các chữ số hoặc chữ cái (A, J, Q, K) đứng trước Emoji
+        let val = card.replace(/[♠️|♣️|♥️|♦️]/g, '').trim(); 
+        
+        if (val === 'A') { 
+            aces++; 
+            score += 11; 
+        } else if (['J', 'Q', 'K'].includes(val)) { 
+            score += 10; 
+        } else { 
+            score += parseInt(val); 
+        }
     }
-    while (score > 21 && aces > 0) { score -= 10; aces--; }
+    while (score > 21 && aces > 0) { 
+        score -= 10; 
+        aces--; 
+    }
     return score;
-}
+    }
 
 function dealCard() {
     const suits = ['♠️', '♣️', '♥️', '♦️'];
@@ -1018,10 +1012,14 @@ function dealCard() {
 function cardToImageUrl(card) {
     if (card === '🂠') return 'https://i.imgur.com/89S9OQ3.png';
     const mapSuit = { '♠️': 'S', '♣️': 'C', '♥️': 'H', '♦️': 'D' };
-    const val = card.slice(0, -2);
-    const suit = card.slice(-2);
+    
+    // Lấy phần số/chữ và phần chất bài riêng biệt
+    const val = card.replace(/[♠️|♣️|♥️|♦️]/g, '').trim();
+    const suitSymbol = card.match(/[♠️|♣️|♥️|♦️]/g)[0];
+    const suit = mapSuit[suitSymbol];
+    
     const finalVal = val === '10' ? '0' : val;
-    return `https://deckofcardsapi.com/static/img/${finalVal}${mapSuit[suit]}.png`;
+    return `https://deckofcardsapi.com/static/img/${finalVal}${suit}.png`;
 }
 async function cmdXidach(message, args) {
     if (args.length < 1) return message.reply("💡 Cách dùng: `!xidach <số tiền>`");
