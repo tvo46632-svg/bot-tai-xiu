@@ -352,17 +352,17 @@ client.on("ready", async () => {
 });
 
 // ===============================================
-//   XỬ LÝ INTERACTION (FIX CỨNG NGOẶC & HELP)
+//   XỬ LÝ INTERACTION (FIX NGOẶC CHUẨN 100%)
 // ===============================================
 client.on("interactionCreate", async (interaction) => {
-    // 1. XỬ LÝ LỆNH SLASH /DOI
-    if (interaction.isChatInputCommand()) {
-        if (interaction.commandName === 'doi') {
-            const amount = interaction.options.getInteger('amount');
-            const type = interaction.options.getString('type');
-            await interaction.deferReply({ ephemeral: true });
+    try {
+        // 1. XỬ LÝ LỆNH SLASH /DOI
+        if (interaction.isChatInputCommand()) {
+            if (interaction.commandName === 'doi') {
+                const amount = interaction.options.getInteger('amount');
+                const type = interaction.options.getString('type');
+                await interaction.deferReply({ ephemeral: true });
 
-            try {
                 const user = await getUser(interaction.user.id);
                 if (!user) return interaction.editReply("❌ Bạn chưa có dữ liệu!");
 
@@ -372,19 +372,20 @@ client.on("interactionCreate", async (interaction) => {
                     const moneyOut = Math.floor(amount * (1 - phi));
                     await addXu(interaction.user.id, -amount); 
                     await addMoney(interaction.user.id, moneyOut);
-                    await interaction.editReply(`✅ **ĐỔI THÀNH CÔNG**\n💰 Nhận: **${moneyOut.toLocaleString()} Tiền**\n🪙 Khấu trừ: **${amount.toLocaleString()} Xu**`);
+                    await interaction.editReply(`✅ **ĐỔI THÀNH CÔNG**\n💰 Nhận: **${moneyOut.toLocaleString()} Tiền**`);
                 } else {
                     if (user.money < amount) return interaction.editReply("❌ Bạn không đủ tiền!");
                     await addMoney(interaction.user.id, -amount);
                     await addXu(interaction.user.id, amount);
-                    await interaction.editReply(`✅ **ĐỔI THÀNH CÔNG**\n🪙 Nhận: **${amount.toLocaleString()} Xu**\n💰 Khấu trừ: **${amount.toLocaleString()} Tiền**`);
+                    await interaction.editReply(`✅ **ĐỔI THÀNH CÔNG**\n🪙 Nhận: **${amount.toLocaleString()} Xu**`);
                 }
-            } catch (err) {
-                if (interaction.deferred) await interaction.editReply("❌ Lỗi hệ thống!");
-            }
-        }
-        return; 
+            } // <--- Đóng của: if (interaction.commandName === 'doi')
+            return; 
+        } // <--- Đóng của: if (interaction.isChatInputCommand())
+        } catch (error) {
+        console.error("Lỗi Interaction:", error);
     }
+}); // <--- ĐÂY LÀ DẤU CHẤT DỨT NỖI ĐAU
 // =====================
 //      TUNG XU
 // =====================
