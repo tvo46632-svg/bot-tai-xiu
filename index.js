@@ -939,7 +939,9 @@ async function cmdChuyenxu(message, args) {
         setTimeout(() => mainMsg.delete().catch(() => {}), 10000);
     });
 }
-// 1. BẢNG CHUYỂN ĐỔI (Đã sửa Key để khớp với dạng 9h, 8s, Ad...)
+//-------- XI DACH -----------
+//--------- PHIEN BAN CO HINH ANH HOAN THIEN ------------------
+
 const cardEmojis = {
     // Chất Bích (s)
     ':As:': '<:As:1453654015882821693>', ':2s:': '<:2s:1453654034467651636>', ':3s:': '<:3s:1453654192873934888>', ':4s:': '<:4s:1453654318417711105>', ':5s:': '<:5s:1453654339762651198>', 
@@ -964,7 +966,6 @@ const cardEmojis = {
     '🂠': '<:back:1453657459507073074>'
 };
 
-// 2. Hàm Format để hiển thị Emoji
 function formatHandWithImages(hand, isHidden = false) {
     if (isHidden) { 
         return `${cardEmojis['🂠']} ${cardEmojis[hand[1]] || hand[1]}`;
@@ -972,13 +973,13 @@ function formatHandWithImages(hand, isHidden = false) {
     return hand.map(card => cardEmojis[card] || card).join(" ");
 }
 
-// 3. Hàm tính điểm (Sửa logic để hiểu dạng 9h, 10s...)
 function calcPoint(hand) {
     let score = 0;
     let aces = 0;
     for (let card of hand) {
-        // Loại bỏ dấu hai chấm và chữ cái cuối cùng (chất bài)
-        let val = card.replace(/:/g, '').slice(0, -1); 
+        // Cần xóa bỏ cả dấu : và chữ cái cuối cùng để lấy phần số
+        let cleanName = card.replace(/:/g, ''); // Ví dụ: ":10s:" -> "10s"
+        let val = cleanName.slice(0, -1);       // "10s" -> "10"
         
         if (val === 'A') { aces++; score += 11; }
         else if (['J', 'Q', 'K'].includes(val)) { score += 10; }
@@ -988,24 +989,23 @@ function calcPoint(hand) {
     return score;
 }
 
-// 4. Hàm chia bài (Trả về dạng 9h, 8s để khớp bảng Emoji)
 function dealCard() {
     const suits = ['s', 'c', 'h', 'd'];
     const values = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
     const suit = suits[Math.floor(Math.random() * suits.length)];
     const value = values[Math.floor(Math.random() * values.length)];
-    return `:${value}${suit}:`; // Thêm dấu : ở đây
+    return `:${value}${suit}:`; 
 }
-// 5. Hàm lấy URL ảnh lá bài (Thumbnail)
+
 function cardToImageUrl(card) {
     if (card === '🂠') return 'https://i.imgur.com/89S9OQ3.png';
-    const val = card.slice(0, -1);
-    const suit = card.slice(-1).toUpperCase();
+    let cleanName = card.replace(/:/g, ''); // Xóa dấu :
+    const val = cleanName.slice(0, -1);
+    const suit = cleanName.slice(-1).toUpperCase();
     const finalVal = val === '10' ? '0' : val;
     return `https://deckofcardsapi.com/static/img/${finalVal}${suit}.png`;
 }
 
-// ====== LỆNH CHÍNH ======
 let blackjackSession = {};
 
 async function cmdXidach(message, args) {
@@ -1047,7 +1047,6 @@ async function cmdXidach(message, args) {
     blackjackSession[message.channel.id] = session;
 }
 
-// ====== XỬ LÝ NÚT BẤM ======
 client.on("interactionCreate", async (interaction) => {
     if (!interaction.isButton()) return;
     const [action, userId] = interaction.customId.split("_");
@@ -1133,18 +1132,6 @@ client.on("interactionCreate", async (interaction) => {
         finishGame(interaction.channel.id);
     }
 });
-
-function finishGame(channelId) {
-    const session = blackjackSession[channelId];
-    if (session && session.msg) {
-        setTimeout(() => {
-            session.msg.delete().catch(() => {});
-            delete blackjackSession[channelId];
-        }, 20000);
-    } else {
-        delete blackjackSession[channelId];
-    }
-}
 
 function finishGame(channelId) {
     const session = blackjackSession[channelId];
