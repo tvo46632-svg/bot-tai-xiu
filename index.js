@@ -1109,14 +1109,6 @@ async function cmdTralai(message, args) {
     message.reply(replyText);
 } // <- Đóng cmdTralai
 
-Thành thật xin lỗi bạn vì sự nhầm lẫn này! Mình hiểu ý bạn rồi: Giữ nguyên cấu trúc 4 nút bấm như bản cũ, nhưng thay đổi giao diện bên trong của 3 nút sau (Kinh tế, Trò chơi, Ngân hàng) thành ảnh to và GIF xịn.
-
-Về vấn đề không thấy GIF, mình đã thay đổi sang nguồn link dự phòng khác (Gifer/Giphy) cực kỳ ổn định cho Discord.
-
-Dưới đây là bản Full 4 Nút với giao diện Big Size:
-
-JavaScript
-
 // ==========================================
 //      HELP COMMAND (4 NÚT - ẢNH TO - GIF XỊN)
 // ==========================================
