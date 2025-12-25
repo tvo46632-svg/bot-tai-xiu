@@ -1640,6 +1640,31 @@ async function startDealing(channel, game) {
         }
     }, 60000); // 60 giây tự lật
 }
+//--- ham ngua bai ---
+async function handleNguaBaiCommand(message) {
+    const game = activeGames.get(message.channel.id);
+    if (!game || game.type !== 'baicao') return message.reply("❌ Không có ván bài cào nào!");
+    
+    const player = game.players.find(p => p.id === message.author.id);
+    if (!player) return message.reply("❌ Bạn không tham gia ván này!");
+    if (player.revealed) return message.reply("⚠️ Bạn đã ngửa bài rồi!");
+
+    player.revealed = true;
+    message.reply(`🔓 **${player.name}** đã ngửa bài!`);
+    
+    if (game.players.every(p => p.revealed)) {
+        await finishBaicao(message.channel, game);
+    }
+}
+
+async function handleXetBaiCommand(message) {
+    const game = activeGames.get(message.channel.id);
+    if (!game || game.type !== 'baicao') return message.reply("❌ Không có ván bài cào nào!");
+    if (message.author.id !== game.ownerId) return message.reply("❌ Chỉ chủ phòng mới có quyền xét bài sớm!");
+
+    await finishBaicao(message.channel, game);
+}
+
 // --- [MỚI] 6. HÀM TẠO GAME & ĐẾM NGƯỢC (Dùng hàm này trong lệnh chat) ---
 async function startGameWithTimer(interaction, betAmount) {
     const channelId = interaction.channelId;
@@ -1924,9 +1949,9 @@ async function handleBaiCaoCommand(message, args) {
 // =====================
 // HÀM KẾT THÚC BÀI CÀO (Tách ra ngoài)
 // =====================
-async function finishBaicao(channel, game) {
+async function finishBaicao(channel, game) { // THÊM CHỮ async VÀO ĐÂY
     if (game.isFinishing) return;
-    game.isFinishing = true; 
+    game.isFinishing = true;
     
     if (game.autoFlipTimer) clearTimeout(game.autoFlipTimer);
 
