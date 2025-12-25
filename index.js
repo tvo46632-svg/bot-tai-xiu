@@ -1689,53 +1689,69 @@ game.players.push({
 // =====================
 //      XỬ LÝ NÚT BẤM
 // =====================
-client.on("interactionCreate", async (interaction) => {
+client.on('interactionCreate', async (interaction) => {
     if (!interaction.isButton()) return;
-    
+
+    // Lấy thông tin ván game từ Map
     const game = activeGames.get(interaction.channelId);
     if (!game) {
         return interaction.reply({ content: "⚠️ Ván bài này đã kết thúc hoặc không tồn tại.", ephemeral: true });
     }
 
-    // 1. Nếu là nút của BÀI CÀO
-    if (['join_baicao', 'view_hand', 'flip_hand'].includes(interaction.customId)) {
-        const game = activeGames.get(interaction.channelId);
-        if (!game) return interaction.reply({ content: "Ván bài đã kết thúc.", ephemeral: true });
-        // Gọi logic xử lý bài cào tại đây...
-        
-        const pData = await getUser(interaction.user.id);
-        if (!pData || pData.money < game.bet) return interaction.reply({ content: "💸 Bạn không đủ tiền cược!", ephemeral: true });
-        
-        if (game.players.find(p => p.id === interaction.user.id)) return interaction.reply({ content: "⚠️ Bạn đã ở trong sòng rồi!", ephemeral: true });
-        if (game.players.length >= 10) return interaction.reply({ content: "🚫 Sòng đã đầy!", ephemeral: true });
+    // --- XỬ LÝ RIÊNG CHO BÀI CÀO ---
+    if (game.type === 'baicao') {
+        // 1. Nút Tham Gia (Chạy khi status là 'joining')
+        if (interaction.customId === 'join_baicao') {
+            if (game.status !== 'joining') return interaction.reply({ content: "🚫 Sòng đã bắt đầu!", ephemeral: true });
+            
+            if (game.players.find(p => p.id === interaction.user.id)) {
+                return interaction.reply({ content: "⚠️ Bạn đã ở trong sòng rồi!", ephemeral: true });
+            }
 
-        // Trừ tiền cược
-        pData.money -= game.bet;
-        await db.write();
+            const pData = await getUser(interaction.user.id);
+            if (!pData || pData.money < game.bet) return interaction.reply({ content: "💸 Bạn không đủ tiền!", ephemeral: true });
 
-        // Thêm người chơi
-        game.players.push({ 
-            id: interaction.user.id, 
-            name: interaction.user.username, 
-            hand: [], 
-            revealed: false 
-        });
+            pData.money -= game.bet;
+            game.players.push({ id: interaction.user.id, name: interaction.user.username, hand: [], revealed: false });
+            await db.write();
 
-        // --- CẬP NHẬT LẠI EMBED ĐANG ĐẾM NGƯỢC ---
-        // Lấy lại embed cũ để sửa phần danh sách người chơi
-        const oldEmbed = interaction.message.embeds[0];
-        const playerList = game.players.map((p, idx) => `${idx + 1}. **${p.name}**`).join('\n');
-        
-        // Cập nhật lại Description nhưng giữ nguyên các thông tin khác
-        const updatedEmbed = EmbedBuilder.from(oldEmbed)
-            .setDescription(
-                oldEmbed.description.split('Người tham gia:')[0] + // Lấy phần text phía trên
-                `Người tham gia: \n${playerList}`
-            );
+            const playerList = game.players.map((p, idx) => `${idx + 1}. **${p.name}**`).join('\n');
+            const updatedEmbed = EmbedBuilder.from(interaction.message.embeds[0])
+                .setDescription(`Sòng bài cào của **${game.hostName || "Nhà cái"}**\nMức cược: **${game.bet.toLocaleString()}**\n\nNgười tham gia:\n${playerList}`);
+            
+            await interaction.message.edit({ embeds: [updatedEmbed] });
+            return interaction.reply({ content: `✅ Bạn đã tham gia!`, ephemeral: true });
+        }
 
-        await interaction.message.edit({ embeds: [updatedEmbed] });
-        return interaction.reply({ content: `✅ Bạn đã tham gia sòng cược **${game.bet.toLocaleString()}**!`, ephemeral: true });
+        // CHẶN: Chỉ các nút bên dưới (Xem/Ngửa) mới yêu cầu status là 'playing'
+        if (game.status !== 'playing') {
+            return interaction.reply({ content: "⏳ Vui lòng đợi nhà cái chia bài xong!", ephemeral: true });
+        }
+
+        // 2. Nút Xem Bài & Ngửa Bài
+        const player = game.players.find(p => p.id === interaction.user.id);
+        if (!player) return interaction.reply({ content: "❌ Bạn không tham gia ván này!", ephemeral: true });
+
+        if (interaction.customId === 'view_hand') {
+            const handVisual = formatHand(player.hand, false);
+            const pInfo = getHandInfo(player.hand);
+            const scoreText = pInfo.isBaTay ? "🔥 **BA TÂY**" : `**${pInfo.score}** nút`;
+            return interaction.reply({ content: `👀 Bài của bạn: ${handVisual}\n👉 Điểm: ${scoreText}`, ephemeral: true });
+        }
+
+        if (interaction.customId === 'flip_hand') {
+            if (player.revealed) return interaction.reply({ content: "⚠️ Bạn đã ngửa bài rồi!", ephemeral: true });
+            player.revealed = true;
+            await interaction.reply({ content: `🔓 **${player.name}** đã hạ bài!` });
+
+            if (game.players.every(p => p.revealed)) {
+                await finishBaicao(interaction.channel, game);
+            }
+        }
     }
+
+    // --- XỬ LÝ CHO XÌ DÁCH (Giữ nguyên logic của bạn nhưng bọc trong if game.type === 'xidach') ---
+    if (game.type === 'xidach') {
 
     // --- CÁC NÚT XEM BÀI & NGỬA BÀI (Chỉ hoạt động khi status là 'playing') ---
     if (game.status !== 'playing') return;
@@ -1835,12 +1851,13 @@ async function handleBaiCaoCommand(message, args) {
     if (!userData || userData.money < betAmount) return message.reply("❌ Bạn không đủ tiền!");
     if (activeGames.has(message.channel.id)) return message.reply("❌ Đang có ván bài diễn ra ở kênh này!");
 
-    const gameState = { 
-        type: 'baicao', // BẮT BUỘC có để chống xung đột Xì Dách
+   const gameState = { 
+        type: 'baicao',
         bet: betAmount, 
         players: [], 
         status: 'joining', 
         botHand: [],
+        hostName: message.author.username, // Thêm dòng này
         ownerId: message.author.id,
         tableMsg: null,
         revealMsgs: [] 
@@ -1876,8 +1893,10 @@ async function handleBaiCaoCommand(message, args) {
 // ham khoi tao xetbai    
 // ======================
 async function finishBaicao(channel, game) {
+    if (game.isFinishing) return; // Nếu đang kết thúc rồi thì bỏ qua
+    game.isFinishing = true; 
+    
     if (game.autoFlipTimer) clearTimeout(game.autoFlipTimer);
-    activeGames.delete(channel.id);
 
     // 1. Dọn dẹp tin nhắn cũ trên bàn
     if (game.tableMsg) await game.tableMsg.delete().catch(() => {});
