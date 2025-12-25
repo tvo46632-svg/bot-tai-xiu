@@ -1348,45 +1348,52 @@ client.on("interactionCreate", async (interaction) => {
         return interaction.reply({ content: `🃏 Bài của bạn là: **${player.hand.join(' ')}**`, ephemeral: true });
     }
 
-  if (interaction.customId === 'flip_hand') {
+ if (interaction.customId === 'flip_hand') {
         if (player.revealed) return interaction.reply({ content: "Bạn đã ngửa bài rồi!", ephemeral: true });
         
+        // 1. Khóa trạng thái đã lật
         player.revealed = true; 
-        // Thông báo công khai là người này đã lật bài (nhưng không hiện bài Bot)
         await interaction.reply({ content: `⏳ **${player.name}** đang chuẩn bị ngửa bài...` });
         
         await new Promise(r => setTimeout(r, 2000));
 
-        const result = solveGame(player, game.botHand, game.bet);
-        const pDB = await getUser(player.id);
-        
-        if (pDB) {
-            pDB.money += result.receive;
-            await db.write();
-        }
+        // 2. Thông báo CÔNG KHAI: Chỉ hiện bộ bài của người đó, TUYỆT ĐỐI không hiện kết quả Thắng/Thua
+        await interaction.editReply(`🎴 **${player.name}** đã hạ bài: **${player.hand.join(' ')}**\n*(Kết quả sẽ có khi ván bài kết thúc)*`);
 
-        // 1. Thông báo CÔNG KHAI: Chỉ hiện bài người chơi và kết quả Thắng/Thua (ẩn số nút của Bot)
-        // Thay vì hiện "Bot X nút", ta chỉ hiện "Thắng" hoặc "Thua"
-        const publicMsg = `🎴 **${player.name}** đã hạ bài: **${player.hand.join(' ')}**\n➜ **Kết quả:** ${result.msg.split('vs Bot')[0]}`; 
-        await interaction.editReply(publicMsg);
+        // 3. Thông báo RIÊNG (Chỉ người lật mới thấy): Cho họ biết họ bao nhiêu nút
+        const pInfo = getHandInfo(player.hand);
+        const pScoreText = pInfo.isBaTay ? "Ba Tây" : `${pInfo.score} nút`;
+        await interaction.followUp({ 
+            content: `㊙️ **Xem bài riêng:** Bài của bạn là **${pScoreText}**. Đợi mọi người lật hết để biết kết quả so với Bot nhé!`, 
+            ephemeral: true 
+        });
 
-        // 2. Thông báo RIÊNG (Chỉ người lật mới thấy): Hiện chi tiết bài Bot để đối chứng
-        const privateMsg = `㊙️ **Đối chứng riêng:** Bài của Bot là **${game.botHand.join(' ')}**\n💰 Số dư hiện tại: **${pDB ? pDB.money.toLocaleString() : '???'}**`;
-        await interaction.followUp({ content: privateMsg, ephemeral: true });
-
-        // 3. Kiểm tra kết thúc ván: Khi người cuối cùng lật bài mới hiện bài Bot cho cả sòng
+        // 4. KIỂM TRA KẾT THÚC VÁN: Đây là lúc tính tiền và công bố mọi thứ
         if (game.players.every(p => p.revealed)) {
             activeGames.delete(interaction.channelId);
             
-            if (game.tableMsg) {
-                await game.tableMsg.delete().catch(() => {});
-            }
+            if (game.tableMsg) await game.tableMsg.delete().catch(() => {});
 
-            // Tính toán số nút Bot để thông báo cuối cùng
+            // Tính toán bài Bot
             const bInfo = getHandInfo(game.botHand);
             const bScoreText = bInfo.isBaTay ? "Ba Tây" : `${bInfo.score} nút`;
 
-            await interaction.channel.send(`🏁 **Ván bài kết thúc!**\n🎴 **Bài của Nhà cái (Bot):** ${game.botHand.join(' ')} (**${bScoreText}**)\n👉 Mọi người có thể mở ván mới.`);
+            // Tạo danh sách kết quả tổng hợp
+            let summary = `🏁 **VÁN BÀI KẾT THÚC!**\n`;
+            summary += `🎴 **Bài của Nhà cái (Bot):** ${game.botHand.join(' ')} (**${bScoreText}**)\n`;
+            summary += `──────────────────────────\n`;
+
+            for (let p of game.players) {
+                const result = solveGame(p, game.botHand, game.bet);
+                const pDB = await getUser(p.id);
+                if (pDB) {
+                    pDB.money += result.receive;
+                    await db.write();
+                    summary += `👤 **${p.name}**: ${result.msg} ➜ 💰 Ví: **${pDB.money.toLocaleString()}**\n`;
+                }
+            }
+
+            await interaction.channel.send(summary);
         }
     }
 }); // Đóng client.on
@@ -1436,6 +1443,14 @@ async function handleBaiCaoCommand(message, args) {
         }
     }, 30000);
 }
+Để đồng bộ với logic "Hạ bài trước - Tính tiền sau" (để giữ bí mật bài Bot cho đến cuối ván), bạn cần sửa lại hàm handleXetBaiCommand sao cho nó không công bố kết quả ngay lập tức.
+
+Thay vào đó, nó sẽ chỉ hiện bộ bài của người bị xét, sau đó kiểm tra xem nếu là người cuối cùng thì mới tung bảng tổng kết.
+
+Dưới đây là bản code đã chỉnh sửa cho bạn:
+
+JavaScript
+
 // =====================
 // ham khoi tao xetbai    
 // ======================
@@ -1446,21 +1461,46 @@ async function handleXetBaiCommand(message) {
     const unrevealed = game.players.filter(p => !p.revealed);
     if (unrevealed.length === 0) return message.reply("Mọi người đã ngửa bài hết rồi!");
 
-    // Chọn ngẫu nhiên 1 người trong số những người chưa ngửa bài
+    // 1. Chọn ngẫu nhiên 1 người chưa lật và khóa trạng thái lật bài
     const target = unrevealed[Math.floor(Math.random() * unrevealed.length)];
     target.revealed = true;
 
-    const result = solveGame(target, game.botHand, game.bet);
-    const pDB = await getUser(target.id);
-    pDB.money += result.receive;
-    await db.write();
+    // 2. Chỉ thông báo bộ bài hạ xuống (TUYỆT ĐỐI không hiện Thắng/Thua ở đây)
+    message.channel.send(`🎲 **Bot xét bài ngẫu nhiên:**\n👤 **${target.name}** hạ bài: **${target.hand.join(' ')}**\n*(Kết quả sẽ có khi ván bài kết thúc)*`);
 
-    message.channel.send(`🎲 **Bot xét bài ngẫu nhiên:**\n👤 **${target.name}**: ${target.hand.join(' ')}\n➜ **Kết quả:** ${result.msg}`);
-
-    // Kiểm tra ván đấu kết thúc
+    // 3. Kiểm tra ván đấu kết thúc (Khi người cuối cùng đã lật bài)
     if (game.players.every(p => p.revealed)) {
         activeGames.delete(message.channel.id);
-        message.channel.send("🏁 Ván bài đã kết thúc sau khi xét bài!");
+        
+        // Xóa bàn bài cũ cho sạch kênh chat
+        if (game.tableMsg) {
+            await game.tableMsg.delete().catch(() => {});
+        }
+
+        // Tính toán thông tin bài Bot
+        const bInfo = getHandInfo(game.botHand);
+        const bScoreText = bInfo.isBaTay ? "Ba Tây" : `${bInfo.score} nút`;
+
+        // 4. Tạo bảng tổng kết cuối cùng
+        let summary = `🏁 **VÁN BÀI KẾT THÚC SAU KHI XÉT BÀI!**\n`;
+        summary += `🎴 **Bài của Nhà cái (Bot):** ${game.botHand.join(' ')} (**${bScoreText}**)\n`;
+        summary += `──────────────────────────\n`;
+
+        for (let p of game.players) {
+            const result = solveGame(p, game.botHand, game.bet);
+            const pDB = await getUser(p.id);
+            if (pDB) {
+                pDB.money += result.receive;
+                // Không cần db.write() trong vòng lặp để tránh lag, tí nữa write một lần cuối
+                summary += `👤 **${p.name}**: ${result.msg} ➜ 💰 Ví: **${pDB.money.toLocaleString()}**\n`;
+            }
+        }
+        
+        // Lưu dữ liệu một lần duy nhất
+        await db.write();
+
+        // Gửi bảng tổng kết ra kênh chat
+        message.channel.send(summary);
     }
 }
 // =====================
