@@ -1947,18 +1947,21 @@ async function handleBaiCaoCommand(message, args) {
 }
 
 // =====================
-// HÀM KẾT THÚC BÀI CÀO (Tách ra ngoài)
+// HÀM KẾT THÚC BÀI CÀO
 // =====================
-async function finishBaicao(channel, game) { // THÊM CHỮ async VÀO ĐÂY
+async function finishBaicao(channel, game) { 
     if (game.isFinishing) return;
     game.isFinishing = true;
     
     if (game.autoFlipTimer) clearTimeout(game.autoFlipTimer);
 
-    if (game.tableMsg) await game.tableMsg.delete().catch(() => {});
-    if (game.revealMsgs) {
-        for (const m of game.revealMsgs) await m.delete().catch(() => {});
-    }
+    // 1. Dọn dẹp tin nhắn cũ
+    try {
+        if (game.tableMsg) await game.tableMsg.delete().catch(() => {});
+        if (game.revealMsgs) {
+            for (const m of game.revealMsgs) await m.delete().catch(() => {});
+        }
+    } catch (e) { console.log("Lỗi xóa tin nhắn:", e); }
 
     const bInfo = getHandInfo(game.botHand);
     const botHandVisual = formatHand(game.botHand, false);
@@ -1974,20 +1977,9 @@ async function finishBaicao(channel, game) { // THÊM CHỮ async VÀO ĐÂY
             summaryList += `👤 **${p.name}**\n└ Kết quả: ${result.msg}\n💰 Ví: **${pDB.money.toLocaleString()}**\n\n`;
         }
     }
+    
     await db.write();
     activeGames.delete(channel.id);
-
-    const finalEmbed = new EmbedBuilder()
-        .setTitle("🏁 KẾT QUẢ VÁN BÀI CÀO")
-        .setColor("#FFD700")
-        .addFields(
-            { name: "🏰 NHÀ CÁI (BOT)", value: `🃏 Bài: ${botHandVisual}\n📊 Điểm: ${bScoreText}` },
-            { name: "📝 CHI TIẾT", value: summaryList || "Không có người chơi" }
-        )
-        .setTimestamp();
-
-    await channel.send({ embeds: [finalEmbed] });
-}
 
     // 2. BẢNG KẾT QUẢ SIÊU ĐẸP
     const finalEmbed = new EmbedBuilder()
@@ -2009,7 +2001,9 @@ async function finishBaicao(channel, game) { // THÊM CHỮ async VÀO ĐÂY
         .setFooter({ text: `💵 Mức cược: ${game.bet.toLocaleString()} | Sòng bài uy tín 100%` })
         .setTimestamp();
 
+    // Dòng này sẽ hết lỗi vì hàm phía trên đã có async
     await channel.send({ embeds: [finalEmbed] });
+}
     //=====================
     // Hàm tính kết quả
     //=====================
