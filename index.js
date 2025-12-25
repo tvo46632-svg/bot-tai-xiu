@@ -1101,12 +1101,14 @@ async function cmdXidach(message, args) {
 // --- XỬ LÝ NÚT BẤM (Rút / Dằn) ---
 client.on("interactionCreate", async (interaction) => {
     if (!interaction.isButton()) return;
+    
     const [action, userId] = interaction.customId.split("_");
     const session = blackjackSession[interaction.channel.id];
 
-    if (interaction.customId.startsWith('h_')) return; 
-    if (!session || session.userId !== interaction.user.id) {
-        return interaction.reply({ content: "❌ Không phải phiên của bạn!", ephemeral: true });
+   // 2. Nếu là nút của XÌ DÁCH (Blackjack)
+    if (interaction.customId.startsWith('hit_') || interaction.customId.startsWith('stand_')) {
+        const session = blackjackSession[interaction.channelId];
+        if (!session) return interaction.reply({ content: "Phiên xì dách đã hết hạn.", ephemeral: true });
     }
 
     if (action === "hit") {
@@ -1535,25 +1537,49 @@ function getHandInfo(hand) {
 
 // --- 4. HÀM CHIA BÀI VÀO BÀN (Đã chỉnh sửa để nhận danh sách từ timer) ---
 async function startDealing(channel, game) {
-    // Kiểm tra lại lần cuối xem ván còn tồn tại không
     if (!activeGames.has(channel.id)) return;
 
     game.status = 'playing';
     const deck = createDeck();
     
-    // Chia bài cho Bot
+    // Chia bài cho Bot và Người chơi
     game.botHand = [deck.pop(), deck.pop(), deck.pop()];
-
-    // Thông báo bắt đầu chia bài
-    await channel.send(`${cardEmojis[':back:']} **Hết giờ cược! Nhà cái đang xào bài và chia...**`);
-
-    // Chia bài cho từng người chơi
     for (let player of game.players) {
         player.hand = [deck.pop(), deck.pop(), deck.pop()];
     }
-    
-    // Delay 2 giây tạo hiệu ứng
+
+    await channel.send(`${cardEmojis[':back:']} **Hết giờ cược! Nhà cái đang chia bài...**`);
     await new Promise(r => setTimeout(r, 2000));
+
+    // --- ĐOẠN NÀY LÀ P2: HIỂN THỊ BÀN CHƠI ---
+    const CARD_ICONS = ["🟦", "🟥", "🟩", "🟨", "🟧", "🟪", "🟫", "⬛", "⬜", "🔘"];
+    const embed = new EmbedBuilder()
+        .setTitle("🃏 BÀN BÀI CÀO CHUYÊN NGHIỆP")
+        .setColor('#2b2d31')
+        .setDescription(
+            "✅ **Tất cả bài đã được chia úp!**\n\n" +
+            game.players.map((p, idx) => `${CARD_ICONS[idx] || "👤"} **${p.name}**: ${cardEmojis[':back:']} ${cardEmojis[':back:']} ${cardEmojis[':back:']}`).join('\n')
+        )
+        .setFooter({ text: "Bạn có 60 giây để ngửa bài!" });
+
+    const row = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId('view_hand').setLabel('Xem Bài').setStyle(ButtonStyle.Secondary).setEmoji('👀'),
+        new ButtonBuilder().setCustomId('flip_hand').setLabel('Ngửa Bài').setStyle(ButtonStyle.Success).setEmoji('🖐️')
+    );
+
+    // Gửi tin nhắn bàn bài
+    game.tableMsg = await channel.send({ embeds: [embed], components: [row] });
+
+    // --- AUTO-FLIP (CHỐNG TREO SÒNG) ---
+    game.autoFlipTimer = setTimeout(async () => {
+        const checkGame = activeGames.get(channel.id);
+        if (checkGame && checkGame.status === 'playing') {
+            checkGame.players.forEach(p => p.revealed = true);
+            await channel.send("⏰ **Hết giờ!** Nhà cái tự động thu bài.");
+            await finishBaicao(channel, checkGame); // Hàm tổng kết
+        }
+    }, 60000); 
+}
 
     // --- (Phần hiển thị bàn chơi giống code cũ) ---
     const CARD_ICONS = ["🟦", "🟥", "🟩", "🟨", "🟧", "🟪", "🟫", "⬛", "⬜", "🔘"];
@@ -1603,22 +1629,24 @@ async function startGameWithTimer(interaction, betAmount) {
     hostData.money -= betAmount;
     await db.write();
 
-    // 2. Khởi tạo dữ liệu Game
-    const game = {
-        bet: betAmount,
-        players: [],
-        status: 'joining', // Trạng thái chờ người vào
-        revealMsgs: [],    // Để lưu các tin nhắn ngửa bài
-        botHand: []
-    };
+   // 2. Khởi tạo dữ liệu Game
+const game = {
+    type: 'baicao', // Đã thêm
+    bet: betAmount,
+    players: [],
+    status: 'joining', 
+    revealMsgs: [],    
+    botHand: [],
+    tableMsg: null
+};
 
-    // Thêm Host vào danh sách người chơi đầu tiên
-    game.players.push({
-        id: interaction.user.id,
-        name: interaction.user.username,
-        hand: [],
-        revealed: false
-    });
+    // Thêm Host vào danh sách (Đảm bảo lưu ID đúng để đối chiếu sau này)
+game.players.push({
+    id: interaction.user.id, // ID này dùng để check khi bấm Ngửa bài
+    name: interaction.user.username,
+    hand: [],
+    revealed: false
+});
 
     activeGames.set(channelId, game);
 
@@ -1695,10 +1723,11 @@ client.on("interactionCreate", async (interaction) => {
         return interaction.reply({ content: "⚠️ Ván bài này đã kết thúc hoặc không tồn tại.", ephemeral: true });
     }
 
-    // --- XỬ LÝ NÚT THAM GIA ---
-    if (interaction.customId === 'join_baicao') {
-        // Chỉ cho phép join khi status là 'joining'
-        if (game.status !== 'joining') return interaction.reply({ content: "🚫 Ván bài đã bắt đầu hoặc đang chia bài!", ephemeral: true });
+    // 1. Nếu là nút của BÀI CÀO
+    if (['join_baicao', 'view_hand', 'flip_hand'].includes(interaction.customId)) {
+        const game = activeGames.get(interaction.channelId);
+        if (!game) return interaction.reply({ content: "Ván bài đã kết thúc.", ephemeral: true });
+        // Gọi logic xử lý bài cào tại đây...
         
         const pData = await getUser(interaction.user.id);
         if (!pData || pData.money < game.bet) return interaction.reply({ content: "💸 Bạn không đủ tiền cược!", ephemeral: true });
@@ -1832,17 +1861,17 @@ async function handleBaiCaoCommand(message, args) {
     if (!userData || userData.money < betAmount) return message.reply("❌ Bạn không đủ tiền!");
     if (activeGames.has(message.channel.id)) return message.reply("❌ Đang có ván bài diễn ra ở kênh này!");
 
-  const gameState = { 
-    bet: betAmount, 
-    players: [], 
-    status: 'joining', 
-    botHand: [],
-    ownerId: message.author.id,
-    tableMsg: null,
-    revealMsgs: [] // Mảng này sẽ giữ các tin nhắn lật bài của người chơi
-};
+    const gameState = { 
+        type: 'baicao', // BẮT BUỘC có để chống xung đột Xì Dách
+        bet: betAmount, 
+        players: [], 
+        status: 'joining', 
+        botHand: [],
+        ownerId: message.author.id,
+        tableMsg: null,
+        revealMsgs: [] 
+    };
 
-    // Chủ sòng tham gia luôn
     userData.money -= betAmount;
     gameState.players.push({ id: message.author.id, name: message.author.username, hand: [], revealed: false });
     await db.write();
@@ -1857,10 +1886,10 @@ async function handleBaiCaoCommand(message, args) {
         new ButtonBuilder().setCustomId('join_baicao').setLabel('Tham gia').setStyle(ButtonStyle.Success)
     );
 
-    const msg = await message.channel.send({ embeds: [embed], components: [row] });
+    gameState.tableMsg = await message.channel.send({ embeds: [embed], components: [row] }); // Lưu lại để xóa sau này
 
     setTimeout(() => {
-        msg.edit({ components: [] }).catch(() => {});
+        if (gameState.tableMsg) gameState.tableMsg.edit({ components: [] }).catch(() => {});
         const game = activeGames.get(message.channel.id);
         if (game && game.status === 'joining') {
             if (game.players.length >= 1) startDealing(message.channel, game);
@@ -1872,55 +1901,96 @@ async function handleBaiCaoCommand(message, args) {
 // =====================
 // ham khoi tao xetbai    
 // ======================
-async function handleXetBaiCommand(message) {
-    const game = activeGames.get(message.channel.id);
-    if (!game || game.status !== 'playing') return;
+async function finishBaicao(channel, game) {
+    if (game.autoFlipTimer) clearTimeout(game.autoFlipTimer);
+    activeGames.delete(channel.id);
 
-    const unrevealed = game.players.filter(p => !p.revealed);
-    if (unrevealed.length === 0) return message.reply("Mọi người đã ngửa bài hết rồi!");
-
-    // 1. Chọn ngẫu nhiên 1 người
-    const target = unrevealed[Math.floor(Math.random() * unrevealed.length)];
-    target.revealed = true;
-
-    // 2. Thông báo và LƯU vào revealMsgs (Sửa lỗi biến m ở đây)
-    const m = await message.channel.send(`🎲 **Bot xét bài ngẫu nhiên:**\n👤 **${target.name}** hạ bài: **${target.hand.join(' ')}**\n*(Kết quả sẽ có khi ván bài kết thúc)*`);
-    game.revealMsgs.push(m); 
-
-    // 3. KIỂM TRA KẾT THÚC VÁN
-    if (game.players.every(p => p.revealed)) {
-        activeGames.delete(message.channel.id);
-
-        // Xóa bàn bài và các tin nhắn lẻ
-        if (game.tableMsg) await game.tableMsg.delete().catch(() => {});
-        if (game.revealMsgs) {
-            for (const msg of game.revealMsgs) {
-                await msg.delete().catch(() => {});
-            }
-        }
-
-        // Tính toán thông tin bài Bot
-        const bInfo = getHandInfo(game.botHand);
-        const bScoreText = bInfo.isBaTay ? "Ba Tây" : `${bInfo.score} nút`;
-
-        // 4. Tạo bảng tổng kết
-        let summary = `🏁 **VÁN BÀI KẾT THÚC SAU KHI XÉT BÀI!**\n`;
-        summary += `🎴 **Bài của Nhà cái (Bot):** ${game.botHand.join(' ')} (**${bScoreText}**)\n`;
-        summary += `──────────────────────────\n`;
-
-        for (let p of game.players) {
-            const result = solveGame(p, game.botHand, game.bet);
-            const pDB = await getUser(p.id);
-            if (pDB) {
-                pDB.money += result.receive;
-                summary += `👤 **${p.name}**: ${result.msg} ➜ 💰 Ví: **${pDB.money.toLocaleString()}**\n`;
-            }
-        }
-        
-        await db.write();
-        message.channel.send(summary);
+    // 1. Dọn dẹp tin nhắn cũ trên bàn
+    if (game.tableMsg) await game.tableMsg.delete().catch(() => {});
+    if (game.revealMsgs) {
+        for (const m of game.revealMsgs) await m.delete().catch(() => {});
     }
+
+    const bInfo = getHandInfo(game.botHand);
+    const botHandVisual = formatHand(game.botHand, false);
+    const bScoreText = bInfo.isBaTay ? "🔥 **BA TÂY**" : `**${bInfo.score}** nút`;
+
+    let summaryList = "";
+    for (let p of game.players) {
+        const result = solveGame(p, game.botHand, game.bet);
+        const pDB = await getUser(p.id);
+        
+        if (pDB) {
+            // CỘNG THẲNG VÀO VÍ: result.receive đã bao gồm (vốn + lãi) nếu thắng
+            pDB.money += result.receive;
+            summaryList += `👤 **${p.name}**\n   └ Kết quả: ${result.msg}\n   💰 Ví hiện tại: **${pDB.money.toLocaleString()}**\n\n`;
+        }
+    }
+    await db.write();
+
+    // 2. BẢNG KẾT QUẢ SIÊU ĐẸP
+    const finalEmbed = new EmbedBuilder()
+        .setTitle("🏁 KẾT QUẢ VÁN BÀI CÀO")
+        .setColor("#FFD700") // Màu vàng Gold chuyên nghiệp
+        .setThumbnail("https://i.imgur.com/89S9OQ3.png") // Icon bộ bài
+        .addFields(
+            { 
+                name: "🏰 NHÀ CÁI (BOT)", 
+                value: `🃏 Bài: ${botHandVisual}\n📊 Điểm: ${bScoreText}`, 
+                inline: false 
+            },
+            { 
+                name: "📝 CHI TIẾT TỪNG TỤ", 
+                value: summaryList || "Không có người chơi", 
+                inline: false 
+            }
+        )
+        .setFooter({ text: `💵 Mức cược: ${game.bet.toLocaleString()} | Sòng bài uy tín 100%` })
+        .setTimestamp();
+
+    await channel.send({ embeds: [finalEmbed] });
 }
+    //=====================
+    // Hàm tính kết quả
+    //=====================
+    function solveGame(player, botHand, bet) {
+    const pInfo = getHandInfo(player.hand);
+    const bInfo = getHandInfo(botHand);
+
+    let win = false;
+    let tie = false;
+
+    // So sánh Ba Tây
+    if (pInfo.isBaTay && !bInfo.isBaTay) win = true;
+    else if (!pInfo.isBaTay && bInfo.isBaTay) win = false;
+    else if (pInfo.isBaTay && bInfo.isBaTay) tie = true;
+    else {
+        // So điểm
+        if (pInfo.score > bInfo.score) win = true;
+        else if (pInfo.score < bInfo.score) win = false;
+        else tie = true;
+    }
+
+    // Định dạng hiển thị tiền thắng/thua
+    if (tie) {
+        return { 
+            receive: bet, 
+            msg: `⚪ **Hòa** (Hoàn lại **${bet.toLocaleString()}**)` 
+        };
+    }
+    if (win) {
+        return { 
+            receive: bet * 2, 
+            msg: `🟢 **Thắng** (+\`${bet.toLocaleString()}\`)` 
+        };
+    }
+    // Trường hợp thua: Không dùng đầu lâu, dùng màu đỏ đơn giản
+    return { 
+        receive: 0, 
+        msg: `🔴 **Thua** (-\`${bet.toLocaleString()}\`)` 
+    };
+        }
+    
 // =====================
 //      MAIN EVENTS 
 // =====================
