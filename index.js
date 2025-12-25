@@ -1769,26 +1769,25 @@ game.players.push({
 //      XỬ LÝ NÚT BẤM
 // =====================
 client.on('interactionCreate', async (interaction) => {
+    // 1. Chỉ xử lý Nút bấm. Nếu là lệnh khác thì bỏ qua.
     if (!interaction.isButton()) return;
 
     const game = activeGames.get(interaction.channelId);
+    
     if (!game) {
-        // Dùng flags: [64] để thay thế ephemeral: true (hết cảnh báo Deprecated)
         return interaction.reply({ content: "⚠️ Ván bài này đã kết thúc hoặc không tồn tại.", flags: [64] }).catch(() => {});
     }
 
     try {
-        // --- FIX LỖI UNKNOWN INTERACTION (10062) ---
-        // Nếu không phải nút xem bài, ta deferUpdate ngay để Discord không ngắt kết nối sau 3s
+        // --- FIX LỖI UNKNOWN INTERACTION ---
         if (interaction.customId !== 'view_hand') {
             await interaction.deferUpdate().catch(() => {});
         }
 
-        // --- XỬ LÝ RIÊNG CHO BÀI CÀO ---
+        // --- TRƯỜNG HỢP: BÀI CÀO ---
         if (game.type === 'baicao') {
             if (interaction.customId === 'join_baicao') {
                 if (game.status !== 'joining') return;
-                
                 if (game.players.find(p => p.id === interaction.user.id)) return;
 
                 const pData = await getUser(interaction.user.id);
@@ -1815,7 +1814,6 @@ client.on('interactionCreate', async (interaction) => {
                     const handVisual = formatHand(player.hand, false);
                     const pInfo = getHandInfo(player.hand);
                     const scoreText = pInfo.isBaTay ? "🔥 **BA TÂY**" : `**${pInfo.score}** nút`;
-                    // Nút xem bài thì vẫn dùng reply ephemeral
                     return interaction.reply({ content: `👀 Bài của bạn: ${handVisual}\n👉 Điểm: ${scoreText}`, flags: [64] });
                 }
 
@@ -1823,85 +1821,77 @@ client.on('interactionCreate', async (interaction) => {
                     if (player.revealed) return;
                     player.revealed = true;
                     await interaction.channel.send(`🔓 **${player.name}** đã hạ bài!`);
-
                     if (game.players.every(p => p.revealed)) {
                         await finishBaicao(interaction.channel, game);
                     }
                 }
             }
-        }
+        } 
+        
+        // --- TRƯỜNG HỢP: XÌ DÁCH ---
+        else if (game.type === 'xidach') {
+            if (game.status !== 'playing') return;
 
-    // --- XỬ LÝ CHO XÌ DÁCH ---
-    if (game.type === 'xidach') {
-        if (game.status !== 'playing') return;
+            const player = game.players.find(p => p.id === interaction.user.id);
+            if (!player) return interaction.followUp({ content: "🚫 Bạn không có trong ván bài này!", flags: [64] });
 
-        const player = game.players.find(p => p.id === interaction.user.id);
-        if (!player) return interaction.reply({ content: "🚫 Bạn không có trong ván bài này!", ephemeral: true });
+            if (interaction.customId === 'view_hand') {
+                const handVisual = formatHand(player.hand, false);
+                const pInfo = getHandInfo(player.hand);
+                const scoreText = pInfo.isBaTay ? "🔥 **BA TÂY**" : `**${pInfo.score}** nút`;
 
-        if (interaction.customId === 'view_hand') {
-            const handVisual = formatHand(player.hand, false);
-            const pInfo = getHandInfo(player.hand);
-            const scoreText = pInfo.isBaTay ? "🔥 **BA TÂY**" : `**${pInfo.score}** nút`;
+                return interaction.reply({ 
+                    content: `👀 **Bài của bạn:** ${handVisual}\n👉 Điểm: ${scoreText}`, 
+                    flags: [64] 
+                });
+            }
 
-            return interaction.reply({ 
-                content: `👀 **Bài của bạn:** ${handVisual}\n👉 Điểm: ${scoreText}`, 
-                ephemeral: true 
-            });
-        }
+            if (interaction.customId === 'flip_hand') {
+                if (player.revealed) return interaction.followUp({ content: "⚠️ Bạn đã ngửa bài rồi!", flags: [64] });
+                
+                player.revealed = true;
+                // Nếu đã deferUpdate ở trên thì không được dùng reply nữa, phải dùng followUp hoặc channel.send
+                await interaction.channel.send(`⏳ **${player.name}** đang chuẩn bị ngửa bài...`);
+                await new Promise(r => setTimeout(r, 1500));
 
-        if (interaction.customId === 'flip_hand') {
-            if (player.revealed) return interaction.reply({ content: "⚠️ Bạn đã ngửa bài rồi!", ephemeral: true });
-            
-            player.revealed = true;
-            await interaction.reply({ content: `⏳ **${player.name}** đang chuẩn bị ngửa bài...` });
-            await new Promise(r => setTimeout(r, 1500));
+                const handVisual = formatHand(player.hand, false);
+                const msg = await interaction.channel.send(`🔓 **${player.name}** đã hạ bài: ${handVisual}`);
+                
+                if (!game.revealMsgs) game.revealMsgs = [];
+                game.revealMsgs.push(msg);
 
-            const handVisual = formatHand(player.hand, false);
-            const msg = await interaction.editReply(`🔓 **${player.name}** đã hạ bài: ${handVisual}`);
-            
-            if (!game.revealMsgs) game.revealMsgs = [];
-            game.revealMsgs.push(msg);
+                if (game.players.every(p => p.revealed)) {
+                    // Logic kết thúc Xì Dách của bạn
+                    const botHandVisual = formatHand(game.botHand, false);
+                    const bInfo = getHandInfo(game.botHand);
+                    const bScoreText = bInfo.isBaTay ? "🔥 **BA TÂY**" : `**${bInfo.score}** nút`;
 
-            const pInfo = getHandInfo(player.hand);
-            const scoreText = pInfo.isBaTay ? "Ba Tây" : `${pInfo.score} nút`;
-            await interaction.followUp({ 
-                content: `㊙️ Bạn hạ bài **${scoreText}**. Chờ những người khác nhé!`, 
-                ephemeral: true 
-            });
-
-            if (game.players.every(p => p.revealed)) {
-                activeGames.delete(interaction.channelId);
-                if (game.tableMsg) await game.tableMsg.delete().catch(() => {});
-                if (game.revealMsgs) {
-                    for (const m of game.revealMsgs) await m.delete().catch(() => {});
-                }
-
-                const botHandVisual = formatHand(game.botHand, false);
-                const bInfo = getHandInfo(game.botHand);
-                const bScoreText = bInfo.isBaTay ? "🔥 **BA TÂY**" : `**${bInfo.score}** nút`;
-
-                let summaryList = "";
-                for (let p of game.players) {
-                    const result = solveGame(p, game.botHand, game.bet);
-                    const pDB = await getUser(p.id);
-                    if (pDB) {
-                        pDB.money += result.receive;
-                        summaryList += `👤 **${p.name}**: ${result.msg}\n💰 Ví: **${pDB.money.toLocaleString()}**\n\n`;
+                    let summaryList = "";
+                    for (let p of game.players) {
+                        const result = solveGame(p, game.botHand, game.bet);
+                        const pDB = await getUser(p.id);
+                        if (pDB) {
+                            pDB.money += result.receive;
+                            summaryList += `👤 **${p.name}**: ${result.msg}\n💰 Ví: **${pDB.money.toLocaleString()}**\n\n`;
+                        }
                     }
+                    await db.write();
+
+                    const finalEmbed = new EmbedBuilder()
+                        .setTitle("🏁 KẾT QUẢ VÁN BÀI XÌ DÁCH")
+                        .setColor("#FFD700")
+                        .setDescription(`🏰 **NHÀ CÁI (BOT):** ${botHandVisual}\n👉 Kết quả: ${bScoreText}\n──────────────────────────\n${summaryList}`)
+                        .setTimestamp();
+
+                    await interaction.channel.send({ embeds: [finalEmbed] });
+                    activeGames.delete(interaction.channelId);
                 }
-                await db.write();
-
-                const finalEmbed = new EmbedBuilder()
-                    .setTitle("🏁 KẾT QUẢ VÁN BÀI")
-                    .setColor("#FFD700")
-                    .setDescription(`🏰 **NHÀ CÁI (BOT):** ${botHandVisual}\n👉 Kết quả: ${bScoreText}\n──────────────────────────\n${summaryList}`)
-                    .setTimestamp();
-
-                await interaction.channel.send({ embeds: [finalEmbed] });
             }
         }
+    } catch (error) {
+        console.error("Lỗi Interaction:", error);
     }
-}); // <--- ĐÓNG client.on('interactionCreate') TẠI ĐÂY
+});
 
 // =====================
 // HÀM KHỞI TẠO LỆNH !BAICAO (Tách ra ngoài)
