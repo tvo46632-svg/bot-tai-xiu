@@ -1110,10 +1110,9 @@ async function cmdTralai(message, args) {
 } // <- Đóng cmdTralai
 
 // ==========================================
-//      HELP COMMAND (BẢN ỔN ĐỊNH - NO LAG)
+//      HELP COMMAND (BẢN FIX HIỂN THỊ GIF)
 // ==========================================
 async function cmdHelp(message) {
-    // --- HÀM TẠO EMBED GỐC (TRANG CHỦ) ---
     const generateHomeEmbed = () => {
         return new EmbedBuilder()
             .setTitle('🎰 SÒNG BẠC MACAO & CASINO ROYAL 🎰')
@@ -1128,7 +1127,6 @@ async function cmdHelp(message) {
             .setTimestamp();
     };
 
-    // --- HÀM TẠO NÚT BẤM ---
     const getRow = () => {
         return new ActionRowBuilder().addComponents(
             new ButtonBuilder().setCustomId('h_home').setLabel('Trang Chủ').setStyle(ButtonStyle.Secondary).setEmoji('🏠'),
@@ -1138,19 +1136,19 @@ async function cmdHelp(message) {
         );
     };
 
-    // Gửi tin nhắn Help ban đầu
     const helpMsg = await message.reply({ 
         embeds: [generateHomeEmbed()], 
         components: [getRow()] 
     });
 
-    // --- XỬ LÝ SỰ KIỆN BẤM NÚT ---
-    const collector = helpMsg.createMessageComponentCollector({ 
-        time: 60000 // Tồn tại 60 giây
-    });
+    const collector = helpMsg.createMessageComponentCollector({ time: 60000 });
 
     collector.on('collect', async i => {
-        // Tạo Embed mới dựa trên nút bấm
+        // Kiểm tra quyền: Chỉ người gọi lệnh mới được bấm
+        if (i.user.id !== message.author.id) {
+            return i.reply({ content: "Đây không phải menu của bạn!", ephemeral: true });
+        }
+
         const embed = new EmbedBuilder().setColor('#FFD700').setTimestamp();
 
         if (i.customId === 'h_home') {
@@ -1160,7 +1158,8 @@ async function cmdHelp(message) {
         
         else if (i.customId === 'h_eco') {
             embed.setTitle('💰 HỆ THỐNG TÀI CHÍNH')
-                 .setThumbnail('https://media1.tenor.com/m/0juOI5VQircAAAAd/money-flying-money-maker.gif')
+                 // Đổi sang link GIF trực tiếp hơn
+                 .setThumbnail('https://i.pinimg.com/originals/de/7a/21/de7a213988636402287c2c9d2f624d77.gif')
                  .setDescription(
                     `**Lệnh Cơ Bản:**\n` +
                     `\`!tien\` : Kiểm tra số dư.\n` +
@@ -1174,7 +1173,7 @@ async function cmdHelp(message) {
         
         else if (i.customId === 'h_game') {
             embed.setTitle('🎲 SẢNH TRÒ CHƠI CASINO')
-                 .setThumbnail('https://media1.tenor.com/m/0mPNSNKXUr8AAAAC/poker.gif')
+                 .setThumbnail('https://i.gifer.com/C60P.gif')
                  .addFields(
                     { 
                         name: '🃏 BÀI CÀO (3 Cây)', 
@@ -1189,7 +1188,7 @@ async function cmdHelp(message) {
         
         else if (i.customId === 'h_bank') {
             embed.setTitle('🏦 NGÂN HÀNG & TÍN DỤNG')
-                 .setThumbnail('https://media1.tenor.com/m/13H8kTVxtWgAAAAC/black-money.gif')
+                 .setThumbnail('https://i.gifer.com/PY8q.gif')
                  .addFields(
                   {
                     name: '💸 VAY VỐN', 
@@ -1202,18 +1201,14 @@ async function cmdHelp(message) {
                  );
         }
 
-        // Cập nhật ngay lập tức không delay
         await i.update({ embeds: [embed], components: [getRow()] });
     });
 
     collector.on('end', async () => {
-        // Tự động xóa sau 60s cho sạch box chat
         try {
             await helpMsg.delete();
             await message.delete();
-        } catch (e) {
-            // Chống lỗi nếu tin nhắn đã bị xóa trước đó
-        }
+        } catch (e) {}
     });
 }
 // ==========================================
