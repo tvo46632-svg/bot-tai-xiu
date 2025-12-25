@@ -1773,57 +1773,63 @@ client.on('interactionCreate', async (interaction) => {
 
     const game = activeGames.get(interaction.channelId);
     if (!game) {
-        return interaction.reply({ content: "⚠️ Ván bài này đã kết thúc hoặc không tồn tại.", ephemeral: true });
+        // Dùng flags: [64] để thay thế ephemeral: true (hết cảnh báo Deprecated)
+        return interaction.reply({ content: "⚠️ Ván bài này đã kết thúc hoặc không tồn tại.", flags: [64] }).catch(() => {});
     }
 
-    // --- XỬ LÝ RIÊNG CHO BÀI CÀO ---
-    if (game.type === 'baicao') {
-        if (interaction.customId === 'join_baicao') {
-            if (game.status !== 'joining') return interaction.reply({ content: "🚫 Sòng đã bắt đầu!", ephemeral: true });
-            
-            if (game.players.find(p => p.id === interaction.user.id)) {
-                return interaction.reply({ content: "⚠️ Bạn đã ở trong sòng rồi!", ephemeral: true });
+    try {
+        // --- FIX LỖI UNKNOWN INTERACTION (10062) ---
+        // Nếu không phải nút xem bài, ta deferUpdate ngay để Discord không ngắt kết nối sau 3s
+        if (interaction.customId !== 'view_hand') {
+            await interaction.deferUpdate().catch(() => {});
+        }
+
+        // --- XỬ LÝ RIÊNG CHO BÀI CÀO ---
+        if (game.type === 'baicao') {
+            if (interaction.customId === 'join_baicao') {
+                if (game.status !== 'joining') return;
+                
+                if (game.players.find(p => p.id === interaction.user.id)) return;
+
+                const pData = await getUser(interaction.user.id);
+                if (!pData || pData.money < game.bet) {
+                    return interaction.followUp({ content: "💸 Bạn không đủ tiền!", flags: [64] });
+                }
+
+                pData.money -= game.bet;
+                game.players.push({ id: interaction.user.id, name: interaction.user.username, hand: [], revealed: false });
+                await db.write();
+
+                const playerList = game.players.map((p, idx) => `${idx + 1}. **${p.name}**`).join('\n');
+                const updatedEmbed = EmbedBuilder.from(interaction.message.embeds[0])
+                    .setDescription(`Sòng bài cào của **${game.hostName || "Nhà cái"}**\nMức cược: **${game.bet.toLocaleString()}**\n\nNgười tham gia:\n${playerList}`);
+                
+                await interaction.message.edit({ embeds: [updatedEmbed] });
             }
 
-            const pData = await getUser(interaction.user.id);
-            if (!pData || pData.money < game.bet) return interaction.reply({ content: "💸 Bạn không đủ tiền!", ephemeral: true });
+            if (game.status === 'playing') {
+                const player = game.players.find(p => p.id === interaction.user.id);
+                if (!player) return;
 
-            pData.money -= game.bet;
-            game.players.push({ id: interaction.user.id, name: interaction.user.username, hand: [], revealed: false });
-            await db.write();
+                if (interaction.customId === 'view_hand') {
+                    const handVisual = formatHand(player.hand, false);
+                    const pInfo = getHandInfo(player.hand);
+                    const scoreText = pInfo.isBaTay ? "🔥 **BA TÂY**" : `**${pInfo.score}** nút`;
+                    // Nút xem bài thì vẫn dùng reply ephemeral
+                    return interaction.reply({ content: `👀 Bài của bạn: ${handVisual}\n👉 Điểm: ${scoreText}`, flags: [64] });
+                }
 
-            const playerList = game.players.map((p, idx) => `${idx + 1}. **${p.name}**`).join('\n');
-            const updatedEmbed = EmbedBuilder.from(interaction.message.embeds[0])
-                .setDescription(`Sòng bài cào của **${game.hostName || "Nhà cái"}**\nMức cược: **${game.bet.toLocaleString()}**\n\nNgười tham gia:\n${playerList}`);
-            
-            await interaction.message.edit({ embeds: [updatedEmbed] });
-            return interaction.reply({ content: `✅ Bạn đã tham gia!`, ephemeral: true });
-        }
+                if (interaction.customId === 'flip_hand') {
+                    if (player.revealed) return;
+                    player.revealed = true;
+                    await interaction.channel.send(`🔓 **${player.name}** đã hạ bài!`);
 
-        if (game.status !== 'playing') {
-            return interaction.reply({ content: "⏳ Vui lòng đợi nhà cái chia bài xong!", ephemeral: true });
-        }
-
-        const player = game.players.find(p => p.id === interaction.user.id);
-        if (!player) return interaction.reply({ content: "❌ Bạn không tham gia ván này!", ephemeral: true });
-
-        if (interaction.customId === 'view_hand') {
-            const handVisual = formatHand(player.hand, false);
-            const pInfo = getHandInfo(player.hand);
-            const scoreText = pInfo.isBaTay ? "🔥 **BA TÂY**" : `**${pInfo.score}** nút`;
-            return interaction.reply({ content: `👀 Bài của bạn: ${handVisual}\n👉 Điểm: ${scoreText}`, ephemeral: true });
-        }
-
-        if (interaction.customId === 'flip_hand') {
-            if (player.revealed) return interaction.reply({ content: "⚠️ Bạn đã ngửa bài rồi!", ephemeral: true });
-            player.revealed = true;
-            await interaction.reply({ content: `🔓 **${player.name}** đã hạ bài!` });
-
-            if (game.players.every(p => p.revealed)) {
-                await finishBaicao(interaction.channel, game);
+                    if (game.players.every(p => p.revealed)) {
+                        await finishBaicao(interaction.channel, game);
+                    }
+                }
             }
         }
-    }
 
     // --- XỬ LÝ CHO XÌ DÁCH ---
     if (game.type === 'xidach') {
