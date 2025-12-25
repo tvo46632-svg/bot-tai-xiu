@@ -1323,12 +1323,12 @@ async function cmdHelp(message) {
     const collector = helpMsg.createMessageComponentCollector({ time: 60000 });
 
     collector.on('collect', async i => {
-        if (i.user.id !== message.author.id) return i.reply({ content: "Menu này không dành cho bạn!", ephemeral: true });
+        await i.deferUpdate().catch(() => {});
 
         const embed = new EmbedBuilder().setColor('#f1c40f').setTimestamp();
 
         if (i.customId === 'h_home') {
-             return await i.update({ embeds: [generateHomeEmbed()], components: [getRow()] });
+            return await i.editReply({ embeds: [generateHomeEmbed()], components: [getRow()] });
         } 
         
         else if (i.customId === 'h_eco') {
@@ -1375,7 +1375,7 @@ async function cmdHelp(message) {
                  );
         }
 
-        await i.update({ embeds: [embed], components: [getRow()] });
+        await i.editReply({ embeds: [embed], components: [getRow()] });
     });
 
     collector.on('end', async () => {
@@ -1721,6 +1721,7 @@ client.on("messageCreate", async (message) => {
             case "baicao": await handleBaiCaoCommand(message, args);  break;
             case "nguabai": await handleNguaBaiCommand(message); break;
             case "xetbai":  await handleXetBaiCommand(message); break;
+            case "top": await cmdTop(message); break;
                 
             case "addmoney": 
             case "reset": 
