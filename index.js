@@ -1115,10 +1115,10 @@ async function cmdTralai(message, args) {
 async function cmdHelp(message) {
     // Định nghĩa bộ sưu tập GIF siêu nét (Direct Links)
     const GIFS = {
-        home: 'https://i.giphy.com/media/v1.Y2lkPTc5MGI3NjExNHJueW9ueXN6ZzR0bm84bm9ueXN6ZzR0bm84bm9ueXN6ZzR0bm84JmVwaT12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/LdOyjZ7TC5K3LHSvZo/giphy.gif', // Tiền bay cực mạnh
-        eco: 'https://i.gifer.com/fetch/w300-preview/60/6079103e622b7a0d4251737f59f63583.gif', // Đếm tiền máy
-        game: 'https://i.gifer.com/fetch/w300-preview/82/823a0d58852e1f66014389280d8591a3.gif', // Chia bài Poker
-        bank: 'https://i.gifer.com/fetch/w300-preview/13/13H8kTVxtWgAAAAC.gif' // Két sắt vàng
+        home: 'https://media4.giphy.com/media/v1.Y2lkPTc5MGI3NjExcXFiNGJuY25ja2Vob3lvajV2NnJ6Zndla2lvbTQwMGtmNGlnMnMyNiZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/13I3peucbA8BfG/giphy.gif', // poker
+        eco: 'https://media1.giphy.com/media/v1.Y2lkPTc5MGI3NjExNHA0bmc1dXpyOTBlaG4ycHdsbnRud3p3dHQwM3oyaHd0YWxnbG45dSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/YRw676NBrmPeM/giphy.gif', // tien
+        game: 'https://media4.giphy.com/media/v1.Y2lkPTc5MGI3NjExbXAxNnJwcHdqMTZ6NTl2N2l6eWI5OHI1OHRqMzZvYThhaDB1bXNoNCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/xT9DPi61MmrDLzVFzq/giphy.gif', //  Poker
+        bank: 'https://media2.giphy.com/media/v1.Y2lkPTc5MGI3NjExc3lrNnRtMGF4OTZ0dGVibGd2ZHhlZGFmeTQ3aGVsdWp0aHg1M3JsdCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/WONHb0Swc0TLiiWWRx/giphy.gif' // Két sắt 
     };
 
     const generateHomeEmbed = () => {
