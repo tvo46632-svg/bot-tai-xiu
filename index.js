@@ -941,32 +941,6 @@ async function cmdChuyenxu(message, args) {
 }
 // ====== THÊM HÀM NÀY Ở ĐẦU FILE CỦA BẠN (CÙNG VỚI `sleep` và `calcPoint`) ======
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-
-// Map để chuyển đổi tên lá bài sang URL hình ảnh (Ví dụ)
-// Bạn cần tự tìm hoặc host các hình ảnh này.
-// ĐÂY LÀ VÍ DỤ DÙNG DECKOFCAREDSAPI.COM - BẠN CÓ THỂ THAY BẰNG NGUỒN KHÁC
-const cardToImageUrl = (card) => {
-    if (card === '🂠') return "https://deckofcardsapi.com/static/img/back.png"; // Lá bài úp
-    
-    let value = card.slice(0, -1);
-    let suit = card.slice(-1);
-
-    // Chuyển đổi suit để phù hợp với API (nếu cần)
-    if (suit === '♠️') suit = 'S';
-    if (suit === '♥️') suit = 'H';
-    if (suit === '♦️') suit = 'D';
-    if (suit === '♣️') suit = 'C';
-
-    // Chuyển đổi value để phù hợp với API (nếu cần)
-    if (value === '10') value = '0'; // API này dùng '0' cho 10
-    if (value === 'J') value = 'J';
-    if (value === 'Q') value = 'Q';
-    if (value === 'K') value = 'K';
-    if (value === 'A') value = 'A';
-
-    return `https://deckofcardsapi.com/static/img/${value}${suit}.png`;
-};
-
 // Hàm này sẽ tạo ra một chuỗi các URL ảnh để Discord có thể hiển thị
 // Discord thường chỉ hiển thị ảnh của URL đầu tiên trong Embed.
 // Để hiện nhiều ảnh, cách tốt nhất là dùng một hàm render ảnh (canvas)
@@ -1027,12 +1001,6 @@ function cardToImageUrl(card) {
     const finalVal = val === '10' ? '0' : val;
     return `https://deckofcardsapi.com/static/img/${finalVal}${mapSuit[suit]}.png`;
 }
-
-// 3. Lệnh khởi tạo game
-async function cmdXidach(message, args) {
-    // ... code giữ nguyên ...
-}
-
 async function cmdXidach(message, args) {
     if (args.length < 1) return message.reply("💡 Cách dùng: `!xidach <số tiền>`");
     const bet = parseInt(args[0]);
