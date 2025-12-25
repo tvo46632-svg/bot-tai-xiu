@@ -1674,6 +1674,50 @@ async function handleBaiCaoCommand(message, args) {
 
     }, 30000); 
 }
+// ==========================================
+// HÀM CHIA BÀI (startDealing) - THÊM VÀO ĐỂ FIX LỖI
+// ==========================================
+async function startDealing(channel, game) {
+    try {
+        game.status = 'playing';
+
+        // 1. Chia bài cho người chơi và Bot
+        // Mỗi người 3 lá
+        for (let p of game.players) {
+            p.hand = [dealCard(), dealCard(), dealCard()];
+        }
+        game.botHand = [dealCard(), dealCard(), dealCard()];
+
+        // 2. Gửi Embed thông báo đã chia bài xong
+        const playEmbed = new EmbedBuilder()
+            .setTitle("🃏 BÀI ĐÃ CHIA XONG!")
+            .setDescription(`Vui lòng kiểm tra bài của bạn bằng nút bên dưới.\n\n**Danh sách người chơi:**\n${game.players.map(p => `• **${p.name}** (Đang chờ lật...)`).join('\n')}`)
+            .setColor("#3498db")
+            .setFooter({ text: "Bạn có 60 giây để lật bài!" });
+
+        const row = new ActionRowBuilder().addComponents(
+            new ButtonBuilder().setCustomId('view_hand').setLabel('👀 Xem bài').setStyle(ButtonStyle.Primary),
+            new ButtonBuilder().setCustomId('flip_hand').setLabel('🔓 Lật bài').setStyle(ButtonStyle.Danger)
+        );
+
+        // Gửi tin nhắn mới và lưu lại để quản lý
+        game.tableMsg = await channel.send({ embeds: [playEmbed], components: [row] });
+
+        // 3. (Tùy chọn) Tự động kết thúc sau 60 giây nếu có người quên lật bài
+        game.autoFlipTimer = setTimeout(() => {
+            if (activeGames.has(channel.id)) {
+                // Ép buộc tất cả người chơi lật bài
+                for (let p of game.players) p.revealed = true;
+                finishBaicao(channel, game);
+            }
+        }, 60000);
+
+    } catch (error) {
+        console.error("Lỗi trong startDealing:", error);
+        channel.send("❌ Có lỗi xảy ra khi chia bài!");
+        activeGames.delete(channel.id);
+    }
+}
 
         // =====================
         // ham khoi tao xetbai    
