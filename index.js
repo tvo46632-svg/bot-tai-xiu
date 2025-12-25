@@ -102,13 +102,22 @@ async function ensureUser(userId) {
     }
 }
 
-// 1. Get user
+// ==========================================
+//      HỆ THỐNG QUẢN LÝ TÀI CHÍNH (DB)
+// ==========================================
+
+/**
+ * 1. Lấy toàn bộ thông tin User
+ * Dùng khi cần truy cập nhiều thuộc tính cùng lúc (money, xu, debt)
+ */
 async function getUser(userId) {
     await ensureUser(userId);
     return db.data.users[userId];
 }
 
-// 2. Các hàm về Tiền (Money)
+/**
+ * 2. CÁC HÀM VỀ TIỀN (MONEY) - Dùng cho Xì Dách, Bài Cào, Bầu Cua
+ */
 async function addMoney(userId, amount) {
     const user = await getUser(userId);
     user.money += amount;
@@ -117,11 +126,14 @@ async function addMoney(userId, amount) {
 
 async function subMoney(userId, amount) {
     const user = await getUser(userId);
+    // Đảm bảo tiền không bị âm
     user.money = Math.max(0, user.money - amount);
     await db.write();
 }
 
-// 3. Các hàm về Xu (Coins)
+/**
+ * 3. CÁC HÀM VỀ XU (COINS) - Dùng cho Ăn Xin, Vay Vốn
+ */
 async function getUserCoins(userId) {
     const user = await getUser(userId);
     return user.xu || 0;
@@ -135,17 +147,20 @@ async function setUserCoins(userId, amount) {
 
 async function addXu(userId, amount) {
     const user = await getUser(userId);
-    user.xu += amount;
+    user.xu = (user.xu || 0) + amount;
     await db.write();
 }
+
 async function subXu(userId, amount) {
     const user = await getUser(userId);
-    // Trừ xu nhưng đảm bảo xu không bị âm (nhỏ nhất là 0)
+    // Trừ xu nhưng đảm bảo không nhỏ hơn 0
     user.xu = Math.max(0, (user.xu || 0) - amount);
     await db.write();
 }
 
-// 4. Các hàm về Nợ (Debt)
+/**
+ * 4. CÁC HÀM VỀ NỢ (DEBT) - Dùng cho hệ thống Ngân Hàng
+ */
 async function getUserDebt(userId) {
     const user = await getUser(userId);
     return user.debt || 0;
@@ -158,6 +173,8 @@ async function setUserDebt(userId, amount) {
 }
 
 // ===================== COMMANDS =====================
+
+
 
 // =====================
 //      ĐIỂM DANH JACKPOT (ANIMATION MƯỢT)
@@ -212,6 +229,9 @@ async function cmdDiemdanh(message) {
     
     await msg.edit(`${finalHeader}\n━━━━━━━━━━━━━━━━━━\n👤 Người chơi: **${message.author.username}**\n💰 Nhận được: **${xuReward.toLocaleString()} xu**\n━━━━━━━━━━━━━━━━━━\n*Số dư mới của bạn đã được cập nhật!*`);
 }
+
+
+
 
 // =====================
 //         XEM TIỀN + NỢ 
@@ -1247,6 +1267,10 @@ function finishGame(channelId) {
         if (session.msg) setTimeout(() => session.msg.delete().catch(() => {}), 20000);
         delete blackjackSession[channelId];
     }
+
+
+
+    
 // =====================
 //      ĂN XIN (BỐC TÚI MÙ)
 // =====================
@@ -1307,6 +1331,11 @@ async function cmdAnxin(message) {
         message.delete().catch(() => {});
     }, 5000);
 }
+
+
+
+
+    
 // =====================
 //        VAY XU 
 // =====================
@@ -1360,6 +1389,12 @@ async function cmdVay(message, args) {
     const interestPercent = interest * 100;
     return message.reply(`### ✅ Vay vốn thành công\n> 💰 Nhận: **+${loanAmount.toLocaleString()} xu**\n> 💸 Tổng nợ phải trả: **${totalOwed.toLocaleString()} xu** (Lãi ${interestPercent}%)\n> 🏦 Số dư mới: \`${currentCoins.toLocaleString()}\``);
 }
+
+
+
+
+
+    
 // =====================
 //        TRẢ LÃI + NỢ
 // =====================
@@ -1404,6 +1439,11 @@ async function cmdTralai(message, args) {
     message.reply(replyText);
 } // <- Đóng cmdTralai
 
+
+
+
+
+    
 // ==========================================
 //      HELP COMMAND (4 NÚT - ẢNH TO - GIF XỊN)
 // ==========================================
@@ -1505,6 +1545,8 @@ async function cmdHelp(message) {
         } catch (e) {}
     });
 }
+
+    
 // =============================================================================
 //                 PHỄU TỔNG INTERACTION (SỬA LỖI NGOẶC)
 // =============================================================================
@@ -1702,12 +1744,11 @@ client.on('interactionCreate', async (interaction) => {
     if (game.autoFlipTimer) clearTimeout(game.autoFlipTimer);
 
     // 1. Dọn dẹp tin nhắn cũ (Thêm .catch để tránh lỗi nếu tin nhắn đã mất)
-    if (game.tableMsg) await game.tableMsg.delete().catch(() => {});
     if (game.revealMsgs && game.revealMsgs.length > 0) {
-        for (const m of game.revealMsgs) {
-            await m.delete().catch(() => {});
-        }
+    for (const m of game.revealMsgs) {
+        await m.delete().catch(() => {});
     }
+}
 
     const bInfo = getHandInfo(game.botHand);
     const botHandVisual = formatHand(game.botHand, false);
