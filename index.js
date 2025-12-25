@@ -1112,8 +1112,6 @@ async function cmdTralai(message, args) {
 // ==========================================
 //      HELP COMMAND (BẢN NÂNG CẤP XỊN)
 // ==========================================
-const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } = require('discord.js');
-
 async function cmdHelp(message) {
     let timeLeft = 60; // Thời gian tồn tại của menu (giây)
     const cooldowns = new Map(); // Bộ nhớ tạm để lưu thời gian chờ của từng người
