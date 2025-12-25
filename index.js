@@ -1112,8 +1112,6 @@ async function cmdTralai(message, args) {
 // ==========================================
 //      HELP COMMAND (FIXED & OPTIMIZED)
 // ==========================================
-const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } = require('discord.js');
-
 async function cmdHelp(message) {
     // Cấu hình
     let timeLeft = 60; // Thời gian gốc
