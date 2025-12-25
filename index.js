@@ -1464,7 +1464,7 @@ async function cmdHelp(message) {
 
 
 // =============================================================================
-//                  PHỄU TỔNG INTERACTION (HOÀN CHỈNH 100%)
+//                   PHỄU TỔNG INTERACTION (ĐÃ FIX LỖI CÚ PHÁP)
 // =============================================================================
 
 client.on('interactionCreate', async (interaction) => {
@@ -1511,9 +1511,8 @@ client.on('interactionCreate', async (interaction) => {
 
             if (action === "stand") {
                 let dealerHand = xidachSession.dealerHand;
-                delete blackjackSession[interaction.channelId]; // Xóa session ngay để tránh bấm nhiều lần
+                delete blackjackSession[interaction.channelId];
 
-                // Nhà cái rút bài cho đến khi >= 17 điểm
                 while (calcPoint(dealerHand) < 17) {
                     dealerHand.push(dealCard());
                     await interaction.editReply({
@@ -1525,7 +1524,6 @@ client.on('interactionCreate', async (interaction) => {
                     await new Promise(res => setTimeout(res, 1000));
                 }
                 
-                // --- LOGIC TÍNH ĐIỂM (Đã lồng vào đúng vị trí) ---
                 const pP = calcPoint(xidachSession.playerHand);
                 const dP = calcPoint(dealerHand);
                 let msg = "", col = "#f1c40f";
@@ -1557,51 +1555,53 @@ client.on('interactionCreate', async (interaction) => {
 
         // --- B. XỬ LÝ BÀI CÀO ---
         if (['join_baicao', 'view_hand', 'flip_hand'].includes(interaction.customId)) {
-            if (interaction.customId !== 'view_hand') {
-                if (!interaction.deferred && !interaction.replied) await interaction.deferUpdate().catch(() => {});
-            }
-
             if (!baicaoSession) {
-                const method = interaction.deferred ? 'followUp' : 'reply';
-                return interaction[method]({ content: "⚠️ Ván không tồn tại.", flags: [64] }).catch(() => {});
+                return interaction.reply({ content: "⚠️ Ván không tồn tại.", flags: [64] }).catch(() => {});
             }
 
+            // 1. Tham gia ván
             if (interaction.customId === 'join_baicao') {
+                await interaction.deferUpdate().catch(() => {});
                 if (baicaoSession.status !== 'joining') return;
+
+                if (baicaoSession.players.some(p => p.id === interaction.user.id)) {
+                    return interaction.followUp({ content: "⚠️ Bạn đã tham gia ván này rồi!", flags: [64] }).catch(() => {});
+                }
+
                 const pD = await getUser(interaction.user.id);
                 if (!pD || pD.money < baicaoSession.bet) return interaction.followUp({ content: "💸 Hết tiền!", flags: [64] }).catch(() => {});
 
                 await subMoney(interaction.user.id, baicaoSession.bet);
                 baicaoSession.players.push({ id: interaction.user.id, name: interaction.user.username, hand: [], revealed: false });
 
-                await interaction.editReply({
+                return interaction.editReply({
                     embeds: [EmbedBuilder.from(interaction.message.embeds[0]).setDescription(`Cược: **${baicaoSession.bet.toLocaleString()}**\n\nNgười chơi:\n${baicaoSession.players.map((p, i) => `${i + 1}. **${p.name}**`).join('\n')}`)]
                 }).catch(() => {});
             }
 
-            if (baicaoSession.status === 'playing') {
-                const player = baicaoSession.players.find(p => p.id === interaction.user.id);
-                if (!player) return interaction.reply({ content: "Bạn không chơi!", flags: [64] }).catch(() => {});
+            // 2. Các nút trong ván chơi (Xem bài / Lật bài)
+            const player = baicaoSession.players.find(p => p.id === interaction.user.id);
+            if (!player) return interaction.reply({ content: "🚫 Bạn không có trong ván này!", flags: [64] }).catch(() => {});
 
-                if (interaction.customId === 'view_hand') {
-                    const info = getHandInfo(player.hand);
-                    return interaction.reply({ content: `👀 Bài: ${formatHand(player.hand)} (${info.isBaTay ? "🔥 BA TÂY" : `${info.score} nút`})`, flags: [64] }).catch(() => {});
-                }
+            if (interaction.customId === 'view_hand') {
+                const info = getHandInfo(player.hand);
+                return interaction.reply({ content: `👀 Bài: ${formatHand(player.hand)} (${info.isBaTay ? "🔥 BA TÂY" : `${info.score} nút`})`, flags: [64] }).catch(() => {});
+            }
 
-                if (interaction.customId === 'flip_hand') {
-                    if (player.revealed) return; 
-                    player.revealed = true;
+            if (interaction.customId === 'flip_hand') {
+                await interaction.deferUpdate().catch(() => {});
+                if (player.revealed) return; 
+                player.revealed = true;
 
-                    await interaction.channel.send(`🔓 **${player.name}** đã ngửa bài!`).then(m => {
-                        setTimeout(() => m.delete().catch(() => {}), 5000);
-                    }).catch(() => {});
+                await interaction.channel.send(`🔓 **${player.name}** đã ngửa bài!`).then(m => {
+                    setTimeout(() => m.delete().catch(() => {}), 5000);
+                }).catch(() => {});
 
-                    if (baicaoSession.players.every(p => p.revealed)) {
-                        await finishBaicao(interaction.channel, baicaoSession);
-                        setTimeout(() => {
-                            interaction.message.delete().catch(() => {});
-                        }, 10000);
-                    }
+                if (baicaoSession.players.every(p => p.revealed)) {
+                    await finishBaicao(interaction.channel, baicaoSession);
+                    setTimeout(() => {
+                        interaction.message.delete().catch(() => {});
+                    }, 10000);
                 }
             }
         }
@@ -1610,62 +1610,70 @@ client.on('interactionCreate', async (interaction) => {
     }
 });
 
-
     
-        // =====================
-        // ham khoi tao nut !baicao
-        // =====================
-        async function handleBaiCaoCommand(message, args) {
-            const betAmount = parseInt(args[0]);
-            if (isNaN(betAmount) || betAmount <= 0) return message.reply("❌ Vui lòng nhập số tiền cược hợp lệ!");
+       // =====================
+// HÀM KHỞI TẠO LỆNH !BAICAO (LUÔN CHƠI - CHỐNG SPAM)
+// =====================
+async function handleBaiCaoCommand(message, args) {
+    const betAmount = parseInt(args[0]);
+    if (isNaN(betAmount) || betAmount <= 0) return message.reply("❌ Vui lòng nhập số tiền cược hợp lệ!");
 
-            const userData = await getUser(message.author.id);
-            if (!userData || userData.money < betAmount) return message.reply("❌ Bạn không đủ tiền!");
-            if (activeGames.has(message.channel.id)) return message.reply("❌ Đang có ván bài diễn ra ở kênh này!");
+    const userData = await getUser(message.author.id);
+    if (!userData || userData.money < betAmount) return message.reply("❌ Bạn không đủ tiền!");
+    
+    // Kiểm tra nếu kênh đang có ván bài diễn ra
+    if (activeGames.has(message.channel.id)) return message.reply("❌ Đang có ván bài diễn ra ở kênh này!");
 
-            const gameState = {
-                type: 'baicao',
-                bet: betAmount,
-                players: [],
-                status: 'joining',
-                botHand: [],
-                hostName: message.author.username, // Thêm dòng này
-                ownerId: message.author.id,
-                tableMsg: null,
-                revealMsgs: []
-            };
+    const gameState = {
+        type: 'baicao',
+        bet: betAmount,
+        players: [],
+        status: 'joining',
+        botHand: [],
+        hostName: message.author.username,
+        ownerId: message.author.id,
+        tableMsg: null,
+        revealMsgs: []
+    };
 
-            userData.money -= betAmount;
-            gameState.players.push({ id: message.author.id, name: message.author.username, hand: [], revealed: false });
-            await db.write();
-            activeGames.set(message.channel.id, gameState);
+    // Trừ tiền chủ bàn và thêm vào danh sách người chơi ngay lập tức
+    await subMoney(message.author.id, betAmount);
+    gameState.players.push({ id: message.author.id, name: message.author.username, hand: [], revealed: false });
+    
+    activeGames.set(message.channel.id, gameState);
 
-            const embed = new EmbedBuilder()
-                .setTitle("🃏 SÒNG BÀI CÀO - TỐI ĐA 10 NGƯỜI")
-                .setDescription(`💰 Mức cược: **${betAmount.toLocaleString()}**\n⏳ Chờ người tham gia: **30 giây**\n\n**Người tham gia:**\n1. ${message.author.username}`)
-                .setColor('#00FF00');
+    const embed = new EmbedBuilder()
+        .setTitle("🃏 SÒNG BÀI CÀO - TỐI ĐA 10 NGƯỜI")
+        .setDescription(`💰 Mức cược: **${betAmount.toLocaleString()}**\n⏳ Chờ người tham gia: **30 giây**\n\n**Người tham gia:**\n1. **${message.author.username}**`)
+        .setColor('#00FF00')
+        .setFooter({ text: "Ấn nút bên dưới để tham gia cược!" });
 
-            const row = new ActionRowBuilder().addComponents(
-                new ButtonBuilder().setCustomId('join_baicao').setLabel('Tham gia').setStyle(ButtonStyle.Success)
-            );
+    const row = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId('join_baicao').setLabel('Tham gia').setStyle(ButtonStyle.Success)
+    );
 
-            gameState.tableMsg = await message.channel.send({ embeds: [embed], components: [row] }); // Lưu lại để xóa sau này
+    gameState.tableMsg = await message.channel.send({ embeds: [embed], components: [row] });
 
-           setTimeout(() => {
-    if (gameState.tableMsg) gameState.tableMsg.edit({ components: [] }).catch(() => { });
-    const game = activeGames.get(message.channel.id);
-    if (game && game.status === 'joining') {
-        // Nếu chỉ có 1 người (chủ bàn) thì hủy ván, trả lại tiền
-        if (game.players.length > 1) { 
-            startDealing(message.channel, game);
-        } else {
-            addMoney(game.ownerId, game.bet); // Trả lại tiền cược cho chủ bàn
-            message.channel.send("📭 Ván bài bị hủy vì không có đủ người tham gia!");
-            activeGames.delete(message.channel.id);
+    // --- TỰ ĐỘNG BẮT ĐẦU SAU 30 GIÂY ---
+    setTimeout(async () => {
+        const game = activeGames.get(message.channel.id);
+        if (!game || game.status !== 'joining') return;
+
+        // 1. Xóa nút "Tham gia" để không cho ai vào thêm nữa
+        if (game.tableMsg) {
+            await game.tableMsg.edit({ components: [] }).catch(() => { });
         }
-    }
-}, 30000);
+
+        // 2. Thông báo bắt đầu (Bất kể 1 người hay nhiều người)
+        if (game.players.length === 1) {
+            message.channel.send("🃏 Chỉ có 1 người tham gia, bạn sẽ so bài với **Bot (Nhà cái)**!");
         }
+
+        // 3. Gọi hàm chia bài để bắt đầu ván đấu
+        startDealing(message.channel, game);
+
+    }, 30000); 
+}
 
         // =====================
         // ham khoi tao xetbai    
