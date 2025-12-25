@@ -4,6 +4,7 @@
 // ================================================
 
 // ---------------- IMPORT MODULES ----------------
+const activeGames = new Map();
 const {
     Client,
     GatewayIntentBits,
@@ -1108,100 +1109,404 @@ async function cmdTralai(message, args) {
     message.reply(replyText);
 } // <- Đóng cmdTralai
 
-// =====================
-//      HELP COMMAND (Bản Xịn)
-// =====================
-async function cmdHelp(message) {
-    let timeLeft = 60; // Tổng thời gian 60 giây
+// ==========================================
+//      HELP COMMAND (BẢN NÂNG CẤP XỊN)
+// ==========================================
+const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } = require('discord.js');
 
-    const generateEmbed = (seconds) => {
+async function cmdHelp(message) {
+    let timeLeft = 60; // Thời gian tồn tại của menu (giây)
+    const cooldowns = new Map(); // Bộ nhớ tạm để lưu thời gian chờ của từng người
+
+    // --- HÀM TẠO EMBED GỐC (TRANG CHỦ) ---
+    const generateHomeEmbed = (seconds) => {
         return new EmbedBuilder()
-            .setTitle('🎮 TRUNG TÂM GIẢI TRÍ CASINO')
-            .setDescription(`Chào mừng bạn! Hãy chọn mục bên dưới để xem chi tiết.\n\n⏳ **Tự động đóng và dọn dẹp sau:** \`${seconds} giây\``)
-            .setColor('#FFD700')
+            .setTitle('🎰 TRUNG TÂM GIẢI TRÍ & CASINO ROYAL 🎰')
+            .setDescription(
+                `Chào mừng **${message.author.username}** và các dân chơi!\n` +
+                `Vui lòng chọn danh mục bên dưới để xem hướng dẫn chi tiết.\n\n` +
+                `> ⚠️ **Lưu ý:** Menu này cho phép **tất cả mọi người** bấm xem.\n` +
+                `> ⏱️ **Anti-Spam:** Mỗi thao tác cách nhau **5 giây**.\n\n` +
+                `⏳ **Menu tự hủy sau:** \`${seconds} giây\``
+            )
+            .setImage('https://i.imgur.com/8Q9tXl3.png') // (Tùy chọn) Link ảnh banner cho xịn, nếu không thích thì xóa dòng này
+            .setColor('#FFD700') // Màu vàng kim loại
+            .setFooter({ text: 'Bot Casino System | Develop by You', iconURL: message.client.user.displayAvatarURL() })
             .setTimestamp();
     };
 
-    const row = new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setCustomId('h_eco').setLabel('Kinh Tế').setStyle(ButtonStyle.Primary).setEmoji('💰'),
-        new ButtonBuilder().setCustomId('h_game').setLabel('Trò Chơi').setStyle(ButtonStyle.Success).setEmoji('🎲'),
-        new ButtonBuilder().setCustomId('h_bank').setLabel('Ngân Hàng').setStyle(ButtonStyle.Danger).setEmoji('🏦')
-    );
+    // --- HÀM TẠO NÚT BẤM ---
+    const getRow = (disabled = false) => {
+        return new ActionRowBuilder().addComponents(
+            new ButtonBuilder().setCustomId('h_home').setLabel('Trang Chủ').setStyle(ButtonStyle.Secondary).setEmoji('🏠').setDisabled(disabled),
+            new ButtonBuilder().setCustomId('h_eco').setLabel('Kinh Tế').setStyle(ButtonStyle.Primary).setEmoji('💰').setDisabled(disabled),
+            new ButtonBuilder().setCustomId('h_game').setLabel('Trò Chơi').setStyle(ButtonStyle.Success).setEmoji('🎲').setDisabled(disabled),
+            new ButtonBuilder().setCustomId('h_bank').setLabel('Ngân Hàng').setStyle(ButtonStyle.Danger).setEmoji('🏦').setDisabled(disabled)
+        );
+    };
 
-    const helpMsg = await message.reply({ embeds: [generateEmbed(timeLeft)], components: [row] });
+    // Gửi tin nhắn Help ban đầu
+    const helpMsg = await message.reply({ 
+        embeds: [generateHomeEmbed(timeLeft)], 
+        components: [getRow()] 
+    });
 
-    // --- BỘ ĐẾM NGƯỢC (Cập nhật mỗi 20 giây) ---
+    // --- BỘ ĐẾM NGƯỢC (Cập nhật footer mỗi 15s để tránh spam API) ---
     const timer = setInterval(async () => {
-        timeLeft -= 20; // Trừ đi 20 giây mỗi lần
-        
+        timeLeft -= 15;
         if (timeLeft <= 0) {
             clearInterval(timer);
         } else {
-            // Lấy embed hiện tại và chỉ cập nhật phần giây đếm ngược
-            const currentEmbed = helpMsg.embeds[0];
-            const updatedEmbed = EmbedBuilder.from(currentEmbed)
-                .setDescription(currentEmbed.description.replace(/\`\d+ giây\`/, `\`${timeLeft} giây\``));
-            
-            await helpMsg.edit({ embeds: [updatedEmbed] }).catch(() => {});
+            // Chỉ cập nhật nếu tin nhắn vẫn còn
+            try {
+                const currentEmbed = helpMsg.embeds[0];
+                const updatedEmbed = EmbedBuilder.from(currentEmbed)
+                    .setDescription(currentEmbed.description.replace(/\`\d+ giây\`/, `\`${timeLeft} giây\``));
+                await helpMsg.edit({ embeds: [updatedEmbed] });
+            } catch (e) { clearInterval(timer); }
         }
-    }, 20000); // 20000ms = 20 giây
+    }, 15000);
 
-    const collector = helpMsg.createMessageComponentCollector({ time: 60000 }); 
+    // --- XỬ LÝ SỰ KIỆN BẤM NÚT ---
+    const collector = helpMsg.createMessageComponentCollector({ 
+        componentType: ComponentType.Button, 
+        time: 60000 
+    });
 
     collector.on('collect', async i => {
-        if (i.user.id !== message.author.id) return i.reply({ content: "Nút này không dành cho bạn!", ephemeral: true });
-        
-        const embed = new EmbedBuilder().setColor('#FFD700');
-        const descSuffix = `\n\n⏳ **Tự động đóng sau:** \`${timeLeft} giây\``;
+        // 1. CHECK COOLDOWN (5 Giây)
+        const now = Date.now();
+        const userCooldown = cooldowns.get(i.user.id);
+        const cooldownAmount = 5000; // 5000ms = 5 giây
 
-        if (i.customId === 'h_eco') {
-            embed.setTitle('💰 HỆ THỐNG KINH TẾ')
-                 .setDescription(
-                    '• `!tien`       : Xem số dư & Nợ\n' +
-                    '• `!diemdanh`   : Nhận lương mỗi ngày\n' +
-                    '• `!chuyentien` : Chuyển tiền (Thuế 5%)\n' +
-                    '• `!chuyenxu`   : Chuyển xu (Thuế 7% - 10%)' + descSuffix
-                 );
-        } else if (i.customId === 'h_game') {
-            embed.setTitle('🎲 KHO TRÒ CHƠI')
-                 .setDescription(
-                    '• `!taixiu`, `!baucua`, `!xidach`, `!tungxu`, `!boctham`, `!anxin`' + descSuffix
-                 );
-        } else if (i.customId === 'h_bank') {
-            embed.setTitle('🏦 NGÂN HÀNG & QUY ĐỔI')
-                 .addFields(
-                  {
-    name: '🏦 Chính sách Vay & Trả (Lãi x2)', 
-    value: '• **Vay:** Số dư < 11k vay tối đa `10,000` xu. Số dư > 11k vay tối đa `x2` tài khoản.\n' +
-           '• **Trả:** Hệ thống tính nợ gấp đôi số tiền đã vay.\n' +
-           '👉 **Lệnh vay:** `!vay [số tiền]` hoặc `!vay` (vay tối đa).\n' +
-           '👉 **Lệnh trả:** `!tralai [số tiền]`, `!tralai all` hoặc `!tralai half`.', 
-    inline: false 
-},
-                    { 
-                        name: '💱 Quy đổi & Thuế phí', 
-                        value: '• `!doi` : Đổi Xu ↔ Tiền (Có phí rút %)\n• Thuế chuyển Xu : 7% - 10% tùy mốc', 
-                        inline: false 
-                    }
-                 )
-                 .setFooter({ text: `Menu tự xóa sau ${timeLeft} giây` });
+        if (userCooldown && (now < userCooldown + cooldownAmount)) {
+            const timeLeftCd = ((userCooldown + cooldownAmount - now) / 1000).toFixed(1);
+            return i.reply({ 
+                content: `🚫 **${i.user.username}**, vui lòng đợi **${timeLeftCd}s** để bấm tiếp!`, 
+                ephemeral: true 
+            });
         }
 
-        await i.update({ embeds: [embed], components: [row] });
+        // Cập nhật thời gian cooldown cho người dùng này
+        cooldowns.set(i.user.id, now);
+
+        // 2. XỬ LÝ LOGIC HIỂN THỊ
+        const embed = new EmbedBuilder().setColor('#FFD700').setTimestamp();
+        const descSuffix = `\n━━━━━━━━━━━━━━━━━━━━━━\n⏳ **Tự đóng sau:** \`${timeLeft} giây\` | 👤 **Người xem:** ${i.user.username}`;
+
+        if (i.customId === 'h_home') {
+             // Quay về trang chủ
+             await i.update({ embeds: [generateHomeEmbed(timeLeft)], components: [getRow()] });
+             return;
+        } 
+        
+        else if (i.customId === 'h_eco') {
+            embed.setTitle('💰 HỆ THỐNG TÀI CHÍNH')
+                 .setThumbnail('https://cdn-icons-png.flaticon.com/512/2485/2485519.png') // Icon minh họa
+                 .setDescription(
+                    `Quản lý túi tiền của bạn để trở thành đại gia server.\n` +
+                    `\n**Lệnh Cơ Bản:**` +
+                    `\n\`!tien\` : Kiểm tra số dư hiện tại & Nợ xấu.` +
+                    `\n\`!diemdanh\` : Nhận lương điểm danh hàng ngày.` +
+                    `\n\`!top\` : Xem bảng xếp hạng đại gia.` +
+                    `\n\n**Giao Dịch:**` +
+                    `\n\`!chuyentien <@user> <số tiền>\` : Chuyển tiền (Phí 5%).` +
+                    `\n\`!chuyenxu <@user> <số xu>\` : Chuyển xu (Phí 7-10%).` +
+                    descSuffix
+                 );
+        } 
+        
+        else if (i.customId === 'h_game') {
+            embed.setTitle('🎲 SẢNH TRÒ CHƠI CASINO')
+                 .setThumbnail('https://cdn-icons-png.flaticon.com/512/1067/1067357.png')
+                 .setDescription(`Danh sách các trò chơi đỏ đen mạo hiểm. Hãy cân nhắc kỹ!`)
+                 .addFields(
+                    { 
+                        name: '🃏 BÀI CÀO (3 Cây) - MỚI UPDATE ✨', 
+                        value: 
+                        `> **\`!baicao <tiền cược>\`**: Tạo bàn hoặc tham gia ván bài.\n` +
+                        `> **\`!nguabai\`**: Xem bài của riêng bạn (Chỉ bạn thấy).\n` +
+                        `> **\`!xetbai\`**: Buộc xét bài người cuối cùng (Dùng khi có người ngủ quên/treo máy quá 5p).`
+                    },
+                    { 
+                        name: '🎲 CÁC GAME KHÁC', 
+                        value: 
+                        `• \`!taixiu <cuoc>\` : Tài (11-17) hoặc Xỉu (4-10).\n` +
+                        `• \`!baucua <cua/tom...> <tien>\` : Bầu cua tôm cá.\n` +
+                        `• \`!xidach\` : Blackjack 21 điểm.\n` +
+                        `• \`!tungxu\` : Sấp ngửa định mệnh.\n` +
+                        `• \`!boctham\` : Thử vận may rủi.\n` +
+                        `• \`!anxin\` : Dành cho người hết tiền.`
+                    }
+                 )
+                 .setFooter({ text: 'Chơi có trách nhiệm!' });
+                 // Thêm suffix vào cuối description nếu muốn, hoặc để ở Footer
+        } 
+        
+        else if (i.customId === 'h_bank') {
+            embed.setTitle('🏦 NGÂN HÀNG & TÍN DỤNG')
+                 .setThumbnail('https://cdn-icons-png.flaticon.com/512/2830/2830284.png')
+                 .addFields(
+                  {
+                    name: '💸 VAY VỐN (LÃI SUẤT CẮT CỔ)', 
+                    value: 
+                    '• **Điều kiện:** Số dư < 11k vay tối đa `10,000`. Số dư lớn hơn được vay `x2`.\n' +
+                    '• **Cơ chế:** Vay 1 trả 2 (Nợ gấp đôi thực nhận).\n' +
+                    '>>> `!vay <số tiền>` : Làm thủ tục vay.\n' +
+                    '`!vay` : Vay tối đa hạn mức cho phép.'
+                  },
+                  {
+                    name: '💳 TRẢ NỢ & RÚT TIỀN',
+                    value:
+                    '>>> `!tralai <số tiền>` : Trả bớt nợ.\n' +
+                    '`!tralai all` : Trả sạch nợ.\n' +
+                    '`!doi <xu>` : Quy đổi Xu game thành Tiền (Có phí).'
+                  }
+                 )
+                 .setFooter({ text: descSuffix.replace(/\n/g, '') }); // Dọn text cho gọn vào footer
+        }
+
+        await i.update({ embeds: [embed], components: [getRow()] });
     });
 
     collector.on('end', async () => {
         clearInterval(timer);
+        // Khi hết giờ, xóa tin nhắn help và tin nhắn lệnh của người dùng để dọn dẹp box chat
         await helpMsg.delete().catch(() => {});
         await message.delete().catch(() => {});
     });
+}
+// ==========================================
+//      CÁC HÀM BỔ TRỢ BÀI CÀO (FULL FIX)
+// ==========================================
+
+// --- 1. HÀM CHIA BÀI ---
+async function startDealing(channel, game) {
+    game.status = 'playing';
+    const deck = createDeck();
+    
+    // Chia bài cho Bot (Ẩn)
+    game.botHand = [deck.pop(), deck.pop(), deck.pop()];
+
+    channel.send("🎴 **Nhà cái đang bắt đầu chia bài...**");
+
+    // Hiệu ứng chia bài từng người
+    for (let player of game.players) {
+        player.hand = [deck.pop(), deck.pop(), deck.pop()];
+        const dealMsg = await channel.send(`... 🃏 Đang phát bài cho **${player.name}**`);
+        await new Promise(r => setTimeout(r, 1200));
+        await dealMsg.delete().catch(() => {});
+    }
+
+    // Gửi bàn bài công khai
+    const embed = new EmbedBuilder()
+        .setTitle("🃏 BÀN BÀI CÀO CHUYÊN NGHIỆP")
+        .setDescription(
+            "✅ **Tất cả bài đã được chia úp!**\n\n" +
+            "👉 Bấm **Xem Bài** để xem bài riêng.\n" +
+            "👉 Bấm **Ngửa Bài** để công khai kết quả.\n\n" +
+            "**Danh sách tụ bài:**\n" + 
+            game.players.map(p => `👤 **${p.name}**: 🎴 🎴 🎴`).join('\n')
+        )
+        .setColor('#2b2d31')
+        .setFooter({ text: "Lưu ý: Nút Ngửa Bài sẽ delay 2 giây." });
+
+    const row = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId('view_hand').setLabel('Xem Bài').setStyle(ButtonStyle.Secondary).setEmoji('👀'),
+        new ButtonBuilder().setCustomId('flip_hand').setLabel('Ngửa Bài').setStyle(ButtonStyle.Primary).setEmoji('🖐️')
+    );
+
+    await channel.send({ embeds: [embed], components: [row] });
+
+    // Dọn dẹp sòng sau 5 phút nếu bị treo
+    setTimeout(() => {
+        if (activeGames.has(channel.id)) activeGames.delete(channel.id);
+    }, 300000); 
+}
+
+// --- 2. TẠO BỘ BÀI ---
+function createDeck() {
+    const suits = ['♠️', '♣️', '♦️', '♥️'];
+    const ranks = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+    let deck = [];
+    for (let s of suits) {
+        for (let r of ranks) deck.push(`[${r}${s}]`);
+    }
+    return deck.sort(() => Math.random() - 0.5);
+}
+
+// --- 3. PHÂN TÍCH BÀI ---
+function getHandInfo(hand) {
+    let score = 0, faces = 0;
+    hand.forEach(card => {
+        const rank = card.replace(/[\[\]♠️♣️♦️♥️]/g, '');
+        if (['J', 'Q', 'K'].includes(rank)) { faces++; score += 10; }
+        else if (rank === 'A') score += 1;
+        else score += parseInt(rank);
+    });
+    return { score: score % 10, isBaTay: faces === 3 };
+}
+
+// --- 4. SO BÀI & TÍNH TIỀN ---
+function solveGame(player, botHand, bet) {
+    const p = getHandInfo(player.hand);
+    const b = getHandInfo(botHand);
+    if (p.isBaTay) {
+        if (b.isBaTay) return { receive: bet, msg: "Hòa (Cùng Ba Tây) - Hoàn tiền" };
+        const total = (bet * 2) + (bet * 0.2);
+        return { receive: total, msg: `🔥 **BA TÂY!** Thắng +20% (Nhận: ${total.toLocaleString()})` };
+    }
+    if (b.isBaTay) return { receive: 0, msg: `Thua (Bot có Ba Tây - Bạn ${p.score} nút)` };
+    if (p.score > b.score) return { receive: bet * 2, msg: `Thắng! (${p.score} nút vs Bot ${b.score} nút)` };
+    if (p.score === b.score) return { receive: bet, msg: `Hòa! (${p.score} nút) - Hoàn cược` };
+    return { receive: 0, msg: `Thua! (${p.score} nút vs Bot ${b.score} nút)` };
+}
+
+// =====================
+//     XỬ LÝ NÚT BẤM
+// =====================
+client.on("interactionCreate", async (interaction) => {
+    if (!interaction.isButton()) return;
+    const game = activeGames.get(interaction.channelId);
+    if (!game) return;
+
+    // NÚT THAM GIA
+    if (interaction.customId === 'join_baicao') {
+        if (game.status !== 'joining') return interaction.reply({ content: "Ván bài đã bắt đầu!", ephemeral: true });
+        const pData = db.data.users.find(u => u.id === interaction.user.id);
+        if (!pData || pData.balance < game.bet) return interaction.reply({ content: "Bạn không đủ tiền!", ephemeral: true });
+        if (game.players.find(p => p.id === interaction.user.id)) return interaction.reply({ content: "Bạn đã vào sòng rồi!", ephemeral: true });
+        if (game.players.length >= 10) return interaction.reply({ content: "Sòng đầy!", ephemeral: true });
+
+        pData.balance -= game.bet;
+        await db.write();
+        game.players.push({ id: interaction.user.id, name: interaction.user.username, hand: [], revealed: false });
+
+        const newEmbed = EmbedBuilder.from(interaction.message.embeds[0])
+            .setDescription(`💰 Mức cược: **${game.bet.toLocaleString()}**\n\n**Người tham gia:**\n${game.players.map((p, idx) => `${idx + 1}. ${p.name}`).join('\n')}`);
+        
+        await interaction.message.edit({ embeds: [newEmbed] });
+        return interaction.reply({ content: `✅ Đã tham gia cược ${game.bet}`, ephemeral: true });
+    }
+
+    // NÚT XEM & NGỬA BÀI
+    if (game.status !== 'playing') return;
+    const player = game.players.find(p => p.id === interaction.user.id);
+    if (!player) return interaction.reply({ content: "Bạn không ở trong ván này!", ephemeral: true });
+
+    if (interaction.customId === 'view_hand') {
+        return interaction.reply({ content: `🃏 Bài của bạn là: **${player.hand.join(' ')}**`, ephemeral: true });
+    }
+
+   if (interaction.customId === 'flip_hand') {
+        // 1. Kiểm tra nếu đã lật rồi thì không cho lật nữa
+        if (player.revealed) return interaction.reply({ content: "Bạn đã ngửa bài rồi!", ephemeral: true });
+        
+        // 2. QUAN TRỌNG: Khóa trạng thái ngay lập tức trước khi đợi 2 giây
+        player.revealed = true; 
+        
+        // 3. Thông báo cho cả sòng biết người này đang lật
+        await interaction.reply({ content: `⏳ **${player.name}** đang chuẩn bị ngửa bài...` });
+        
+        // 4. Delay 2 giây như yêu cầu
+        await new Promise(r => setTimeout(r, 2000));
+
+        // 5. Tính toán kết quả và cộng tiền
+        const result = solveGame(player, game.botHand, game.bet);
+        const pDB = db.data.users.find(u => u.id === player.id);
+        
+        if (pDB) {
+            pDB.balance += result.receive;
+            await db.write();
+        }
+
+        // 6. Sửa lại tin nhắn chờ thành kết quả bài thực tế
+        await interaction.editReply(`🎴 **${player.name}** lật bài: ${player.hand.join(' ')}\n➜ **Kết quả:** ${result.msg}`);
+
+        // 7. Kiểm tra kết thúc ván (Xóa game nếu mọi người đã lật hết)
+        if (game.players.every(p => p.revealed)) {
+    activeGames.delete(interaction.channelId);
+    // Hiện thêm bài của Bot để minh bạch
+    await interaction.channel.send(`🎴 **Nhà cái (Bot) hạ bài:** ${game.botHand.join(' ')}\n🏁 **Ván bài kết thúc!** Mọi người có thể mở ván mới.`);
+}
+});
+// =====================
+// ham khoi tao nut !baicao
+// =====================
+async function handleBaiCaoCommand(message, args) {
+    const betAmount = parseInt(args[0]);
+    if (isNaN(betAmount) || betAmount <= 0) return message.reply("❌ Vui lòng nhập số tiền cược hợp lệ!");
+
+    const userData = db.data.users.find(u => u.id === message.author.id);
+    if (!userData || userData.balance < betAmount) return message.reply("❌ Bạn không đủ tiền!");
+    if (activeGames.has(message.channel.id)) return message.reply("❌ Đang có ván bài diễn ra ở kênh này!");
+
+    const gameState = { 
+        bet: betAmount, 
+        players: [], 
+        status: 'joining', 
+        botHand: [],
+        ownerId: message.author.id 
+    };
+
+    // Chủ sòng tham gia luôn
+    userData.balance -= betAmount;
+    gameState.players.push({ id: message.author.id, name: message.author.username, hand: [], revealed: false });
+    await db.write();
+    activeGames.set(message.channel.id, gameState);
+
+    const embed = new EmbedBuilder()
+        .setTitle("🃏 SÒNG BÀI CÀO - TỐI ĐA 10 NGƯỜI")
+        .setDescription(`💰 Mức cược: **${betAmount.toLocaleString()}**\n⏳ Chờ người tham gia: **30 giây**\n\n**Người tham gia:**\n1. ${message.author.username}`)
+        .setColor('#00FF00');
+
+    const row = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId('join_baicao').setLabel('Tham gia').setStyle(ButtonStyle.Success)
+    );
+
+    const msg = await message.channel.send({ embeds: [embed], components: [row] });
+
+    setTimeout(() => {
+        msg.edit({ components: [] }).catch(() => {});
+        const game = activeGames.get(message.channel.id);
+        if (game && game.status === 'joining') {
+            if (game.players.length >= 1) startDealing(message.channel, game);
+            else activeGames.delete(message.channel.id);
+        }
+    }, 30000);
+}
+// =====================
+// ham khoi tao xetbai    
+// ======================
+async function handleXetBaiCommand(message) {
+    const game = activeGames.get(message.channel.id);
+    if (!game || game.status !== 'playing') return;
+
+    const unrevealed = game.players.filter(p => !p.revealed);
+    if (unrevealed.length === 0) return message.reply("Mọi người đã ngửa bài hết rồi!");
+
+    // Chọn ngẫu nhiên 1 người trong số những người chưa ngửa bài
+    const target = unrevealed[Math.floor(Math.random() * unrevealed.length)];
+    target.revealed = true;
+
+    const result = solveGame(target, game.botHand, game.bet);
+    const pDB = db.data.users.find(u => u.id === target.id);
+    pDB.balance += result.receive;
+    await db.write();
+
+    message.channel.send(`🎲 **Bot xét bài ngẫu nhiên:**\n👤 **${target.name}**: ${target.hand.join(' ')}\n➜ **Kết quả:** ${result.msg}`);
+
+    // Kiểm tra ván đấu kết thúc
+    if (game.players.every(p => p.revealed)) {
+        activeGames.delete(message.channel.id);
+        message.channel.send("🏁 Ván bài đã kết thúc sau khi xét bài!");
+    }
 }
 // =====================
 //      MAIN EVENTS 
 // =====================
 client.on("messageCreate", async (message) => {
     if (message.author.bot || !message.content.startsWith(PREFIX)) return;
-
     const args = message.content.slice(PREFIX.length).trim().split(/ +/);
     const cmd = args.shift().toLowerCase();
 
@@ -1219,6 +1524,9 @@ client.on("messageCreate", async (message) => {
             case "xidach": await cmdXidach(message, args); break;
             case "chuyentien": await cmdChuyentien(message, args); break;
             case "chuyenxu": await cmdChuyenxu(message, args); break;
+            case "baicao": await handleBaiCaoCommand(message, args);  break;
+            case "nguabai": await handleNguaBaiCommand(message); break;
+            case "xetbai":  await handleXetBaiCommand(message); break;
                 
             case "addmoney": 
             case "reset": 
@@ -1233,6 +1541,7 @@ client.on("messageCreate", async (message) => {
         console.error("Lỗi lệnh chat:", error);
     }
 });
+
 
 // -------------------- BOT LOGIN --------------------
 client.login(process.env.TOKEN);
