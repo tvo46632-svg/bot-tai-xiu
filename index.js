@@ -88,83 +88,63 @@ async function cmdAdmin(message, args) {
         }
     }
 }
-// Hàm lấy toàn bộ danh sách user để làm bảng xếp hạng
-async function getAllUsers() {
+// Hàm gốc để đảm bảo dữ liệu luôn tồn tại
+async function ensureUser(userId) {
     await db.read();
-    // Chuyển Object users thành một mảng các User kèm theo ID để dễ xử lý
-    return Object.entries(db.data.users).map(([id, data]) => {
-        return {
-            id: id,
-            money: data.money || 0,
-            xu: data.xu || 0,
-            debt: data.debt || 0
-        };
-    });
+    // Nếu db.data chưa có users, tạo mới nó
+    if (!db.data.users) db.data.users = {}; 
+    // Nếu user chưa có, tạo mặc định
+    if (!db.data.users[userId]) {
+        db.data.users[userId] = { money: 1000, xu: 200, debt: 0, lastDaily: "" };
+    }
 }
 
-// Get or create user
+// 1. Get user
 async function getUser(userId) {
-    db.data.users[userId] ||= { money: 0, xu: 0 };
-    await db.write();
+    await ensureUser(userId);
     return db.data.users[userId];
 }
 
-// Add money
+// 2. Các hàm về Tiền (Money)
 async function addMoney(userId, amount) {
     const user = await getUser(userId);
     user.money += amount;
     await db.write();
 }
 
-// Subtract money
 async function subMoney(userId, amount) {
     const user = await getUser(userId);
-    user.money -= amount;
-    if (user.money < 0) user.money = 0;
+    user.money = Math.max(0, user.money - amount);
     await db.write();
 }
 
-// Add xu
+// 3. Các hàm về Xu (Coins)
+async function getUserCoins(userId) {
+    const user = await getUser(userId);
+    return user.xu || 0;
+}
+
+async function setUserCoins(userId, amount) {
+    const user = await getUser(userId);
+    user.xu = amount;
+    await db.write();
+}
+
 async function addXu(userId, amount) {
     const user = await getUser(userId);
     user.xu += amount;
     await db.write();
 }
 
-// Subtract xu
-async function subXu(userId, amount) {
-    const user = await getUser(userId);
-    user.xu -= amount;
-    if (user.xu < 0) user.xu = 0;
-    await db.write();
-}
-// Lấy số xu hiện tại
-async function getUserCoins(userId) {
-    await db.read();
-    db.data.users[userId] ||= { money: 0, xu: 0, debt: 0 };
-    return db.data.users[userId].xu || 0;
-}
-
-// Set số xu
-async function setUserCoins(userId, amount) {
-    await db.read();
-    db.data.users[userId] ||= { money: 0, xu: 0, debt: 0 };
-    db.data.users[userId].xu = amount;
-    await db.write();
-}
-
-// Lấy nợ (debt)
+// 4. Các hàm về Nợ (Debt)
 async function getUserDebt(userId) {
-    await db.read();
-    db.data.users[userId] ||= { money: 0, xu: 0, debt: 0 };
-    return db.data.users[userId].debt || 0;
+    const user = await getUser(userId);
+    return user.debt || 0;
 }
 
-// Set nợ (debt)
 async function setUserDebt(userId, amount) {
-    await db.read();
-    db.data.users[userId] ||= { money: 0, xu: 0, debt: 0 };
-    db.data.users[userId].debt = amount;
+    const user = await getUser(userId);
+    user.debt = amount;
     await db.write();
 }
 
