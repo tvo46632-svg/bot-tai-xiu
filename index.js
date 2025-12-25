@@ -2010,7 +2010,6 @@ async function finishBaicao(channel, game) { // THÊM CHỮ async VÀO ĐÂY
         .setTimestamp();
 
     await channel.send({ embeds: [finalEmbed] });
-}
     //=====================
     // Hàm tính kết quả
     //=====================
