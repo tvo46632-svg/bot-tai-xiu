@@ -215,21 +215,25 @@ async function cmdDiemdanh(message) {
 // =====================
 async function cmdTien(message) {
     const userId = message.author.id;
-    await db.read(); // Đọc dữ liệu từ DB
-    db.data.users[userId] ||= { money: 0, xu: 0, debt: 0 }; // Khởi tạo nếu chưa có dữ liệu người dùng
+    await db.read(); 
 
-    const user = db.data.users[userId];
-    const currentMoney = user.money || 0; // Tiền
-    const currentXu = user.xu || 0;       // Xu
-    const userDebt = user.debt || 0;       // Nợ
-
-    // Trả về số tiền và xu hiện tại của người dùng
-    let replyText = `💰 Hiện tại bạn có **${currentMoney} tiền** và **${currentXu} xu**.`;
-    if (userDebt > 0) {
-        replyText += `\n⚠️ Bạn đang nợ bot **${userDebt} xu**.`;
+    // Kiểm tra và khởi tạo dữ liệu (Thay cho toán tử ||=)
+    if (!db.data.users) db.data.users = {}; // Đảm bảo object users tồn tại
+    if (!db.data.users[userId]) {
+        db.data.users[userId] = { money: 0, xu: 0, debt: 0 };
     }
 
-    message.reply(replyText); // Chỉ gọi 1 lần
+    const user = db.data.users[userId];
+    const currentMoney = user.money || 0;
+    const currentXu = user.xu || 0;
+    const userDebt = user.debt || 0;
+
+    let replyText = `💰 Hiện tại bạn có **${currentMoney.toLocaleString()} tiền** và **${currentXu.toLocaleString()} xu**.`;
+    if (userDebt > 0) {
+        replyText += `\n⚠️ Bạn đang nợ bot **${userDebt.toLocaleString()} xu**.`;
+    }
+
+    message.reply(replyText);
 }
 
 
