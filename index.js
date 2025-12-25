@@ -1092,8 +1092,6 @@ function checkSpecialHand(hand) {
     return null;
 }
 
-let blackjackSession = {};
-
 // --- LỆNH CHÍNH (!xidach) ---
 async function cmdXidach(message, args) {
     if (args.length < 1) return message.reply("💡 Cách dùng: `!xidach <số tiền>`");
