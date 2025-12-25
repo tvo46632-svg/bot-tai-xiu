@@ -34,7 +34,10 @@ const db = new Low(adapter);
 // Initialize database with default structure
 async function initDB() {
     await db.read();
-    db.data ||= { users: {}, daily: {}, boctham: {} };
+    // Cách viết này an toàn 100%
+    if (!db.data) {
+        db.data = { users: {}, daily: {}, boctham: {} };
+    }
     await db.write();
 }
 
@@ -220,7 +223,7 @@ async function cmdTien(message) {
     // Kiểm tra và khởi tạo dữ liệu (Thay cho toán tử ||=)
     if (!db.data.users) db.data.users = {}; // Đảm bảo object users tồn tại
     if (!db.data.users[userId]) {
-        db.data.users[userId] = { money: 0, xu: 0, debt: 0 };
+        db.data.users[userId] = { money: 1000, xu: 100, debt: 0 };
     }
 
     const user = db.data.users[userId];
