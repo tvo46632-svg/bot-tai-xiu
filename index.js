@@ -1110,24 +1110,31 @@ async function cmdTralai(message, args) {
 } // <- Đóng cmdTralai
 
 // ==========================================
-//      HELP COMMAND (FIXED & OPTIMIZED)
+//      HELP COMMAND (BẢN FINAL FIX LỖI)
 // ==========================================
-async function cmdHelp(message) {
-    // Cấu hình
-    let timeLeft = 60; // Thời gian gốc
-    const cooldowns = new Map();
+const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } = require('discord.js');
 
-    // Hàm lấy Footer chuẩn (Chứa bộ đếm)
+async function cmdHelp(message) {
+    // --- 1. CẤU HÌNH & BIẾN ---
+    let timeLeft = 60; 
+    let timer = null; // Biến giữ bộ đếm để có thể tắt/bật linh hoạt
+    const cooldowns = new Map();
+    
+    // Lưu trạng thái hiện tại để bộ đếm biết đang ở trang nào mà vẽ lại
+    let currentView = 'h_home'; 
+    let currentUser = message.author; 
+
+    // --- 2. CÁC HÀM TẠO GIAO DIỆN (EMBED) ---
+
+    // Hàm tạo Footer thống nhất (Chứa đồng hồ)
     const getFooter = (seconds, user) => {
         return { 
-            text: `⏳ Tự hủy: ${seconds}s | 👤 ${user ? user.username : message.author.username}`, 
-            iconURL: user ? user.displayAvatarURL() : message.author.displayAvatarURL() 
+            text: `⏳ Tự đóng: ${seconds}s | 👤 ${user.username}`, 
+            iconURL: user.displayAvatarURL() 
         };
     };
 
-    // --- 1. CÁC HÀM TẠO EMBED (Tách ra cho gọn) ---
-    
-    // Trang chủ
+    // TRANG CHỦ (Đảm bảo có ảnh)
     const createHomeEmbed = (seconds) => {
         return new EmbedBuilder()
             .setTitle('🎰 TRUNG TÂM GIẢI TRÍ ROYAL 🎰')
@@ -1135,15 +1142,16 @@ async function cmdHelp(message) {
                 `Chào mừng **${message.author.username}**!\n` +
                 `Chọn danh mục bên dưới để xem hướng dẫn.\n\n` +
                 `> ⚠️ **Lưu ý:** Menu dành cho **tất cả mọi người**.\n` +
-                `> ⏱️ **Anti-Spam:** 5 giây/click.`
+                `> ⏱️ **Anti-Spam:** 3 giây/click.`
             )
-            .setImage('https://img.pikbest.com/origin/10/14/49/86dpIkbEsTcqF.jpg')
+            // Đảm bảo link ảnh sống, nếu link chết sẽ ko hiện. Thử link mặc định của Discord nếu cần test.
+            .setImage('https://img.pikbest.com/origin/10/14/49/86dpIkbEsTcqF.jpg') 
             .setColor('#FFD700')
-            .setFooter(getFooter(seconds)) // Đưa timer xuống Footer
+            .setFooter(getFooter(seconds, message.author))
             .setTimestamp();
     };
 
-    // Trang Kinh tế
+    // TRANG KINH TẾ
     const createEcoEmbed = (seconds, user) => {
         return new EmbedBuilder()
             .setTitle('💰 HỆ THỐNG TÀI CHÍNH')
@@ -1158,7 +1166,7 @@ async function cmdHelp(message) {
             .setFooter(getFooter(seconds, user));
     };
 
-    // Trang Game
+    // TRANG GAME
     const createGameEmbed = (seconds, user) => {
         return new EmbedBuilder()
             .setTitle('🎲 SẢNH CASINO')
@@ -1171,7 +1179,7 @@ async function cmdHelp(message) {
             .setFooter(getFooter(seconds, user));
     };
 
-    // Trang Bank
+    // TRANG BANK
     const createBankEmbed = (seconds, user) => {
         return new EmbedBuilder()
             .setTitle('🏦 NGÂN HÀNG & TÍN DỤNG')
@@ -1184,7 +1192,18 @@ async function cmdHelp(message) {
             .setFooter(getFooter(seconds, user));
     };
 
-    // --- 2. TẠO NÚT BẤM ---
+    // Hàm chọn Embed dựa trên ID nút
+    const getEmbedByView = (viewId, seconds, user) => {
+        switch (viewId) {
+            case 'h_home': return createHomeEmbed(seconds);
+            case 'h_eco': return createEcoEmbed(seconds, user);
+            case 'h_game': return createGameEmbed(seconds, user);
+            case 'h_bank': return createBankEmbed(seconds, user);
+            default: return createHomeEmbed(seconds);
+        }
+    };
+
+    // TẠO NÚT BẤM
     const getRow = (disabled = false) => {
         return new ActionRowBuilder().addComponents(
             new ButtonBuilder().setCustomId('h_home').setEmoji('🏠').setStyle(ButtonStyle.Secondary).setDisabled(disabled),
@@ -1194,96 +1213,86 @@ async function cmdHelp(message) {
         );
     };
 
-    // Gửi tin nhắn gốc
+    // --- 3. GỬI TIN NHẮN & KHỞI TẠO ---
     const helpMsg = await message.reply({ 
         embeds: [createHomeEmbed(timeLeft)], 
         components: [getRow()] 
     });
 
-    // --- 3. XỬ LÝ SỰ KIỆN ---
     const collector = helpMsg.createMessageComponentCollector({ 
         componentType: ComponentType.Button, 
-        time: 60000 // 60 giây gốc
+        time: 60000 // Thời gian sống tối đa của collector
     });
 
-    // Biến lưu trạng thái hiện tại để interval biết đang ở trang nào mà update
-    let currentView = 'h_home'; 
-    let currentUser = message.author; // Người vừa bấm nút cuối cùng
-
-    // --- BỘ ĐẾM GIỜ (Sửa lại logic update) ---
-    const timer = setInterval(async () => {
-        timeLeft -= 5; // Giảm 5s mỗi lần (check nhanh hơn chút cho mượt)
+    // --- 4. HÀM QUẢN LÝ ĐỒNG HỒ (QUAN TRỌNG) ---
+    const startTimer = () => {
+        // Xóa timer cũ nếu có để tránh chạy chồng chéo
+        if (timer) clearInterval(timer);
         
-        if (timeLeft <= 0) {
-            clearInterval(timer);
-            // Collector sẽ tự end do hết time hoặc ta stop tay ở dưới
-            return; 
-        }
-
-        try {
-            // Tự động xác định đang ở trang nào để update lại footer
-            let updateEmbed;
-            switch (currentView) {
-                case 'h_home': updateEmbed = createHomeEmbed(timeLeft); break;
-                case 'h_eco': updateEmbed = createEcoEmbed(timeLeft, currentUser); break;
-                case 'h_game': updateEmbed = createGameEmbed(timeLeft, currentUser); break;
-                case 'h_bank': updateEmbed = createBankEmbed(timeLeft, currentUser); break;
-                default: updateEmbed = createHomeEmbed(timeLeft);
-            }
+        timer = setInterval(async () => {
+            timeLeft -= 5;
             
-            // Chỉ edit nếu tin nhắn còn tồn tại
-            await helpMsg.edit({ embeds: [updateEmbed], components: [getRow()] });
-        } catch (e) {
-            // Nếu mất tin nhắn (bị xóa) thì dừng loop luôn
-            clearInterval(timer); 
-            collector.stop();
-        }
-    }, 5000); // Update mỗi 5 giây (15s hơi lâu khiến người dùng tưởng lag)
+            if (timeLeft <= 0) {
+                clearInterval(timer);
+                // Hết giờ -> Xóa tin nhắn hoặc Disable nút
+                try { await helpMsg.delete(); await message.delete(); } catch(e){}
+                return;
+            }
 
+            try {
+                // Update đồng hồ vào tin nhắn (sử dụng view hiện tại)
+                const updateEmbed = getEmbedByView(currentView, timeLeft, currentUser);
+                await helpMsg.edit({ embeds: [updateEmbed], components: [getRow()] });
+            } catch (e) {
+                clearInterval(timer); // Nếu tin nhắn bị xóa tay thì dừng timer
+            }
+        }, 5000);
+    };
+
+    // Bắt đầu đếm ngay khi gửi
+    startTimer();
+
+    // --- 5. XỬ LÝ SỰ KIỆN BẤM NÚT ---
     collector.on('collect', async i => {
-        // Check Cooldown
+        // A. NGẮT TIMER NGAY LẬP TỨC
+        // Để tránh việc timer edit tin nhắn trong lúc ta đang update -> Gây lỗi Interaction Failed
+        if (timer) clearInterval(timer);
+
+        // B. CHECK COOLDOWN
         const now = Date.now();
         const userCooldown = cooldowns.get(i.user.id);
-        const cooldownAmount = 3000; // Giảm xuống 3s cho đỡ khó chịu
+        const cooldownAmount = 3000; 
 
         if (userCooldown && (now < userCooldown + cooldownAmount)) {
-            return i.reply({ content: `🚫 Từ từ thôi bạn ơi! Đợi xíu.`, ephemeral: true });
+            // Nếu spam, bật lại timer rồi báo lỗi
+            startTimer();
+            return i.reply({ content: `🚫 Chậm lại chút bạn ơi!`, ephemeral: true });
         }
         cooldowns.set(i.user.id, now);
 
-        // Reset thời gian đếm ngược khi có người tương tác (Tính năng mới)
-        timeLeft = 60; 
-        currentView = i.customId; // Lưu lại trang hiện tại
-        currentUser = i.user; // Lưu người bấm
+        // C. CẬP NHẬT TRẠNG THÁI
+        timeLeft = 60; // Reset thời gian về 60s
+        currentView = i.customId; // Lưu trang hiện tại
+        currentUser = i.user; // Lưu người vừa bấm
 
-        // Xử lý chuyển trang
-        let newEmbed;
-        if (i.customId === 'h_home') newEmbed = createHomeEmbed(timeLeft);
-        else if (i.customId === 'h_eco') newEmbed = createEcoEmbed(timeLeft, i.user);
-        else if (i.customId === 'h_game') newEmbed = createGameEmbed(timeLeft, i.user);
-        else if (i.customId === 'h_bank') newEmbed = createBankEmbed(timeLeft, i.user);
-
-        await i.update({ embeds: [newEmbed], components: [getRow()] });
+        // D. CẬP NHẬT GIAO DIỆN (UPDATE)
+        const newEmbed = getEmbedByView(currentView, timeLeft, currentUser);
+        
+        try {
+            await i.update({ embeds: [newEmbed], components: [getRow()] });
+            // Update thành công thì mới chạy lại timer
+            startTimer();
+        } catch (e) {
+            console.log("Lỗi update:", e);
+            // Nếu lỗi thì cũng ráng chạy lại timer
+            startTimer();
+        }
     });
 
     collector.on('end', async () => {
-        clearInterval(timer);
-        try {
-            // Cách 1: Xóa luôn tin nhắn (như bạn muốn)
-            await helpMsg.delete();
-            await message.delete();
-            
-            // Cách 2 (Khuyên dùng): Disable nút và báo hết giờ (đỡ bị user hỏi sao mất tin nhắn)
-            /*
-            const disabledRow = getRow(true);
-            const endEmbed = EmbedBuilder.from(helpMsg.embeds[0])
-                .setFooter({ text: '❌ Menu đã hết hạn sử dụng' })
-                .setColor('#2c2f33');
-            await helpMsg.edit({ embeds: [endEmbed], components: [disabledRow] });
-            */
-        } catch (e) {
-            // Bỏ qua lỗi nếu tin nhắn đã bị xóa trước đó
-        }
+        if (timer) clearInterval(timer);
+        // Dọn dẹp cuối cùng nếu chưa xóa
+        try { await helpMsg.delete(); await message.delete(); } catch(e){}
     });
 }
 // ==========================================
