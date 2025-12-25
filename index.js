@@ -1851,7 +1851,6 @@ client.on('interactionCreate', async (interaction) => {
             await interaction.channel.send({ embeds: [finalEmbed] });
         }
     }
-}); // Đóng client.on
 // =====================
 // ham khoi tao nut !baicao
 // =====================
