@@ -867,7 +867,7 @@ async function cmdTop(message) {
     const embed = new EmbedBuilder()
         .setTitle("🏆 BẢNG XẾP HẠNG ĐẠI GIA SERVER")
         .setColor("#FFD700") // Màu vàng kim
-        .setThumbnail("https://i.imgur.com/k9vE873.png") // Có thể thay bằng icon vương miện
+        .setThumbnail("https://media.tenor.com/llloRI8QtkQAAAAi/money.gif") // Có thể thay bằng icon vương miện
         .setDescription("Tổng giá trị được tính bằng: `Tiền + Xu`")
         .setTimestamp();
 
@@ -1091,9 +1091,22 @@ function checkSpecialHand(hand) {
     return null;
 }
 
-// --- LỆNH CHÍNH (!xidach) ---
+// =============================================================================
+//  1. HÀM KIỂM TRA BÀI ĐẶC BIỆT (XÌ DÁCH / XÌ BÀN)
+// =============================================================================
+function checkSpecialHand(hand) {
+    if (hand.length !== 2) return null;
+    const values = hand.map(c => c.replace(/:/g, '').slice(0, -1));
+    const aceCount = values.filter(v => v === 'A').length;
+    if (aceCount === 2) return "XI_BAN";
+    if (aceCount === 1 && values.some(v => ['10', 'J', 'Q', 'K'].includes(v))) return "XI_DACH";
+    return null;
+}
+
+// =============================================================================
+//  2. LỆNH KHỞI TẠO !XIDACH (CÓ CHECK ĂN NGAY)
+// =============================================================================
 async function cmdXidach(message, args) {
-    if (args.length < 1) return message.reply("💡 Cách dùng: `!xidach <số tiền>`");
     const bet = parseInt(args[0]);
     if (isNaN(bet) || bet <= 0) return message.reply("❌ Số tiền không hợp lệ!");
 
@@ -1101,7 +1114,6 @@ async function cmdXidach(message, args) {
     if (user.money < bet) return message.reply("💸 Bạn không đủ tiền!");
     
     await subMoney(message.author.id, bet);
-    const currentUser = await getUser(message.author.id);
 
     const session = {
         userId: message.author.id,
@@ -1111,173 +1123,66 @@ async function cmdXidach(message, args) {
         msg: null
     };
 
-    // --- KIỂM TRA ĂN NGAY (XÌ BÀN / XÌ DÁCH) ---
-    const specialType = checkSpecialHand(session.playerHand);
-    if (specialType) {
-        let winAmount = bet * 3; // Nhận lại vốn + Thắng gấp đôi (x2)
-        let title = "";
-        
-        if (specialType === "XI_BAN") title = "✨ XÌ BÀN (2 XÌ) ✨";
-        else title = "✨ XÌ DÁCH ✨";
+    // --- CHECK ĂN NGAY ---
+    const special = checkSpecialHand(session.playerHand);
+    const dealerSpecial = checkSpecialHand(session.dealerHand);
 
-        await addMoney(message.author.id, winAmount);
+    if (special || dealerSpecial) {
+        let msg = "", winAmount = 0, color = "#e67e22";
+        
+        if (special && dealerSpecial) {
+            msg = "⚖️ **HÒA!** Cả hai cùng có bài đặc biệt.";
+            winAmount = bet;
+        } else if (special) {
+            msg = `🔥 **${special === "XI_BAN" ? "XÌ BÀN" : "XÌ DÁCH"}!** Bạn thắng gấp đôi.`;
+            winAmount = bet * 3;
+            color = "#2ecc71";
+        } else {
+            msg = "💀 **NHÀ CÁI XÌ DÁCH!** Bạn đã thua.";
+            winAmount = 0;
+            color = "#ff4d4d";
+        }
+
+        if (winAmount > 0) await addMoney(message.author.id, winAmount);
         const finalUser = await getUser(message.author.id);
 
         const winEmbed = new EmbedBuilder()
-            .setTitle(`🎉 ${title} - THẮNG GẤP ĐÔI!`)
-            .setColor("#e67e22") // Màu vàng cam
-            .setThumbnail(cardToImageUrl(session.playerHand[0]))
+            .setTitle("🃏 KẾT QUẢ XÌ DÁCH")
+            .setColor(color)
             .addFields(
-                { name: `👤 Bài bạn`, value: `${formatHandWithImages(session.playerHand)}`, inline: false },
-                { name: `🤖 Nhà cái`, value: `${formatHandWithImages(session.dealerHand)}`, inline: false }
+                { name: `👤 Bạn`, value: formatHandWithImages(session.playerHand), inline: false },
+                { name: `🤖 Nhà cái`, value: formatHandWithImages(session.dealerHand), inline: false }
             )
-            .setDescription(`Bạn có **${title}**! Ăn trọn **${winAmount.toLocaleString()}** 💰`)
-            .setFooter({ text: `💰 Số dư mới: ${finalUser.money.toLocaleString()}` });
+            .setDescription(`${msg}\n💰 Ví: **${finalUser.money.toLocaleString()}**`);
 
         return message.channel.send({ embeds: [winEmbed] });
     }
-    // --- NẾU KHÔNG CÓ GÌ ĐẶC BIỆT THÌ CHƠI TIẾP ---
 
+    // --- CHƠI TIẾP ---
     const embed = new EmbedBuilder()
         .setTitle("🃏 SÒNG BÀI XÌ DÁCH")
         .setColor("#2f3136")
-        .setThumbnail(cardToImageUrl(session.playerHand[0]))
         .addFields(
-            { name: `👤 Bạn (${calcPoint(session.playerHand)})`, value: `${formatHandWithImages(session.playerHand)}`, inline: false },
-            { name: `🤖 Nhà cái`, value: `${formatHandWithImages(session.dealerHand, true)}`, inline: false }
+            { name: `👤 Bạn (${calcPoint(session.playerHand)})`, value: formatHandWithImages(session.playerHand), inline: false },
+            { name: `🤖 Nhà cái`, value: formatHandWithImages(session.dealerHand, true), inline: false }
         )
-        .setDescription(`💵 Tiền cược: **${bet.toLocaleString()}**`)
-        .setFooter({ text: `💰 Số dư: ${currentUser.money.toLocaleString()} | Đang chờ bạn...` });
+        .setFooter({ text: "Sử dụng các nút bên dưới để chơi" });
 
     const row = new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setCustomId(`hit_${message.author.id}`).setLabel("Rút Bài").setEmoji("➕").setStyle(ButtonStyle.Primary),
-        new ButtonBuilder().setCustomId(`stand_${message.author.id}`).setLabel("Dằn Bài").setEmoji("🛑").setStyle(ButtonStyle.Secondary)
+        new ButtonBuilder().setCustomId(`hit_${message.author.id}`).setLabel("Rút Bài").setStyle(ButtonStyle.Primary),
+        new ButtonBuilder().setCustomId(`stand_${message.author.id}`).setLabel("Dằn Bài").setStyle(ButtonStyle.Secondary)
     );
 
     session.msg = await message.channel.send({ embeds: [embed], components: [row] });
     blackjackSession[message.channel.id] = session;
-}
-// --- NGU LINH ---
-function calcPoint(hand) {
-    let score = 0;
-    let aces = 0;
-    for (let card of hand) {
-        let val = card.replace(/:/g, '').slice(0, -1);
-        if (val === 'A') { aces++; score += 11; }
-        else if (['J', 'Q', 'K', '10'].includes(val)) { score += 10; }
-        else { score += parseInt(val); }
-    }
-    while (score > 21 && aces > 0) { score -= 10; aces--; }
-    return score;
-}   
 
-client.on("interactionCreate", async (interaction) => {
-    if (!interaction.isButton()) return;
-    
-    const [action, userId] = interaction.customId.split("_");
-    if (!["hit", "stand"].includes(action)) return;
-
-    const session = blackjackSession[interaction.channelId];
-    if (!session) return interaction.reply({ content: "❌ Phiên đã kết thúc.", ephemeral: true });
-    if (interaction.user.id !== userId) return interaction.reply({ content: "🚫 Đây không phải ván bài của bạn!", ephemeral: true });
-
-    try {
-        if (action === "hit") {
-            session.playerHand.push(dealCard());
-            const total = calcPoint(session.playerHand);
-            const isNgulinh = session.playerHand.length === 5 && total <= 21;
-            const isQuac = total > 21;
-
-            if (isNgulinh || isQuac) {
-                let winAmount = isNgulinh ? session.bet * 3 : 0;
-                if (winAmount > 0) await addMoney(userId, winAmount);
-
-                const finalEmbed = EmbedBuilder.from(interaction.message.embeds[0])
-                    .setColor(isNgulinh ? "#9b59b6" : "#ff4d4d")
-                    .setFields(
-                        { name: `👤 Bạn (${total}) ${isNgulinh ? "- ✨ NGŨ LINH ✨" : "- QUẮC!"}`, value: formatHandWithImages(session.playerHand), inline: false },
-                        { name: `🤖 Nhà cái`, value: formatHandWithImages(session.dealerHand, !isQuac), inline: false }
-                    )
-                    .setDescription(isNgulinh ? `🔥 **NGŨ LINH!** Bạn ăn **${winAmount.toLocaleString()}**!` : `❌ **QUẮC!** Bạn thua **${session.bet.toLocaleString()}**!`);
-
-                await interaction.update({ embeds: [finalEmbed], components: [] });
-                return finishGame(interaction.channelId);
-            }
-
-            // Chưa kết thúc, cập nhật bài bình thường
-            await interaction.update({
-                embeds: [EmbedBuilder.from(interaction.message.embeds[0]).setFields(
-                    { name: `👤 Bạn (${total})`, value: formatHandWithImages(session.playerHand), inline: false },
-                    { name: `🤖 Nhà cái`, value: formatHandWithImages(session.dealerHand, true), inline: false }
-                )]
-            });
+    // Tự động hủy sau 1 phút nếu treo máy
+    setTimeout(() => {
+        if (blackjackSession[message.channel.id]) {
+            delete blackjackSession[message.channel.id];
+            session.msg.edit({ components: [] }).catch(() => {});
         }
-
-        if (action === "stand") {
-            await interaction.deferUpdate();
-            let dealerHand = session.dealerHand;
-
-            while (calcPoint(dealerHand) < 17) {
-                dealerHand.push(dealCard());
-                await interaction.editReply({
-                    embeds: [EmbedBuilder.from(interaction.message.embeds[0]).setFields(
-                        { name: `👤 Bạn (${calcPoint(session.playerHand)})`, value: formatHandWithImages(session.playerHand), inline: false },
-                        { name: `🤖 Nhà cái (${calcPoint(dealerHand)})`, value: formatHandWithImages(dealerHand), inline: false }
-                    ).setFooter({ text: "🤖 Nhà cái đang rút bài..." })]
-                });
-                await sleep(1200);
-            }
-
-            const pTotal = calcPoint(session.playerHand), dTotal = calcPoint(dealerHand);
-            let result = { text: "", color: "#e74c3c", win: 0 };
-
-            if (dTotal > 21 || pTotal > dTotal) {
-                result = { text: `🎉 **THẮNG!** Nhận +${session.bet.toLocaleString()}`, color: "#2ecc71", win: session.bet * 2 };
-            } else if (pTotal === dTotal) {
-                result = { text: `⚖️ **HÒA!** Hoàn lại ${session.bet.toLocaleString()}`, color: "#f1c40f", win: session.bet };
-            } else {
-                result.text = `❌ **THUA!** Mất ${session.bet.toLocaleString()}`;
-            }
-
-            if (result.win > 0) await addMoney(userId, result.win);
-            const userData = await getUser(userId);
-
-            await interaction.editReply({
-                embeds: [EmbedBuilder.from(interaction.message.embeds[0])
-                    .setColor(result.color)
-                    .setFields(
-                        { name: `👤 Bạn (${pTotal})`, value: formatHandWithImages(session.playerHand), inline: false },
-                        { name: `🤖 Nhà cái (${dTotal})`, value: formatHandWithImages(dealerHand), inline: false }
-                    )
-                    .setDescription(`${result.text}\n💵 Số dư: **${userData.money.toLocaleString()}**`)
-                ], components: []
-            });
-            finishGame(interaction.channelId);
-        }
-    } catch (e) {
-        console.error("Lỗi Xì Dách:", e);
-    }
-});
-//---- LENH XOA SAU KHI HET VAN ----
-
-function finishGame(channelId) {
-    const session = blackjackSession[channelId];
-    if (!session) return; // Nếu không có ván nào thì thoát luôn
-
-    // Lưu lại tin nhắn vào một biến tạm để xóa sau
-    const msgToDelete = session.msg;
-
-    if (msgToDelete && typeof msgToDelete.delete === 'function') {
-        setTimeout(() => {
-            msgToDelete.delete().catch(err => {
-                // Chỉ log lỗi nếu không phải lỗi "Tin nhắn không tồn tại"
-                if (err.code !== 10008) console.error("Không thể xóa mess Xì Dách:", err.message);
-            });
-        }, 20000); // 20 giây
-    }
-
-    // Xóa session ngay lập tức để giải phóng bộ nhớ và cho phép ván mới bắt đầu
-    delete blackjackSession[channelId];
+    }, 60000);
 }
 
 
@@ -1557,9 +1462,9 @@ async function cmdHelp(message) {
     });
 }
 
-    
+
 // =============================================================================
-//                 PHỄU TỔNG INTERACTION (ĐÃ FIX NGOẶC & TỰ XÓA TIN NHẮN)
+//                  PHỄU TỔNG INTERACTION (HOÀN CHỈNH 100%)
 // =============================================================================
 
 client.on('interactionCreate', async (interaction) => {
@@ -1567,109 +1472,105 @@ client.on('interactionCreate', async (interaction) => {
         if (!interaction.isButton()) return;
 
         const xidachSession = blackjackSession[interaction.channelId];
-        const baicaoSession = activeGames.get(interaction.channelId); // Lấy session bài cào từ Map của bạn
+        const baicaoSession = activeGames.get(interaction.channelId);
 
         // --- A. XỬ LÝ XÌ DÁCH ---
         if (interaction.customId.startsWith('hit_') || interaction.customId.startsWith('stand_')) {
+            if (!interaction.deferred && !interaction.replied) await interaction.deferUpdate().catch(() => {});
+
             const [action, userId] = interaction.customId.split("_");
-
-            if (!interaction.deferred && !interaction.replied) {
-                await interaction.deferUpdate().catch(() => {});
-            }
-
-            if (!xidachSession) return interaction.followUp({ content: "❌ Ván này đã kết thúc.", flags: [64] });
-            if (interaction.user.id !== userId) return interaction.followUp({ content: "🚫 Không phải bài của bạn!", flags: [64] });
+            if (!xidachSession) return interaction.followUp({ content: "❌ Ván đã kết thúc.", flags: [64] }).catch(() => {});
+            if (interaction.user.id !== userId) return interaction.followUp({ content: "🚫 Không phải bài bạn!", flags: [64] }).catch(() => {});
 
             if (action === "hit") {
                 xidachSession.playerHand.push(dealCard());
                 const total = calcPoint(xidachSession.playerHand);
 
-                if (xidachSession.playerHand.length === 5 && total <= 21) {
-                    const winAmount = xidachSession.bet * 3;
-                    await addMoney(userId, winAmount);
+                if ((xidachSession.playerHand.length === 5 && total <= 21) || total > 21) {
+                    let desc = total > 21 ? `❌ **QUẮC!** Bạn thua.` : `🔥 **NGŨ LINH!** Bạn thắng lớn.`;
+                    if (total <= 21) await addMoney(userId, xidachSession.bet * 3);
                     delete blackjackSession[interaction.channelId];
-                    return interaction.editReply({
-                        embeds: [EmbedBuilder.from(interaction.message.embeds[0]).setColor("#9b59b6").setFields(
-                            { name: `👤 Bạn (${total}) - ✨ NGŨ LINH ✨`, value: formatHandWithImages(xidachSession.playerHand), inline: false },
-                            { name: `🤖 Nhà cái`, value: formatHandWithImages(xidachSession.dealerHand), inline: false }
-                        ).setDescription(`🔥 **NGŨ LINH!** Bạn thắng **${winAmount.toLocaleString()}**!`)],
-                        components: []
-                    }).catch(() => {});
-                }
 
-                if (total > 21) {
-                    delete blackjackSession[interaction.channelId];
-                    return interaction.editReply({
-                        embeds: [EmbedBuilder.from(interaction.message.embeds[0]).setColor("#ff4d4d").setFields(
-                            { name: `👤 Bạn (${total}) - QUẮC!`, value: formatHandWithImages(xidachSession.playerHand), inline: false },
+                    await interaction.editReply({
+                        embeds: [EmbedBuilder.from(interaction.message.embeds[0]).setColor(total > 21 ? "#ff4d4d" : "#9b59b6").setFields(
+                            { name: `👤 Bạn (${total})`, value: formatHandWithImages(xidachSession.playerHand), inline: false },
                             { name: `🤖 Nhà cái`, value: formatHandWithImages(xidachSession.dealerHand), inline: false }
-                        ).setDescription(`❌ **QUẮC!** Bạn thua **${xidachSession.bet.toLocaleString()}**!`)],
-                        components: []
+                        ).setDescription(desc)], components: []
                     }).catch(() => {});
+                    
+                    return setTimeout(() => interaction.deleteReply().catch(() => {}), 15000);
                 }
 
                 return interaction.editReply({
                     embeds: [EmbedBuilder.from(interaction.message.embeds[0]).setFields(
                         { name: `👤 Bạn (${total})`, value: formatHandWithImages(xidachSession.playerHand), inline: false },
                         { name: `🤖 Nhà cái`, value: formatHandWithImages(xidachSession.dealerHand, true), inline: false }
-                    )],
-                    components: [interaction.message.components[0]]
+                    )]
                 }).catch(() => {});
             }
 
             if (action === "stand") {
                 let dealerHand = xidachSession.dealerHand;
-                delete blackjackSession[interaction.channelId];
+                delete blackjackSession[interaction.channelId]; // Xóa session ngay để tránh bấm nhiều lần
 
+                // Nhà cái rút bài cho đến khi >= 17 điểm
                 while (calcPoint(dealerHand) < 17) {
                     dealerHand.push(dealCard());
                     await interaction.editReply({
                         embeds: [EmbedBuilder.from(interaction.message.embeds[0]).setFields(
                             { name: `👤 Bạn (${calcPoint(xidachSession.playerHand)})`, value: formatHandWithImages(xidachSession.playerHand), inline: false },
                             { name: `🤖 Nhà cái (${calcPoint(dealerHand)})`, value: formatHandWithImages(dealerHand), inline: false }
-                        )],
-                        components: []
+                        )]
                     }).catch(() => {});
-                    await new Promise(res => setTimeout(res, 1200));
+                    await new Promise(res => setTimeout(res, 1000));
                 }
-
+                
+                // --- LOGIC TÍNH ĐIỂM (Đã lồng vào đúng vị trí) ---
                 const pP = calcPoint(xidachSession.playerHand);
                 const dP = calcPoint(dealerHand);
                 let msg = "", col = "#f1c40f";
 
                 if (dP > 21 || pP > dP) {
                     await addMoney(userId, xidachSession.bet * 2);
-                    msg = `🎉 **THẮNG!** +\`${xidachSession.bet.toLocaleString()}\``; col = "#2ecc71";
+                    msg = `🎉 **THẮNG!** Bạn nhận được **${(xidachSession.bet * 2).toLocaleString()}**`; 
+                    col = "#2ecc71";
                 } else if (pP === dP) {
                     await addMoney(userId, xidachSession.bet);
-                    msg = `⚖️ **HÒA!** Hoàn tiền.`;
+                    msg = `⚖️ **HÒA!** Hoàn lại tiền cược.`;
                 } else {
-                    msg = `❌ **THUA!**`; col = "#e74c3c";
+                    msg = `❌ **THUA!** Chúc bạn may mắn lần sau.`; 
+                    col = "#e74c3c";
                 }
 
-                const u = await getUser(userId);
-                return interaction.editReply({
+                const userFinal = await getUser(userId);
+                await interaction.editReply({
                     embeds: [EmbedBuilder.from(interaction.message.embeds[0]).setColor(col).setFields(
                         { name: `👤 Bạn (${pP})`, value: formatHandWithImages(xidachSession.playerHand), inline: false },
                         { name: `🤖 Nhà cái (${dP})`, value: formatHandWithImages(dealerHand), inline: false }
-                    ).setDescription(`${msg}\n💰 Ví: **${u.money.toLocaleString()}**`)],
+                    ).setDescription(`${msg}\n💰 Ví: **${userFinal.money.toLocaleString()}**`)],
                     components: []
                 }).catch(() => {});
+                
+                return setTimeout(() => interaction.deleteReply().catch(() => {}), 15000);
             }
         }
 
         // --- B. XỬ LÝ BÀI CÀO ---
         if (['join_baicao', 'view_hand', 'flip_hand'].includes(interaction.customId)) {
-            if (!baicaoSession) return interaction.reply({ content: "⚠️ Ván không tồn tại.", flags: [64] });
+            if (interaction.customId !== 'view_hand') {
+                if (!interaction.deferred && !interaction.replied) await interaction.deferUpdate().catch(() => {});
+            }
+
+            if (!baicaoSession) {
+                const method = interaction.deferred ? 'followUp' : 'reply';
+                return interaction[method]({ content: "⚠️ Ván không tồn tại.", flags: [64] }).catch(() => {});
+            }
 
             if (interaction.customId === 'join_baicao') {
-                if (baicaoSession.status !== 'joining') return interaction.reply({ content: "❌ Hết giờ!", flags: [64] });
-                if (baicaoSession.players.some(p => p.id === interaction.user.id)) return interaction.reply({ content: "Bạn đã vào rồi!", flags: [64] });
-
+                if (baicaoSession.status !== 'joining') return;
                 const pD = await getUser(interaction.user.id);
-                if (!pD || pD.money < baicaoSession.bet) return interaction.reply({ content: "💸 Hết tiền!", flags: [64] });
+                if (!pD || pD.money < baicaoSession.bet) return interaction.followUp({ content: "💸 Hết tiền!", flags: [64] }).catch(() => {});
 
-                await interaction.deferUpdate().catch(() => {});
                 await subMoney(interaction.user.id, baicaoSession.bet);
                 baicaoSession.players.push({ id: interaction.user.id, name: interaction.user.username, hand: [], revealed: false });
 
@@ -1680,26 +1581,23 @@ client.on('interactionCreate', async (interaction) => {
 
             if (baicaoSession.status === 'playing') {
                 const player = baicaoSession.players.find(p => p.id === interaction.user.id);
-                if (!player) return interaction.reply({ content: "Bạn không chơi!", flags: [64] });
+                if (!player) return interaction.reply({ content: "Bạn không chơi!", flags: [64] }).catch(() => {});
 
                 if (interaction.customId === 'view_hand') {
                     const info = getHandInfo(player.hand);
-                    return interaction.reply({ content: `👀 Bài: ${formatHand(player.hand)} (${info.isBaTay ? "🔥 BA TÂY" : `${info.score} nút`})`, flags: [64] });
+                    return interaction.reply({ content: `👀 Bài: ${formatHand(player.hand)} (${info.isBaTay ? "🔥 BA TÂY" : `${info.score} nút`})`, flags: [64] }).catch(() => {});
                 }
 
                 if (interaction.customId === 'flip_hand') {
-                    if (player.revealed) return interaction.reply({ content: "Ngửa rồi!", flags: [64] });
-                    await interaction.deferUpdate().catch(() => {});
+                    if (player.revealed) return; 
                     player.revealed = true;
 
-                    // Thông báo ngửa bài và tự xóa sau 5 giây
                     await interaction.channel.send(`🔓 **${player.name}** đã ngửa bài!`).then(m => {
                         setTimeout(() => m.delete().catch(() => {}), 5000);
-                    });
+                    }).catch(() => {});
 
                     if (baicaoSession.players.every(p => p.revealed)) {
                         await finishBaicao(interaction.channel, baicaoSession);
-                        // Xóa tin nhắn chính (chứa các nút bấm) sau 10s khi ván đấu kết thúc
                         setTimeout(() => {
                             interaction.message.delete().catch(() => {});
                         }, 10000);
@@ -1711,8 +1609,6 @@ client.on('interactionCreate', async (interaction) => {
         console.error("Lỗi Interaction tổng:", e);
     }
 });
-
-
 
 
     
@@ -1755,14 +1651,20 @@ client.on('interactionCreate', async (interaction) => {
 
             gameState.tableMsg = await message.channel.send({ embeds: [embed], components: [row] }); // Lưu lại để xóa sau này
 
-            setTimeout(() => {
-                if (gameState.tableMsg) gameState.tableMsg.edit({ components: [] }).catch(() => { });
-                const game = activeGames.get(message.channel.id);
-                if (game && game.status === 'joining') {
-                    if (game.players.length >= 1) startDealing(message.channel, game);
-                    else activeGames.delete(message.channel.id);
-                }
-            }, 30000);
+           setTimeout(() => {
+    if (gameState.tableMsg) gameState.tableMsg.edit({ components: [] }).catch(() => { });
+    const game = activeGames.get(message.channel.id);
+    if (game && game.status === 'joining') {
+        // Nếu chỉ có 1 người (chủ bàn) thì hủy ván, trả lại tiền
+        if (game.players.length > 1) { 
+            startDealing(message.channel, game);
+        } else {
+            addMoney(game.ownerId, game.bet); // Trả lại tiền cược cho chủ bàn
+            message.channel.send("📭 Ván bài bị hủy vì không có đủ người tham gia!");
+            activeGames.delete(message.channel.id);
+        }
+    }
+}, 30000);
         }
 
         // =====================
