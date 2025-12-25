@@ -953,11 +953,10 @@ const cardEmojis = {
 // 2. Thay đổi hàm format để dùng Emoji
 function formatHandWithImages(hand, isHidden = false) {
     if (isHidden) { 
-        return `${cardEmojis['🂠']} ${cardEmojis[hand[1]] || hand[1]}`;
+        return `🂠 ${hand[1]}`; // Giữ lá bài úp và hiện lá thứ 2 bằng chữ + emoji
     }
-    return hand.map(card => cardEmojis[card] || card).join(" ");
+    return hand.join(" "); // Trả về dạng: A♠️ 10♥️ (Sẽ có màu đỏ/đen)
 }
-
 // Nếu bạn muốn dùng Emoji (cần phải upload lên server và có ID)
 // const emojiMap = {
 //     "A♠️": "<:A_spade:ID_EMOJI>",
