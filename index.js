@@ -702,11 +702,19 @@ for (const userId in allBets) {
 async function cmdBoctham(message) {
     await db.read();
     const userId = message.author.id;
+
+    // PHẢI CÓ DÒNG NÀY ĐỂ TRÁNH LỖI "undefined"
+    if (!db.data.boctham) db.data.boctham = {}; 
+    
     db.data.boctham[userId] ||= { lastDate: 0, count: 0 };
     const info = db.data.boctham[userId];
 
     const today = new Date().toISOString().slice(0, 10);
-    if (info.lastDate !== today) { info.lastDate = today; info.count = 3; }
+    if (info.lastDate !== today) { 
+        info.lastDate = today; 
+        info.count = 3; 
+    }
+
     if (info.count <= 0) return message.reply("> ❌ Bạn đã hết lượt bốc thăm hôm nay!");
 
     const user = await getUser(userId);
@@ -714,7 +722,6 @@ async function cmdBoctham(message) {
 
     await subMoney(userId, 200);
     info.count--;
-}
 
     // 1. Tính toán phần thưởng
     const rand = Math.random() * 100;
@@ -746,7 +753,11 @@ async function cmdBoctham(message) {
 
     const statusText = reward >= 0 ? `Nhận: **+${reward.toLocaleString()}**` : `Mất: **${reward.toLocaleString()}**`;
     return await msg.edit(`### ${tier.emoji} HỘP QUÀ ${tier.name} ${tier.emoji}\n> ${tier.color} ${statusText} tiền\n> 🎫 Còn lại: \`${info.count}\` lượt`);
-}
+} // <--- CHỈ CÓ 1 DẤU NGOẶC DUY NHẤT Ở CUỐI NÀY THÔI!
+
+
+
+
 // ===================== CHUYỂN TIỀN =====================
 async function cmdChuyentien(message, args) {
     const userId = message.author.id;
