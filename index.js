@@ -1542,7 +1542,7 @@ async function startDealing(channel, game) {
     game.status = 'playing';
     const deck = createDeck();
     
-    // Chia bài cho Bot và Người chơi
+    // 1. Chia bài
     game.botHand = [deck.pop(), deck.pop(), deck.pop()];
     for (let player of game.players) {
         player.hand = [deck.pop(), deck.pop(), deck.pop()];
@@ -1551,37 +1551,7 @@ async function startDealing(channel, game) {
     await channel.send(`${cardEmojis[':back:']} **Hết giờ cược! Nhà cái đang chia bài...**`);
     await new Promise(r => setTimeout(r, 2000));
 
-    // --- ĐOẠN NÀY LÀ P2: HIỂN THỊ BÀN CHƠI ---
-    const CARD_ICONS = ["🟦", "🟥", "🟩", "🟨", "🟧", "🟪", "🟫", "⬛", "⬜", "🔘"];
-    const embed = new EmbedBuilder()
-        .setTitle("🃏 BÀN BÀI CÀO CHUYÊN NGHIỆP")
-        .setColor('#2b2d31')
-        .setDescription(
-            "✅ **Tất cả bài đã được chia úp!**\n\n" +
-            game.players.map((p, idx) => `${CARD_ICONS[idx] || "👤"} **${p.name}**: ${cardEmojis[':back:']} ${cardEmojis[':back:']} ${cardEmojis[':back:']}`).join('\n')
-        )
-        .setFooter({ text: "Bạn có 60 giây để ngửa bài!" });
-
-    const row = new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setCustomId('view_hand').setLabel('Xem Bài').setStyle(ButtonStyle.Secondary).setEmoji('👀'),
-        new ButtonBuilder().setCustomId('flip_hand').setLabel('Ngửa Bài').setStyle(ButtonStyle.Success).setEmoji('🖐️')
-    );
-
-    // Gửi tin nhắn bàn bài
-    game.tableMsg = await channel.send({ embeds: [embed], components: [row] });
-
-    // --- AUTO-FLIP (CHỐNG TREO SÒNG) ---
-    game.autoFlipTimer = setTimeout(async () => {
-        const checkGame = activeGames.get(channel.id);
-        if (checkGame && checkGame.status === 'playing') {
-            checkGame.players.forEach(p => p.revealed = true);
-            await channel.send("⏰ **Hết giờ!** Nhà cái tự động thu bài.");
-            await finishBaicao(channel, checkGame); // Hàm tổng kết
-        }
-    }, 60000); 
-}
-
-    // --- (Phần hiển thị bàn chơi giống code cũ) ---
+    // 2. Thiết lập giao diện bàn chơi (Chỉ khai báo 1 lần)
     const CARD_ICONS = ["🟦", "🟥", "🟩", "🟨", "🟧", "🟪", "🟫", "⬛", "⬜", "🔘"];
     
     const embed = new EmbedBuilder()
@@ -1596,22 +1566,26 @@ async function startDealing(channel, game) {
                 return `${CARD_ICONS[idx] || "👤"} **${p.name}**: ${cardEmojis[':back:']} ${cardEmojis[':back:']} ${cardEmojis[':back:']}`;
             }).join('\n')
         )
-        .setFooter({ text: "Lưu ý: Bạn chỉ được bấm Ngửa Bài 1 lần." });
+        .setFooter({ text: "⚠️ Bạn có 60 giây để Ngửa Bài!" });
 
     const row = new ActionRowBuilder().addComponents(
         new ButtonBuilder().setCustomId('view_hand').setLabel('Xem Bài').setStyle(ButtonStyle.Secondary).setEmoji('👀'),
         new ButtonBuilder().setCustomId('flip_hand').setLabel('Ngửa Bài').setStyle(ButtonStyle.Success).setEmoji('🖐️')
     );
 
-    // Gửi bàn chơi và lưu tin nhắn để xóa sau này
+    // 3. Gửi bàn chơi
     game.tableMsg = await channel.send({ embeds: [embed], components: [row] });
 
-    // Dọn dẹp sòng sau 5 phút nếu bị treo (quên bấm nút)
-    setTimeout(() => {
-        if (activeGames.has(channel.id)) activeGames.delete(channel.id);
-    }, 30000); 
+    // 4. Bộ đếm tự động (Thay thế cho cái 5 phút cũ)
+    game.autoFlipTimer = setTimeout(async () => {
+        const checkGame = activeGames.get(channel.id);
+        if (checkGame && checkGame.status === 'playing') {
+            checkGame.players.forEach(p => p.revealed = true);
+            await channel.send("⏰ **Hết giờ!** Nhà cái tự động thu bài và tổng kết.");
+            await finishBaicao(channel, checkGame); 
+        }
+    }, 60000); // 60 giây tự lật
 }
-
 // --- [MỚI] 6. HÀM TẠO GAME & ĐẾM NGƯỢC (Dùng hàm này trong lệnh chat) ---
 async function startGameWithTimer(interaction, betAmount) {
     const channelId = interaction.channelId;
@@ -1921,9 +1895,10 @@ async function finishBaicao(channel, game) {
         const pDB = await getUser(p.id);
         
         if (pDB) {
-            // CỘNG THẲNG VÀO VÍ: result.receive đã bao gồm (vốn + lãi) nếu thắng
+            // Cộng tiền (Vốn + Lãi) vào ví
             pDB.money += result.receive;
-            summaryList += `👤 **${p.name}**\n   └ Kết quả: ${result.msg}\n   💰 Ví hiện tại: **${pDB.money.toLocaleString()}**\n\n`;
+            // Dùng template literal (dấu huyền) để tránh lỗi ký tự lạ
+            summaryList += `👤 **${p.name}**\n└ Kết quả: ${result.msg}\n💰 Ví: **${pDB.money.toLocaleString()}**\n\n`;
         }
     }
     await db.write();
@@ -1931,8 +1906,8 @@ async function finishBaicao(channel, game) {
     // 2. BẢNG KẾT QUẢ SIÊU ĐẸP
     const finalEmbed = new EmbedBuilder()
         .setTitle("🏁 KẾT QUẢ VÁN BÀI CÀO")
-        .setColor("#FFD700") // Màu vàng Gold chuyên nghiệp
-        .setThumbnail("https://i.imgur.com/89S9OQ3.png") // Icon bộ bài
+        .setColor("#FFD700")
+        .setThumbnail("https://i.imgur.com/89S9OQ3.png")
         .addFields(
             { 
                 name: "🏰 NHÀ CÁI (BOT)", 
