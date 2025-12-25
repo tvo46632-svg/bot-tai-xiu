@@ -1237,6 +1237,8 @@ async function startDealing(channel, game) {
         await new Promise(r => setTimeout(r, 1200));
         await dealMsg.delete().catch(() => {});
     }
+    // ĐỊNH NGHĨA 10 ICON MÀU SẮC
+    const CARD_ICONS = ["🟦", "🟥", "🟩", "🟨", "🟧", "🟪", "🟫", "⬛", "⬜", "🔘"];
 
     // Gửi bàn bài công khai
     const embed = new EmbedBuilder()
@@ -1246,7 +1248,7 @@ async function startDealing(channel, game) {
             "👉 Bấm **Xem Bài** để xem bài riêng.\n" +
             "👉 Bấm **Ngửa Bài** để công khai kết quả.\n\n" +
             "**Danh sách tụ bài:**\n" + 
-            game.players.map(p => `👤 **${p.name}**: 🎴 🎴 🎴`).join('\n')
+           game.players.map((p, idx) => `${CARD_ICONS[idx] || "👤"} **${p.name}**: 🎴 🎴 🎴`).join('\n')
         )
         .setColor('#2b2d31')
         .setFooter({ text: "Lưu ý: Nút Ngửa Bài sẽ delay 2 giây." });
@@ -1256,7 +1258,7 @@ async function startDealing(channel, game) {
         new ButtonBuilder().setCustomId('flip_hand').setLabel('Ngửa Bài').setStyle(ButtonStyle.Primary).setEmoji('🖐️')
     );
 
-    await channel.send({ embeds: [embed], components: [row] });
+    game.tableMsg = await channel.send({ embeds: [embed], components: [row] });
 
     // Dọn dẹp sòng sau 5 phút nếu bị treo
     setTimeout(() => {
@@ -1291,15 +1293,23 @@ function getHandInfo(hand) {
 function solveGame(player, botHand, bet) {
     const p = getHandInfo(player.hand);
     const b = getHandInfo(botHand);
+    
     if (p.isBaTay) {
-        if (b.isBaTay) return { receive: bet, msg: "Hòa (Cùng Ba Tây) - Hoàn tiền" };
+        if (b.isBaTay) return { receive: bet, msg: `Hòa (Cùng Ba Tây) - Hoàn lại **${bet.toLocaleString()}** tiền` };
         const total = (bet * 2) + (bet * 0.2);
-        return { receive: total, msg: `🔥 **BA TÂY!** Thắng +20% (Nhận: ${total.toLocaleString()})` };
+        return { receive: total, msg: `🔥 **BA TÂY!** Thắng rực rỡ (Nhận: **${total.toLocaleString()}** tiền)` };
     }
-    if (b.isBaTay) return { receive: 0, msg: `Thua (Bot có Ba Tây - Bạn ${p.score} nút)` };
-    if (p.score > b.score) return { receive: bet * 2, msg: `Thắng! (${p.score} nút vs Bot ${b.score} nút)` };
-    if (p.score === b.score) return { receive: bet, msg: `Hòa! (${p.score} nút) - Hoàn cược` };
-    return { receive: 0, msg: `Thua! (${p.score} nút vs Bot ${b.score} nút)` };
+    
+    if (b.isBaTay) return { receive: 0, msg: `Thua (Bot có Ba Tây - Bạn ${p.score} nút). Mất **${bet.toLocaleString()}** tiền` };
+    
+    if (p.score > b.score) {
+        const winAmount = bet * 2;
+        return { receive: winAmount, msg: `Thắng! (${p.score} nút vs Bot ${b.score} nút). Nhận: **${winAmount.toLocaleString()}** tiền` };
+    }
+    
+    if (p.score === b.score) return { receive: bet, msg: `Hòa! (${p.score} nút) - Hoàn lại **${bet.toLocaleString()}** tiền` };
+    
+    return { receive: 0, msg: `Thua! (${p.score} nút vs Bot ${b.score} nút). Mất **${bet.toLocaleString()}** tiền` };
 }
 
 // =====================
@@ -1338,20 +1348,15 @@ client.on("interactionCreate", async (interaction) => {
         return interaction.reply({ content: `🃏 Bài của bạn là: **${player.hand.join(' ')}**`, ephemeral: true });
     }
 
-   if (interaction.customId === 'flip_hand') {
-        // 1. Kiểm tra nếu đã lật rồi thì không cho lật nữa
+  if (interaction.customId === 'flip_hand') {
         if (player.revealed) return interaction.reply({ content: "Bạn đã ngửa bài rồi!", ephemeral: true });
         
-        // 2. QUAN TRỌNG: Khóa trạng thái ngay lập tức trước khi đợi 2 giây
         player.revealed = true; 
-        
-        // 3. Thông báo cho cả sòng biết người này đang lật
+        // Thông báo công khai là người này đã lật bài (nhưng không hiện bài Bot)
         await interaction.reply({ content: `⏳ **${player.name}** đang chuẩn bị ngửa bài...` });
         
-        // 4. Delay 2 giây như yêu cầu
         await new Promise(r => setTimeout(r, 2000));
 
-        // 5. Tính toán kết quả và cộng tiền
         const result = solveGame(player, game.botHand, game.bet);
         const pDB = await getUser(player.id);
         
@@ -1360,16 +1365,30 @@ client.on("interactionCreate", async (interaction) => {
             await db.write();
         }
 
-        // 6. Sửa lại tin nhắn chờ thành kết quả bài thực tế
-        await interaction.editReply(`🎴 **${player.name}** lật bài: ${player.hand.join(' ')}\n➜ **Kết quả:** ${result.msg}`);
+        // 1. Thông báo CÔNG KHAI: Chỉ hiện bài người chơi và kết quả Thắng/Thua (ẩn số nút của Bot)
+        // Thay vì hiện "Bot X nút", ta chỉ hiện "Thắng" hoặc "Thua"
+        const publicMsg = `🎴 **${player.name}** đã hạ bài: **${player.hand.join(' ')}**\n➜ **Kết quả:** ${result.msg.split('vs Bot')[0]}`; 
+        await interaction.editReply(publicMsg);
 
-        // 7. Kiểm tra kết thúc ván (Xóa game nếu mọi người đã lật hết)
+        // 2. Thông báo RIÊNG (Chỉ người lật mới thấy): Hiện chi tiết bài Bot để đối chứng
+        const privateMsg = `㊙️ **Đối chứng riêng:** Bài của Bot là **${game.botHand.join(' ')}**\n💰 Số dư hiện tại: **${pDB ? pDB.money.toLocaleString() : '???'}**`;
+        await interaction.followUp({ content: privateMsg, ephemeral: true });
+
+        // 3. Kiểm tra kết thúc ván: Khi người cuối cùng lật bài mới hiện bài Bot cho cả sòng
         if (game.players.every(p => p.revealed)) {
-    activeGames.delete(interaction.channelId);
-    // Hiện thêm bài của Bot để minh bạch
-    await interaction.channel.send(`🎴 **Nhà cái (Bot) hạ bài:** ${game.botHand.join(' ')}\n🏁 **Ván bài kết thúc!** Mọi người có thể mở ván mới.`);
+            activeGames.delete(interaction.channelId);
+            
+            if (game.tableMsg) {
+                await game.tableMsg.delete().catch(() => {});
             }
-} // Đóng if (flip_hand)
+
+            // Tính toán số nút Bot để thông báo cuối cùng
+            const bInfo = getHandInfo(game.botHand);
+            const bScoreText = bInfo.isBaTay ? "Ba Tây" : `${bInfo.score} nút`;
+
+            await interaction.channel.send(`🏁 **Ván bài kết thúc!**\n🎴 **Bài của Nhà cái (Bot):** ${game.botHand.join(' ')} (**${bScoreText}**)\n👉 Mọi người có thể mở ván mới.`);
+        }
+    }
 }); // Đóng client.on
 // =====================
 // ham khoi tao nut !baicao
@@ -1382,13 +1401,14 @@ async function handleBaiCaoCommand(message, args) {
     if (!userData || userData.money < betAmount) return message.reply("❌ Bạn không đủ tiền!");
     if (activeGames.has(message.channel.id)) return message.reply("❌ Đang có ván bài diễn ra ở kênh này!");
 
-    const gameState = { 
-        bet: betAmount, 
-        players: [], 
-        status: 'joining', 
-        botHand: [],
-        ownerId: message.author.id 
-    };
+   const gameState = { 
+    bet: betAmount, 
+    players: [], 
+    status: 'joining', 
+    botHand: [],
+    ownerId: message.author.id,
+    tableMsg: null 
+};
 
     // Chủ sòng tham gia luôn
     userData.money -= betAmount;
