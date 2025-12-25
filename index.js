@@ -1043,9 +1043,12 @@ client.on("interactionCreate", async (interaction) => {
     const channelId = interaction.channel.id;
     const session = blackjackSession[channelId];
 
+    // Thêm điều kiện: Nếu ID nút bấm bắt đầu bằng "h_" (của Help) thì bỏ qua không kiểm tra session
+if (!interaction.customId.startsWith('h_')) { 
     if (!session || session.userId !== interaction.user.id) {
         return interaction.reply({ content: "❌ Không phải phiên của bạn!", ephemeral: true });
     }
+}
 
     // --- NÚT RÚT BÀI ---
     if (action === "hit") {
