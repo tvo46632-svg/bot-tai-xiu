@@ -1746,7 +1746,6 @@ game.players.push({
 client.on('interactionCreate', async (interaction) => {
     if (!interaction.isButton()) return;
 
-    // LẤY THÔNG TIN VÁN GAME TẠI KÊNH HIỆN TẠI
     const game = activeGames.get(interaction.channelId);
     if (!game) {
         return interaction.reply({ content: "⚠️ Ván bài này đã kết thúc hoặc không tồn tại.", ephemeral: true });
@@ -1754,7 +1753,6 @@ client.on('interactionCreate', async (interaction) => {
 
     // --- XỬ LÝ RIÊNG CHO BÀI CÀO ---
     if (game.type === 'baicao') {
-        // 1. Nút Tham Gia (Chạy khi status là 'joining')
         if (interaction.customId === 'join_baicao') {
             if (game.status !== 'joining') return interaction.reply({ content: "🚫 Sòng đã bắt đầu!", ephemeral: true });
             
@@ -1777,12 +1775,10 @@ client.on('interactionCreate', async (interaction) => {
             return interaction.reply({ content: `✅ Bạn đã tham gia!`, ephemeral: true });
         }
 
-        // CHẶN: Chỉ các nút bên dưới (Xem/Ngửa) mới yêu cầu status là 'playing'
         if (game.status !== 'playing') {
             return interaction.reply({ content: "⏳ Vui lòng đợi nhà cái chia bài xong!", ephemeral: true });
         }
 
-        // 2. Nút Xem Bài & Ngửa Bài
         const player = game.players.find(p => p.id === interaction.user.id);
         if (!player) return interaction.reply({ content: "❌ Bạn không tham gia ván này!", ephemeral: true });
 
@@ -1804,97 +1800,80 @@ client.on('interactionCreate', async (interaction) => {
         }
     }
 
-    // --- XỬ LÝ CHO XÌ DÁCH (Giữ nguyên logic của bạn nhưng bọc trong if game.type === 'xidach') ---
+    // --- XỬ LÝ CHO XÌ DÁCH ---
     if (game.type === 'xidach') {
+        if (game.status !== 'playing') return;
 
-    // --- CÁC NÚT XEM BÀI & NGỬA BÀI (Chỉ hoạt động khi status là 'playing') ---
-    if (game.status !== 'playing') return;
+        const player = game.players.find(p => p.id === interaction.user.id);
+        if (!player) return interaction.reply({ content: "🚫 Bạn không có trong ván bài này!", ephemeral: true });
 
-    const player = game.players.find(p => p.id === interaction.user.id);
-    if (!player) return interaction.reply({ content: "🚫 Bạn không có trong ván bài này!", ephemeral: true });
+        if (interaction.customId === 'view_hand') {
+            const handVisual = formatHand(player.hand, false);
+            const pInfo = getHandInfo(player.hand);
+            const scoreText = pInfo.isBaTay ? "🔥 **BA TÂY**" : `**${pInfo.score}** nút`;
 
-    // 1. NÚT XEM BÀI RIÊNG
-    if (interaction.customId === 'view_hand') {
-        const handVisual = formatHand(player.hand, false);
-        const pInfo = getHandInfo(player.hand);
-        const scoreText = pInfo.isBaTay ? "🔥 **BA TÂY**" : `**${pInfo.score}** nút`;
+            return interaction.reply({ 
+                content: `👀 **Bài của bạn:** ${handVisual}\n👉 Điểm: ${scoreText}`, 
+                ephemeral: true 
+            });
+        }
 
-        return interaction.reply({ 
-            content: `👀 **Bài của bạn:** ${handVisual}\n👉 Điểm: ${scoreText}`, 
-            ephemeral: true 
-        });
-    }
-
-    // 2. NÚT NGỬA BÀI
-    if (interaction.customId === 'flip_hand') {
-        if (player.revealed) return interaction.reply({ content: "⚠️ Bạn đã ngửa bài rồi!", ephemeral: true });
-        
-        player.revealed = true;
-
-        // Phản hồi ngay lập tức để tránh lỗi Discord timeout
-        await interaction.reply({ content: `⏳ **${player.name}** đang chuẩn bị ngửa bài...` });
-        
-        // Delay 1.5s tạo hiệu ứng lật bài
-        await new Promise(r => setTimeout(r, 1500));
-
-        const handVisual = formatHand(player.hand, false);
-        const msg = await interaction.editReply(`🔓 **${player.name}** đã hạ bài: ${handVisual}`);
-        
-        // Đưa tin nhắn hạ bài vào mảng để dọn dẹp lúc kết thúc
-        if (!game.revealMsgs) game.revealMsgs = [];
-        game.revealMsgs.push(msg);
-
-        // Thông báo riêng cho người đó
-        const pInfo = getHandInfo(player.hand);
-        const scoreText = pInfo.isBaTay ? "Ba Tây" : `${pInfo.score} nút`;
-        await interaction.followUp({ 
-            content: `㊙️ Bạn hạ bài **${scoreText}**. Chờ những người khác nhé!`, 
-            ephemeral: true 
-        });
-
-        // --- KIỂM TRA KẾT THÚC ---
-        if (game.players.every(p => p.revealed)) {
-            activeGames.delete(interaction.channelId);
-
-            // Xóa bàn chơi và tin nhắn lẻ
-            if (game.tableMsg) await game.tableMsg.delete().catch(() => {});
-            if (game.revealMsgs) {
-                for (const m of game.revealMsgs) {
-                    await m.delete().catch(() => {});
-                }
-            }
-
-            const botHandVisual = formatHand(game.botHand, false);
-            const bInfo = getHandInfo(game.botHand);
-            const bScoreText = bInfo.isBaTay ? "🔥 **BA TÂY**" : `**${bInfo.score}** nút`;
-
-            let summaryList = "";
-            for (let p of game.players) {
-                const result = solveGame(p, game.botHand, game.bet);
-                const pDB = await getUser(p.id);
-                if (pDB) {
-                    pDB.money += result.receive;
-                    summaryList += `👤 **${p.name}**: ${result.msg}\n💰 Ví: **${pDB.money.toLocaleString()}**\n\n`;
-                }
-            }
+        if (interaction.customId === 'flip_hand') {
+            if (player.revealed) return interaction.reply({ content: "⚠️ Bạn đã ngửa bài rồi!", ephemeral: true });
             
-            await db.write();
+            player.revealed = true;
+            await interaction.reply({ content: `⏳ **${player.name}** đang chuẩn bị ngửa bài...` });
+            await new Promise(r => setTimeout(r, 1500));
 
-            const finalEmbed = new EmbedBuilder()
-                .setTitle("🏁 KẾT QUẢ VÁN BÀI")
-                .setColor("#FFD700")
-                .setDescription(
-                    `🏰 **NHÀ CÁI (BOT):** ${botHandVisual}\n👉 Kết quả: ${bScoreText}\n` +
-                    `──────────────────────────\n` +
-                    summaryList
-                )
-                .setTimestamp();
+            const handVisual = formatHand(player.hand, false);
+            const msg = await interaction.editReply(`🔓 **${player.name}** đã hạ bài: ${handVisual}`);
+            
+            if (!game.revealMsgs) game.revealMsgs = [];
+            game.revealMsgs.push(msg);
 
-            await interaction.channel.send({ embeds: [finalEmbed] });
+            const pInfo = getHandInfo(player.hand);
+            const scoreText = pInfo.isBaTay ? "Ba Tây" : `${pInfo.score} nút`;
+            await interaction.followUp({ 
+                content: `㊙️ Bạn hạ bài **${scoreText}**. Chờ những người khác nhé!`, 
+                ephemeral: true 
+            });
+
+            if (game.players.every(p => p.revealed)) {
+                activeGames.delete(interaction.channelId);
+                if (game.tableMsg) await game.tableMsg.delete().catch(() => {});
+                if (game.revealMsgs) {
+                    for (const m of game.revealMsgs) await m.delete().catch(() => {});
+                }
+
+                const botHandVisual = formatHand(game.botHand, false);
+                const bInfo = getHandInfo(game.botHand);
+                const bScoreText = bInfo.isBaTay ? "🔥 **BA TÂY**" : `**${bInfo.score}** nút`;
+
+                let summaryList = "";
+                for (let p of game.players) {
+                    const result = solveGame(p, game.botHand, game.bet);
+                    const pDB = await getUser(p.id);
+                    if (pDB) {
+                        pDB.money += result.receive;
+                        summaryList += `👤 **${p.name}**: ${result.msg}\n💰 Ví: **${pDB.money.toLocaleString()}**\n\n`;
+                    }
+                }
+                await db.write();
+
+                const finalEmbed = new EmbedBuilder()
+                    .setTitle("🏁 KẾT QUẢ VÁN BÀI")
+                    .setColor("#FFD700")
+                    .setDescription(`🏰 **NHÀ CÁI (BOT):** ${botHandVisual}\n👉 Kết quả: ${bScoreText}\n──────────────────────────\n${summaryList}`)
+                    .setTimestamp();
+
+                await interaction.channel.send({ embeds: [finalEmbed] });
+            }
         }
     }
+}); // <--- ĐÓNG client.on('interactionCreate') TẠI ĐÂY
+
 // =====================
-// ham khoi tao nut !baicao
+// HÀM KHỞI TẠO LỆNH !BAICAO (Tách ra ngoài)
 // =====================
 async function handleBaiCaoCommand(message, args) {
     const betAmount = parseInt(args[0]);
@@ -1904,13 +1883,13 @@ async function handleBaiCaoCommand(message, args) {
     if (!userData || userData.money < betAmount) return message.reply("❌ Bạn không đủ tiền!");
     if (activeGames.has(message.channel.id)) return message.reply("❌ Đang có ván bài diễn ra ở kênh này!");
 
-   const gameState = { 
+    const gameState = { 
         type: 'baicao',
         bet: betAmount, 
         players: [], 
         status: 'joining', 
         botHand: [],
-        hostName: message.author.username, // Thêm dòng này
+        hostName: message.author.username,
         ownerId: message.author.id,
         tableMsg: null,
         revealMsgs: [] 
@@ -1930,7 +1909,7 @@ async function handleBaiCaoCommand(message, args) {
         new ButtonBuilder().setCustomId('join_baicao').setLabel('Tham gia').setStyle(ButtonStyle.Success)
     );
 
-    gameState.tableMsg = await message.channel.send({ embeds: [embed], components: [row] }); // Lưu lại để xóa sau này
+    gameState.tableMsg = await message.channel.send({ embeds: [embed], components: [row] });
 
     setTimeout(() => {
         if (gameState.tableMsg) gameState.tableMsg.edit({ components: [] }).catch(() => {});
@@ -1943,15 +1922,14 @@ async function handleBaiCaoCommand(message, args) {
 }
 
 // =====================
-// ham khoi tao xetbai    
-// ======================
+// HÀM KẾT THÚC BÀI CÀO (Tách ra ngoài)
+// =====================
 async function finishBaicao(channel, game) {
-    if (game.isFinishing) return; // Nếu đang kết thúc rồi thì bỏ qua
+    if (game.isFinishing) return;
     game.isFinishing = true; 
     
     if (game.autoFlipTimer) clearTimeout(game.autoFlipTimer);
 
-    // 1. Dọn dẹp tin nhắn cũ trên bàn
     if (game.tableMsg) await game.tableMsg.delete().catch(() => {});
     if (game.revealMsgs) {
         for (const m of game.revealMsgs) await m.delete().catch(() => {});
@@ -1967,13 +1945,24 @@ async function finishBaicao(channel, game) {
         const pDB = await getUser(p.id);
         
         if (pDB) {
-            // Cộng tiền (Vốn + Lãi) vào ví
             pDB.money += result.receive;
-            // Dùng template literal (dấu huyền) để tránh lỗi ký tự lạ
             summaryList += `👤 **${p.name}**\n└ Kết quả: ${result.msg}\n💰 Ví: **${pDB.money.toLocaleString()}**\n\n`;
         }
     }
     await db.write();
+    activeGames.delete(channel.id);
+
+    const finalEmbed = new EmbedBuilder()
+        .setTitle("🏁 KẾT QUẢ VÁN BÀI CÀO")
+        .setColor("#FFD700")
+        .addFields(
+            { name: "🏰 NHÀ CÁI (BOT)", value: `🃏 Bài: ${botHandVisual}\n📊 Điểm: ${bScoreText}` },
+            { name: "📝 CHI TIẾT", value: summaryList || "Không có người chơi" }
+        )
+        .setTimestamp();
+
+    await channel.send({ embeds: [finalEmbed] });
+}
 
     // 2. BẢNG KẾT QUẢ SIÊU ĐẸP
     const finalEmbed = new EmbedBuilder()
