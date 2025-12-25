@@ -351,51 +351,40 @@ client.on("ready", async () => {
     }
 });
 
-// 3. Xử lý Slash Command (Lệnh gạch chéo)
+// 3. Xử lý Interaction (Cả Slash Command và Nút bấm)
 client.on("interactionCreate", async (interaction) => {
-    if (!interaction.isChatInputCommand()) return;
+    // --- PHẦN 1: XỬ LÝ SLASH COMMAND (/doi) ---
+    if (interaction.isChatInputCommand()) {
+        if (interaction.commandName === 'doi') {
+            const amount = interaction.options.getInteger('amount');
+            const type = interaction.options.getString('type');
+            await interaction.deferReply({ ephemeral: true });
 
-    if (interaction.commandName === 'doi') {
-        const amount = interaction.options.getInteger('amount');
-        const type = interaction.options.getString('type');
+            try {
+                const user = await getUser(interaction.user.id);
+                if (!user) return interaction.editReply("❌ Bạn chưa có dữ liệu!");
 
-        // Phản hồi ẩn (chỉ người dùng thấy)
-        await interaction.deferReply({ ephemeral: true });
-
-        try {
-            const user = await getUser(interaction.user.id);
-            if (!user) return interaction.editReply("❌ Bạn chưa có dữ liệu!");
-
-            if (type === 'xu') {
-                if (user.xu < amount) return interaction.editReply("❌ Bạn không đủ xu!");
-                
-                let phi = amount < 5000 ? 0 : (amount < 20000 ? 0.20 : 0.35);
-                const moneyOut = Math.floor(amount * (1 - phi));
-                
-                // SỬA: Dùng add số âm thay vì sub để tránh lỗi undefined
-                await addXu(interaction.user.id, -amount); 
-                await addMoney(interaction.user.id, moneyOut);
-
-                await interaction.editReply(`✅ **ĐỔI THÀNH CÔNG**\n💰 Nhận: **${moneyOut.toLocaleString()} Tiền**\n🪙 Khấu trừ: **${amount.toLocaleString()} Xu**`);
-            } 
-            else {
-                if (user.money < amount) return interaction.editReply("❌ Bạn không đủ tiền!");
-                
-                // SỬA: Dùng add số âm thay vì sub để tránh lỗi undefined
-                await addMoney(interaction.user.id, -amount);
-                await addXu(interaction.user.id, amount);
-
-                await interaction.editReply(`✅ **ĐỔI THÀNH CÔNG**\n🪙 Nhận: **${amount.toLocaleString()} Xu**\n💰 Khấu trừ: **${amount.toLocaleString()} Tiền**`);
-            }
-        } catch (err) {
-            console.error("Lỗi Slash Command:", err);
-            // Kiểm tra nếu chưa trả lời thì mới editReply để tránh lỗi "Interaction already replied"
-            if (interaction.deferred) {
-                await interaction.editReply("❌ Lỗi hệ thống khi xử lý giao dịch!");
+                if (type === 'xu') {
+                    if (user.xu < amount) return interaction.editReply("❌ Bạn không đủ xu!");
+                    let phi = amount < 5000 ? 0 : (amount < 20000 ? 0.20 : 0.35);
+                    const moneyOut = Math.floor(amount * (1 - phi));
+                    await addXu(interaction.user.id, -amount); 
+                    await addMoney(interaction.user.id, moneyOut);
+                    await interaction.editReply(`✅ **ĐỔI THÀNH CÔNG**\n💰 Nhận: **${moneyOut.toLocaleString()} Tiền**\n🪙 Khấu trừ: **${amount.toLocaleString()} Xu**`);
+                } else {
+                    if (user.money < amount) return interaction.editReply("❌ Bạn không đủ tiền!");
+                    await addMoney(interaction.user.id, -amount);
+                    await addXu(interaction.user.id, amount);
+                    await interaction.editReply(`✅ **ĐỔI THÀNH CÔNG**\n🪙 Nhận: **${amount.toLocaleString()} Xu**\n💰 Khấu trừ: **${amount.toLocaleString()} Tiền**`);
+                }
+            } catch (err) {
+                console.error("Lỗi /doi:", err);
+                if (interaction.deferred) await interaction.editReply("❌ Lỗi hệ thống!");
             }
         }
+        return; // Thoát sau khi xử lý Slash
     }
-});
+};
 // =====================
 //      TUNG XU
 // =====================
@@ -1433,29 +1422,12 @@ async function cmdTralai(message, args) {
     message.reply(replyText);
 } // <- Đóng cmdTralai
 
-// ==========================================
-//      HELP COMMAND (4 NÚT - ẢNH TO - GIF XỊN)
-// ==========================================
 async function cmdHelp(message) {
-    // Định nghĩa bộ sưu tập GIF siêu nét (Direct Links)
     const GIFS = {
-        home: 'https://media4.giphy.com/media/v1.Y2lkPTc5MGI3NjExcXFiNGJuY25ja2Vob3lvajV2NnJ6Zndla2lvbTQwMGtmNGlnMnMyNiZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/13I3peucbA8BfG/giphy.gif', // poker
-        eco: 'https://media1.giphy.com/media/v1.Y2lkPTc5MGI3NjExNHA0bmc1dXpyOTBlaG4ycHdsbnRud3p3dHQwM3oyaHd0YWxnbG45dSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/YRw676NBrmPeM/giphy.gif', // tien
-        game: 'https://media4.giphy.com/media/v1.Y2lkPTc5MGI3NjExbXAxNnJwcHdqMTZ6NTl2N2l6eWI5OHI1OHRqMzZvYThhaDB1bXNoNCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/xT9DPi61MmrDLzVFzq/giphy.gif', //  Poker
-        bank: 'https://media2.giphy.com/media/v1.Y2lkPTc5MGI3NjExc3lrNnRtMGF4OTZ0dGVibGd2ZHhlZGFmeTQ3aGVsdWp0aHg1M3JsdCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/WONHb0Swc0TLiiWWRx/giphy.gif' // Két sắt 
-    };
-
-    const generateHomeEmbed = () => {
-        return new EmbedBuilder()
-            .setTitle('🎰 CASINO ROYAL - SẢNH CHỜ CAO CẤP 🎰')
-            .setDescription(
-                `Chào mừng Thần Bài **${message.author.username}**!\n\n` +
-                `🏰 Bạn đang ở sảnh chờ trung tâm. Hãy chọn các phân khu chức năng phía dưới để bắt đầu cuộc chơi.\n\n` +
-                `> ⚠️ **Lưu ý:** Menu sẽ tự đóng sau **60 giây**.`
-            )
-            .setImage(GIFS.home) // Ảnh to trang chủ
-            .setColor('#f1c40f')
-            .setFooter({ text: 'Bot Casino System', iconURL: message.client.user.displayAvatarURL() });
+        home: 'https://media4.giphy.com/media/v1.Y2lkPTc5MGI3NjExcXFiNGJuY25ja2Vob3lvajV2NnJ6Zndla2lvbTQwMGtmNGlnMnMyNiZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/13I3peucbA8BfG/giphy.gif',
+        eco: 'https://media1.giphy.com/media/v1.Y2lkPTc5MGI3NjExNHA0bmc1dXpyOTBlaG4ycHdsbnRud3p3dHQwM3oyaHd0YWxnbG45dSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/YRw676NBrmPeM/giphy.gif',
+        game: 'https://media4.giphy.com/media/v1.Y2lkPTc5MGI3NjExbXAxNnJwcHdqMTZ6NTl2N2l6eWI5OHI1OHRqMzZvYThhaDB1bXNoNCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/xT9DPi61MmrDLzVFzq/giphy.gif',
+        bank: 'https://media2.giphy.com/media/v1.Y2lkPTc5MGI3NjExc3lrNnRtMGF4OTZ0dGVibGd2ZHhlZGFmeTQ3aGVsdWp0aHg1M3JsdCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/WONHb0Swc0TLiiWWRx/giphy.gif'
     };
 
     const getRow = () => {
@@ -1467,71 +1439,45 @@ async function cmdHelp(message) {
         );
     };
 
+    const generateHomeEmbed = () => {
+        return new EmbedBuilder()
+            .setTitle('🎰 CASINO ROYAL - SẢNH CHỜ 🎰')
+            .setDescription(`Chào mừng **${message.author.username}**! Hãy chọn phân khu chức năng bên dưới.`)
+            .setImage(GIFS.home).setColor('#f1c40f');
+    };
+
     const helpMsg = await message.reply({ embeds: [generateHomeEmbed()], components: [getRow()] });
 
-    const collector = helpMsg.createMessageComponentCollector({ time: 60000 });
+    // Collector này sẽ tự lo liệu các nút có ID "h_..."
+    const collector = helpMsg.createMessageComponentCollector({ 
+        filter: i => i.user.id === message.author.id, 
+        time: 60000 
+    });
 
     collector.on('collect', async i => {
         await i.deferUpdate().catch(() => {});
-
         const embed = new EmbedBuilder().setColor('#f1c40f').setTimestamp();
 
         if (i.customId === 'h_home') {
             return await i.editReply({ embeds: [generateHomeEmbed()], components: [getRow()] });
         } 
         
-        else if (i.customId === 'h_eco') {
-            embed.setTitle('💰 HỆ THỐNG TÀI CHÍNH')
-                 .setImage(GIFS.eco) // Ảnh to khu Kinh tế
-                 .setDescription(
-                    `**Lệnh Cơ Bản:**\n` +
-                    `\`!tien\` : Kiểm tra số dư hiện có.\n` +
-                    `\`!diemdanh\` : Nhận lương mỗi ngày.\n` +
-                    `\`!top\` : Bảng xếp hạng đại gia.\n\n` +
-                    `**Giao Dịch:**\n` +
-                    `\`!chuyentien <@user> <số>\` : Phí 5%.\n` +
-                    `\`!chuyenxu\` : Quy đổi tiền tệ.`
-                 );
-        } 
-        
-        else if (i.customId === 'h_game') {
-            embed.setTitle('🎲 SẢNH TRÒ CHƠI CASINO')
-                 .setImage(GIFS.game) // Ảnh to khu Trò chơi
-                 .addFields(
-                    { 
-                        name: '🃏 BÀI CÀO (3 Cây)', 
-                        value: `> \`!baicao <cược>\`: Tham gia ván bài.\n> \`!nguabai\`: Xem bài.\n> \`!xetbai\`: Buộc xét bài.`
-                    },
-                    { 
-                        name: '🎲 CÁC GAME KHÁC', 
-                        value: `• \`!taixiu\`, \`!baucua\`, \`!xidach\`, \`!tungxu\`, \`!boctham\`, \`!anxin\``
-                    }
-                 );
-        } 
-        
-        else if (i.customId === 'h_bank') {
-            embed.setTitle('🏦 NGÂN HÀNG & TÍN DỤNG')
-                 .setImage(GIFS.bank) // Ảnh to khu Ngân hàng
-                 .addFields(
-                  {
-                    name: '💸 VAY VỐN', 
-                    value: '• \`!vay <số tiền>\` : Thủ tục vay vốn.\n• \`!vay\` : Vay tối đa hạn mức.'
-                  },
-                  {
-                    name: '💳 TRẢ NỢ & RÚT TIỀN',
-                    value: '• \`!tralai <số tiền>\` : Trả nợ.\n• \`!tralai all\` : Trả sạch nợ.'
-                  }
-                 );
+        if (i.customId === 'h_eco') {
+            embed.setTitle('💰 HỆ THỐNG TÀI CHÍNH').setImage(GIFS.eco)
+                 .setDescription(`\`!tien\`, \`!diemdanh\`, \`!top\`, \`!chuyentien\`, \`!chuyenxu\``);
+        } else if (i.customId === 'h_game') {
+            embed.setTitle('🎲 SẢNH TRÒ CHƠI').setImage(GIFS.game)
+                 .setDescription(`\`!baicao\`, \`!taixiu\`, \`!baucua\`, \`!xidach\`, \`!tungxu\``);
+        } else if (i.customId === 'h_bank') {
+            embed.setTitle('🏦 NGÂN HÀNG').setImage(GIFS.bank)
+                 .setDescription(`\`!vay\`, \`!tralai\``);
         }
 
         await i.editReply({ embeds: [embed], components: [getRow()] });
     });
 
-    collector.on('end', async () => {
-        try {
-            await helpMsg.delete();
-            await message.delete();
-        } catch (e) {}
+    collector.on('end', () => {
+        helpMsg.edit({ components: [] }).catch(() => {}); // Tắt nút khi hết hạn thay vì xóa nếu muốn
     });
 }
 
