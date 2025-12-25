@@ -882,61 +882,98 @@ async function cmdTop(message) {
     }, 15000);
 }
 
-// ===================== CHUYỂN XU =====================
+// ===================== HÀM CHUYỂN XU (GIAO DỊCH GIỮA NGƯỜI CHƠI) =====================
+/**
+ * Lệnh: !chuyenxu @user <số xu>
+ * Tính năng: 
+ * - Kiểm tra nợ xấu (nếu đang nợ thì không cho chuyển).
+ * - Kiểm tra số dư người gửi.
+ * - Thu phí giao dịch 10%.
+ * - Có nút bấm xác nhận/hủy bỏ để tránh chuyển nhầm.
+ */
 async function cmdChuyenxu(message, args) {
-    const userId = message.author.id;
-    const user = await getUser(userId);
+    const userId = message.author.id; // ID người thực hiện lệnh
+    const user = await getUser(userId); // Lấy dữ liệu người gửi từ database
 
-    // CHẶN KHI ĐANG NỢ
+    // 1. KIỂM TRA NỢ (Chặn giao dịch nếu người gửi đang nợ hệ thống)
     if (user.debt > 0) {
-        return message.reply(`### 🚫 GIAO DỊCH BỊ KHÓA\n> Bạn không thể chuyển xu khi đang nợ (**${user.debt.toLocaleString()} xu**).`);
+        return message.reply(`### 🚫 GIAO DỊCH BỊ KHÓA\n> Bạn không thể chuyển xu khi đang nợ (**${user.debt.toLocaleString()} xu**). Vui lòng trả nợ trước khi chuyển tiền.`);
     }
 
-    const target = message.mentions.users.first();
-    const amount = parseInt(args.find(a => !a.includes('<@') && !isNaN(a)));
+    // 2. XÁC ĐỊNH NGƯỜI NHẬN VÀ SỐ TIỀN
+    const target = message.mentions.users.first(); // Người được nhắc tên (@user)
+    const amount = parseInt(args.find(a => !a.includes('<@') && !isNaN(a))); // Tìm số tiền trong câu lệnh
 
-    if (!target || isNaN(amount) || amount <= 0) 
+    // Kiểm tra tính hợp lệ của đầu vào
+    if (!target || isNaN(amount) || amount <= 0) {
         return message.reply("> ❗ **Hướng dẫn:** `!chuyenxu @user <số xu>`");
+    }
 
-    if (user.xu < amount) 
-        return message.reply(`> ❌ Bạn không đủ xu! (Hiện có: ${user.xu.toLocaleString()})`);
+    // Chặn tự chuyển cho chính mình
+    if (target.id === userId) {
+        return message.reply("> ❌ Bạn không thể tự chuyển xu cho chính mình!");
+    }
 
-    // Phí chuyển xu 10%
+    // 3. KIỂM TRA SỐ DƯ
+    if (user.xu < amount) {
+        return message.reply(`> ❌ Bạn không đủ xu! (Hiện có: **${user.xu.toLocaleString()}** xu)`);
+    }
+
+    // 4. TÍNH TOÁN PHÍ (Phí chuyển xu là 10% - Người nhận nhận net)
     const fee = Math.floor(amount * 0.10);
     const netXu = amount - fee;
 
+    // 5. TẠO NÚT BẤM XÁC NHẬN (ActionRow và Button)
     const row = new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setCustomId(`confirm_xu_${userId}`).setLabel('Xác nhận gửi xu').setStyle(ButtonStyle.Success),
-        new ButtonBuilder().setCustomId(`cancel_xu_${userId}`).setLabel('Hủy').setStyle(ButtonStyle.Danger)
+        new ButtonBuilder()
+            .setCustomId(`confirm_xu_${userId}`)
+            .setLabel('Xác nhận gửi')
+            .setStyle(ButtonStyle.Success), // Màu xanh lá
+        new ButtonBuilder()
+            .setCustomId(`cancel_xu_${userId}`)
+            .setLabel('Hủy giao dịch')
+            .setStyle(ButtonStyle.Danger) // Màu đỏ
     );
 
+    // 6. GỬI TIN NHẮN CHỜ XÁC NHẬN
     const mainMsg = await message.reply({
-        content: `### 🔁 YÊU CẦU CHUYỂN XU\n> 👤 **Người gửi:** ${message.author.username}\n> 👤 **Người nhận:** ${target.username}\n> 🪙 **Thực nhận:** **${netXu.toLocaleString()} xu** (Phí 10%)\n> *Hết hạn sau 60s.*`,
+        content: `### 🔁 YÊU CẦU CHUYỂN XU\n> 👤 **Người gửi:** ${message.author.username}\n> 👤 **Người nhận:** ${target.username}\n> 🪙 **Số xu gửi:** \`${amount.toLocaleString()}\`\n> 💸 **Phí (10%):** \`${fee.toLocaleString()}\`\n> 📥 **Thực nhận:** **${netXu.toLocaleString()} xu**\n> *Hết hạn xác nhận sau 60 giây.*`,
         components: [row]
     });
 
-    const collector = mainMsg.createMessageComponentCollector({ filter: i => i.user.id === userId, time: 60000 });
+    // 7. TẠO COLLECTOR (Bộ lọc chỉ người gửi mới được bấm nút)
+    const filter = i => i.user.id === userId;
+    const collector = mainMsg.createMessageComponentCollector({ filter, time: 60000 });
 
     collector.on('collect', async i => {
         if (i.customId === `confirm_xu_${userId}`) {
+            // Kiểm tra lại số dư một lần cuối trước khi trừ tiền (tránh bug bấm 2 lần)
             const finalCheck = await getUser(userId);
-            if (finalCheck.xu < amount) return i.update({ content: "> ❌ Bạn không còn đủ xu để thực hiện!", components: [] });
+            if (finalCheck.xu < amount) {
+                return i.update({ content: "> ❌ Bạn không còn đủ xu để thực hiện giao dịch này!", components: [] });
+            }
 
-            await addXu(userId, -amount);
-            await addXu(target.id, netXu);
+            // Thực hiện chuyển tiền trong Database
+            await addXu(userId, -amount); // Trừ tiền người gửi
+            await addXu(target.id, netXu); // Cộng tiền người nhận (đã trừ phí)
 
+            // Cập nhật tin nhắn thành công
             await i.update({
                 content: `### ✅ CHUYỂN XU THÀNH CÔNG\n> 🔁 **${target.username}** đã nhận được **${netXu.toLocaleString()}** xu từ **${message.author.username}**.`,
                 components: []
             });
-        } else {
-            await i.update({ content: `> ❌ Giao dịch chuyển xu đã bị hủy.`, components: [] });
+        } else if (i.customId === `cancel_xu_${userId}`) {
+            // Nếu bấm Hủy
+            await i.update({ content: `> ❌ Giao dịch chuyển xu đã bị hủy bỏ bởi người gửi.`, components: [] });
         }
-        collector.stop();
+        collector.stop(); // Dừng collector sau khi đã xử lý
     });
 
-    collector.on('end', () => {
-        setTimeout(() => mainMsg.delete().catch(() => {}), 10000);
+    // Xử lý khi hết thời gian 60s mà không ai bấm
+    collector.on('end', (collected, reason) => {
+        if (reason === 'time') {
+            mainMsg.edit({ content: "> ⏰ Đã quá thời gian xác nhận giao dịch (60s).", components: [] }).catch(() => {});
+        }
     });
 }
 //-------- XI DACH VIP (CÓ ẢNH + LUẬT VN: XÌ BÀN, XÌ DÁCH, NGŨ LINH) -----------
