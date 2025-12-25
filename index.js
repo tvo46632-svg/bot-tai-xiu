@@ -1110,168 +1110,182 @@ async function cmdTralai(message, args) {
 } // <- Đóng cmdTralai
 
 // ==========================================
-//      HELP COMMAND (BẢN NÂNG CẤP XỊN)
+//      HELP COMMAND (FIXED & OPTIMIZED)
 // ==========================================
-async function cmdHelp(message) {
-    let timeLeft = 60; // Thời gian tồn tại của menu (giây)
-    const cooldowns = new Map(); // Bộ nhớ tạm để lưu thời gian chờ của từng người
+const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } = require('discord.js');
 
-    // --- HÀM TẠO EMBED GỐC (TRANG CHỦ) ---
-    const generateHomeEmbed = (seconds) => {
+async function cmdHelp(message) {
+    // Cấu hình
+    let timeLeft = 60; // Thời gian gốc
+    const cooldowns = new Map();
+
+    // Hàm lấy Footer chuẩn (Chứa bộ đếm)
+    const getFooter = (seconds, user) => {
+        return { 
+            text: `⏳ Tự hủy: ${seconds}s | 👤 ${user ? user.username : message.author.username}`, 
+            iconURL: user ? user.displayAvatarURL() : message.author.displayAvatarURL() 
+        };
+    };
+
+    // --- 1. CÁC HÀM TẠO EMBED (Tách ra cho gọn) ---
+    
+    // Trang chủ
+    const createHomeEmbed = (seconds) => {
         return new EmbedBuilder()
-            .setTitle('🎰 TRUNG TÂM GIẢI TRÍ & CASINO ROYAL 🎰')
+            .setTitle('🎰 TRUNG TÂM GIẢI TRÍ ROYAL 🎰')
             .setDescription(
-                `Chào mừng **${message.author.username}** và các dân chơi!\n` +
-                `Vui lòng chọn danh mục bên dưới để xem hướng dẫn chi tiết.\n\n` +
-                `> ⚠️ **Lưu ý:** Menu này cho phép **tất cả mọi người** bấm xem.\n` +
-                `> ⏱️ **Anti-Spam:** Mỗi thao tác cách nhau **5 giây**.\n\n` +
-                `⏳ **Menu tự hủy sau:** \`${seconds} giây\``
+                `Chào mừng **${message.author.username}**!\n` +
+                `Chọn danh mục bên dưới để xem hướng dẫn.\n\n` +
+                `> ⚠️ **Lưu ý:** Menu dành cho **tất cả mọi người**.\n` +
+                `> ⏱️ **Anti-Spam:** 5 giây/click.`
             )
-            .setImage('https://i.imgur.com/8Q9tXl3.png') // (Tùy chọn) Link ảnh banner cho xịn, nếu không thích thì xóa dòng này
-            .setColor('#FFD700') // Màu vàng kim loại
-            .setFooter({ text: 'Bot Casino System | Develop by You', iconURL: message.client.user.displayAvatarURL() })
+            .setImage('https://img.pikbest.com/origin/10/14/49/86dpIkbEsTcqF.jpg')
+            .setColor('#FFD700')
+            .setFooter(getFooter(seconds)) // Đưa timer xuống Footer
             .setTimestamp();
     };
 
-    // --- HÀM TẠO NÚT BẤM ---
+    // Trang Kinh tế
+    const createEcoEmbed = (seconds, user) => {
+        return new EmbedBuilder()
+            .setTitle('💰 HỆ THỐNG TÀI CHÍNH')
+            .setColor('#3498db')
+            .setThumbnail('https://cdn-icons-png.flaticon.com/512/2485/2485519.png')
+            .setDescription(
+                `**Lệnh Cơ Bản:**\n` +
+                `\`!tien\` : Xem số dư.\n\`!diemdanh\` : Nhận lương.\n\`!top\` : BXH Đại gia.\n\n` +
+                `**Giao Dịch:**\n` +
+                `\`!chuyentien <@user> <số>\` : Phí 5%.\n\`!chuyenxu\` : Đổi xu sang tiền.`
+            )
+            .setFooter(getFooter(seconds, user));
+    };
+
+    // Trang Game
+    const createGameEmbed = (seconds, user) => {
+        return new EmbedBuilder()
+            .setTitle('🎲 SẢNH CASINO')
+            .setColor('#2ecc71')
+            .setThumbnail('https://cdn-icons-png.flaticon.com/512/1067/1067357.png')
+            .addFields(
+                { name: '🃏 BÀI CÀO (HOT)', value: '`!baicao <cược>`\n`!nguabai`, `!xetbai`' },
+                { name: '🎲 KHÁC', value: '`!taixiu`, `!baucua`, `!xidach`, `!tungxu`, `!boctham`' }
+            )
+            .setFooter(getFooter(seconds, user));
+    };
+
+    // Trang Bank
+    const createBankEmbed = (seconds, user) => {
+        return new EmbedBuilder()
+            .setTitle('🏦 NGÂN HÀNG & TÍN DỤNG')
+            .setColor('#e74c3c')
+            .setThumbnail('https://cdn-icons-png.flaticon.com/512/2830/2830284.png')
+            .addFields(
+                { name: '💸 VAY NÓNG', value: '`!vay <số tiền>` (Lãi cắt cổ x2)' },
+                { name: '💳 THANH TOÁN', value: '`!tralai <số tiền>`, `!tralai all`' }
+            )
+            .setFooter(getFooter(seconds, user));
+    };
+
+    // --- 2. TẠO NÚT BẤM ---
     const getRow = (disabled = false) => {
         return new ActionRowBuilder().addComponents(
-            new ButtonBuilder().setCustomId('h_home').setLabel('Trang Chủ').setStyle(ButtonStyle.Secondary).setEmoji('🏠').setDisabled(disabled),
-            new ButtonBuilder().setCustomId('h_eco').setLabel('Kinh Tế').setStyle(ButtonStyle.Primary).setEmoji('💰').setDisabled(disabled),
-            new ButtonBuilder().setCustomId('h_game').setLabel('Trò Chơi').setStyle(ButtonStyle.Success).setEmoji('🎲').setDisabled(disabled),
-            new ButtonBuilder().setCustomId('h_bank').setLabel('Ngân Hàng').setStyle(ButtonStyle.Danger).setEmoji('🏦').setDisabled(disabled)
+            new ButtonBuilder().setCustomId('h_home').setEmoji('🏠').setStyle(ButtonStyle.Secondary).setDisabled(disabled),
+            new ButtonBuilder().setCustomId('h_eco').setEmoji('💰').setStyle(ButtonStyle.Primary).setDisabled(disabled),
+            new ButtonBuilder().setCustomId('h_game').setEmoji('🎲').setStyle(ButtonStyle.Success).setDisabled(disabled),
+            new ButtonBuilder().setCustomId('h_bank').setEmoji('🏦').setStyle(ButtonStyle.Danger).setDisabled(disabled)
         );
     };
 
-    // Gửi tin nhắn Help ban đầu
+    // Gửi tin nhắn gốc
     const helpMsg = await message.reply({ 
-        embeds: [generateHomeEmbed(timeLeft)], 
+        embeds: [createHomeEmbed(timeLeft)], 
         components: [getRow()] 
     });
 
-    // --- BỘ ĐẾM NGƯỢC (Cập nhật footer mỗi 15s để tránh spam API) ---
-    const timer = setInterval(async () => {
-        timeLeft -= 15;
-        if (timeLeft <= 0) {
-            clearInterval(timer);
-        } else {
-            // Chỉ cập nhật nếu tin nhắn vẫn còn
-            try {
-                const currentEmbed = helpMsg.embeds[0];
-                const updatedEmbed = EmbedBuilder.from(currentEmbed)
-                    .setDescription(currentEmbed.description.replace(/\`\d+ giây\`/, `\`${timeLeft} giây\``));
-                await helpMsg.edit({ embeds: [updatedEmbed] });
-            } catch (e) { clearInterval(timer); }
-        }
-    }, 15000);
-
-    // --- XỬ LÝ SỰ KIỆN BẤM NÚT ---
+    // --- 3. XỬ LÝ SỰ KIỆN ---
     const collector = helpMsg.createMessageComponentCollector({ 
         componentType: ComponentType.Button, 
-        time: 60000 
+        time: 60000 // 60 giây gốc
     });
 
+    // Biến lưu trạng thái hiện tại để interval biết đang ở trang nào mà update
+    let currentView = 'h_home'; 
+    let currentUser = message.author; // Người vừa bấm nút cuối cùng
+
+    // --- BỘ ĐẾM GIỜ (Sửa lại logic update) ---
+    const timer = setInterval(async () => {
+        timeLeft -= 5; // Giảm 5s mỗi lần (check nhanh hơn chút cho mượt)
+        
+        if (timeLeft <= 0) {
+            clearInterval(timer);
+            // Collector sẽ tự end do hết time hoặc ta stop tay ở dưới
+            return; 
+        }
+
+        try {
+            // Tự động xác định đang ở trang nào để update lại footer
+            let updateEmbed;
+            switch (currentView) {
+                case 'h_home': updateEmbed = createHomeEmbed(timeLeft); break;
+                case 'h_eco': updateEmbed = createEcoEmbed(timeLeft, currentUser); break;
+                case 'h_game': updateEmbed = createGameEmbed(timeLeft, currentUser); break;
+                case 'h_bank': updateEmbed = createBankEmbed(timeLeft, currentUser); break;
+                default: updateEmbed = createHomeEmbed(timeLeft);
+            }
+            
+            // Chỉ edit nếu tin nhắn còn tồn tại
+            await helpMsg.edit({ embeds: [updateEmbed], components: [getRow()] });
+        } catch (e) {
+            // Nếu mất tin nhắn (bị xóa) thì dừng loop luôn
+            clearInterval(timer); 
+            collector.stop();
+        }
+    }, 5000); // Update mỗi 5 giây (15s hơi lâu khiến người dùng tưởng lag)
+
     collector.on('collect', async i => {
-        // 1. CHECK COOLDOWN (5 Giây)
+        // Check Cooldown
         const now = Date.now();
         const userCooldown = cooldowns.get(i.user.id);
-        const cooldownAmount = 5000; // 5000ms = 5 giây
+        const cooldownAmount = 3000; // Giảm xuống 3s cho đỡ khó chịu
 
         if (userCooldown && (now < userCooldown + cooldownAmount)) {
-            const timeLeftCd = ((userCooldown + cooldownAmount - now) / 1000).toFixed(1);
-            return i.reply({ 
-                content: `🚫 **${i.user.username}**, vui lòng đợi **${timeLeftCd}s** để bấm tiếp!`, 
-                ephemeral: true 
-            });
+            return i.reply({ content: `🚫 Từ từ thôi bạn ơi! Đợi xíu.`, ephemeral: true });
         }
-
-        // Cập nhật thời gian cooldown cho người dùng này
         cooldowns.set(i.user.id, now);
 
-        // 2. XỬ LÝ LOGIC HIỂN THỊ
-        const embed = new EmbedBuilder().setColor('#FFD700').setTimestamp();
-        const descSuffix = `\n━━━━━━━━━━━━━━━━━━━━━━\n⏳ **Tự đóng sau:** \`${timeLeft} giây\` | 👤 **Người xem:** ${i.user.username}`;
+        // Reset thời gian đếm ngược khi có người tương tác (Tính năng mới)
+        timeLeft = 60; 
+        currentView = i.customId; // Lưu lại trang hiện tại
+        currentUser = i.user; // Lưu người bấm
 
-        if (i.customId === 'h_home') {
-             // Quay về trang chủ
-             await i.update({ embeds: [generateHomeEmbed(timeLeft)], components: [getRow()] });
-             return;
-        } 
-        
-        else if (i.customId === 'h_eco') {
-            embed.setTitle('💰 HỆ THỐNG TÀI CHÍNH')
-                 .setThumbnail('https://cdn-icons-png.flaticon.com/512/2485/2485519.png') // Icon minh họa
-                 .setDescription(
-                    `Quản lý túi tiền của bạn để trở thành đại gia server.\n` +
-                    `\n**Lệnh Cơ Bản:**` +
-                    `\n\`!tien\` : Kiểm tra số dư hiện tại & Nợ xấu.` +
-                    `\n\`!diemdanh\` : Nhận lương điểm danh hàng ngày.` +
-                    `\n\`!top\` : Xem bảng xếp hạng đại gia.` +
-                    `\n\n**Giao Dịch:**` +
-                    `\n\`!chuyentien <@user> <số tiền>\` : Chuyển tiền (Phí 5%).` +
-                    `\n\`!chuyenxu <@user> <số xu>\` : Chuyển xu (Phí 7-10%).` +
-                    descSuffix
-                 );
-        } 
-        
-        else if (i.customId === 'h_game') {
-            embed.setTitle('🎲 SẢNH TRÒ CHƠI CASINO')
-                 .setThumbnail('https://cdn-icons-png.flaticon.com/512/1067/1067357.png')
-                 .setDescription(`Danh sách các trò chơi đỏ đen mạo hiểm. Hãy cân nhắc kỹ!`)
-                 .addFields(
-                    { 
-                        name: '🃏 BÀI CÀO (3 Cây) - MỚI UPDATE ✨', 
-                        value: 
-                        `> **\`!baicao <tiền cược>\`**: Tạo bàn hoặc tham gia ván bài.\n` +
-                        `> **\`!nguabai\`**: Xem bài của riêng bạn (Chỉ bạn thấy).\n` +
-                        `> **\`!xetbai\`**: Buộc xét bài người cuối cùng (Dùng khi có người ngủ quên/treo máy quá 5p).`
-                    },
-                    { 
-                        name: '🎲 CÁC GAME KHÁC', 
-                        value: 
-                        `• \`!taixiu <cuoc>\` : Tài (11-17) hoặc Xỉu (4-10).\n` +
-                        `• \`!baucua <cua/tom...> <tien>\` : Bầu cua tôm cá.\n` +
-                        `• \`!xidach\` : Blackjack 21 điểm.\n` +
-                        `• \`!tungxu\` : Sấp ngửa định mệnh.\n` +
-                        `• \`!boctham\` : Thử vận may rủi.\n` +
-                        `• \`!anxin\` : Dành cho người hết tiền.`
-                    }
-                 )
-                 .setFooter({ text: 'Chơi có trách nhiệm!' });
-                 // Thêm suffix vào cuối description nếu muốn, hoặc để ở Footer
-        } 
-        
-        else if (i.customId === 'h_bank') {
-            embed.setTitle('🏦 NGÂN HÀNG & TÍN DỤNG')
-                 .setThumbnail('https://cdn-icons-png.flaticon.com/512/2830/2830284.png')
-                 .addFields(
-                  {
-                    name: '💸 VAY VỐN (LÃI SUẤT CẮT CỔ)', 
-                    value: 
-                    '• **Điều kiện:** Số dư < 11k vay tối đa `10,000`. Số dư lớn hơn được vay `x2`.\n' +
-                    '• **Cơ chế:** Vay 1 trả 2 (Nợ gấp đôi thực nhận).\n' +
-                    '>>> `!vay <số tiền>` : Làm thủ tục vay.\n' +
-                    '`!vay` : Vay tối đa hạn mức cho phép.'
-                  },
-                  {
-                    name: '💳 TRẢ NỢ & RÚT TIỀN',
-                    value:
-                    '>>> `!tralai <số tiền>` : Trả bớt nợ.\n' +
-                    '`!tralai all` : Trả sạch nợ.\n' +
-                    '`!doi <xu>` : Quy đổi Xu game thành Tiền (Có phí).'
-                  }
-                 )
-                 .setFooter({ text: descSuffix.replace(/\n/g, '') }); // Dọn text cho gọn vào footer
-        }
+        // Xử lý chuyển trang
+        let newEmbed;
+        if (i.customId === 'h_home') newEmbed = createHomeEmbed(timeLeft);
+        else if (i.customId === 'h_eco') newEmbed = createEcoEmbed(timeLeft, i.user);
+        else if (i.customId === 'h_game') newEmbed = createGameEmbed(timeLeft, i.user);
+        else if (i.customId === 'h_bank') newEmbed = createBankEmbed(timeLeft, i.user);
 
-        await i.update({ embeds: [embed], components: [getRow()] });
+        await i.update({ embeds: [newEmbed], components: [getRow()] });
     });
 
     collector.on('end', async () => {
         clearInterval(timer);
-        // Khi hết giờ, xóa tin nhắn help và tin nhắn lệnh của người dùng để dọn dẹp box chat
-        await helpMsg.delete().catch(() => {});
-        await message.delete().catch(() => {});
+        try {
+            // Cách 1: Xóa luôn tin nhắn (như bạn muốn)
+            await helpMsg.delete();
+            await message.delete();
+            
+            // Cách 2 (Khuyên dùng): Disable nút và báo hết giờ (đỡ bị user hỏi sao mất tin nhắn)
+            /*
+            const disabledRow = getRow(true);
+            const endEmbed = EmbedBuilder.from(helpMsg.embeds[0])
+                .setFooter({ text: '❌ Menu đã hết hạn sử dụng' })
+                .setColor('#2c2f33');
+            await helpMsg.edit({ embeds: [endEmbed], components: [disabledRow] });
+            */
+        } catch (e) {
+            // Bỏ qua lỗi nếu tin nhắn đã bị xóa trước đó
+        }
     });
 }
 // ==========================================
