@@ -1583,7 +1583,7 @@ async function startDealing(channel, game) {
     // Dọn dẹp sòng sau 5 phút nếu bị treo (quên bấm nút)
     setTimeout(() => {
         if (activeGames.has(channel.id)) activeGames.delete(channel.id);
-    }, 300000); 
+    }, 30000); 
 }
 
 // --- [MỚI] 6. HÀM TẠO GAME & ĐẾM NGƯỢC (Dùng hàm này trong lệnh chat) ---
@@ -1681,7 +1681,7 @@ async function startGameWithTimer(interaction, betAmount) {
             activeGames.delete(channelId);
             await interaction.followUp("❌ Có lỗi xảy ra, ván bài bị hủy.");
         }
-    }, 300000); // 30 giây
+    }, 30000); // 30 giây
 }
 
 // =====================
