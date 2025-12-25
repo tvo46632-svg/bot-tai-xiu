@@ -1559,7 +1559,7 @@ async function cmdHelp(message) {
 
     
 // =============================================================================
-//                 PHỄU TỔNG INTERACTION (SỬA LỖI NGOẶC)
+//                 PHỄU TỔNG INTERACTION (ĐÃ FIX LỖI TREO NÚT)
 // =============================================================================
 
 client.on('interactionCreate', async (interaction) => {
@@ -1567,62 +1567,76 @@ client.on('interactionCreate', async (interaction) => {
         if (!interaction.isButton()) return;
 
         const xidachSession = blackjackSession[interaction.channelId];
-        const baicaoSession = activeGames.get(interaction.channelId);
 
         // --- A. XỬ LÝ XÌ DÁCH ---
         if (interaction.customId.startsWith('hit_') || interaction.customId.startsWith('stand_')) {
             const [action, userId] = interaction.customId.split("_");
-            if (!xidachSession) return interaction.reply({ content: "❌ Ván này đã kết thúc.", ephemeral: true });
-            if (interaction.user.id !== userId) return interaction.reply({ content: "🚫 Không phải bài của bạn!", ephemeral: true });
+
+            // 1. Phải phản hồi ngay lập tức để tránh lỗi 10062 (Unknown Interaction)
+            // Dùng deferUpdate để báo cho Discord là "Tôi đang xử lý, đừng treo nút"
+            if (!interaction.deferred && !interaction.replied) {
+                await interaction.deferUpdate().catch(() => {});
+            }
+
+            if (!xidachSession) return interaction.followUp({ content: "❌ Ván này đã kết thúc.", flags: [64] });
+            if (interaction.user.id !== userId) return interaction.followUp({ content: "🚫 Không phải bài của bạn!", flags: [64] });
 
             if (action === "hit") {
                 xidachSession.playerHand.push(dealCard());
                 const total = calcPoint(xidachSession.playerHand);
 
+                // TRƯỜNG HỢP: NGŨ LINH
                 if (xidachSession.playerHand.length === 5 && total <= 21) {
                     const winAmount = xidachSession.bet * 3;
                     await addMoney(userId, winAmount);
                     delete blackjackSession[interaction.channelId];
-                    return interaction.update({
+                    return interaction.editReply({
                         embeds: [EmbedBuilder.from(interaction.message.embeds[0]).setColor("#9b59b6").setFields(
                             { name: `👤 Bạn (${total}) - ✨ NGŨ LINH ✨`, value: formatHandWithImages(xidachSession.playerHand), inline: false },
                             { name: `🤖 Nhà cái`, value: formatHandWithImages(xidachSession.dealerHand), inline: false }
-                        ).setDescription(`🔥 **NGŨ LINH!** Bạn thắng **${winAmount.toLocaleString()}**!`)], components: []
+                        ).setDescription(`🔥 **NGŨ LINH!** Bạn thắng **${winAmount.toLocaleString()}**!`)],
+                        components: [] // Kết thúc ván mới xóa nút
                     }).catch(() => {});
                 }
 
+                // TRƯỜNG HỢP: QUẮC
                 if (total > 21) {
                     delete blackjackSession[interaction.channelId];
-                    return interaction.update({
+                    return interaction.editReply({
                         embeds: [EmbedBuilder.from(interaction.message.embeds[0]).setColor("#ff4d4d").setFields(
                             { name: `👤 Bạn (${total}) - QUẮC!`, value: formatHandWithImages(xidachSession.playerHand), inline: false },
                             { name: `🤖 Nhà cái`, value: formatHandWithImages(xidachSession.dealerHand), inline: false }
-                        ).setDescription(`❌ **QUẮC!** Bạn thua **${xidachSession.bet.toLocaleString()}**!`)], components: []
+                        ).setDescription(`❌ **QUẮC!** Bạn thua **${xidachSession.bet.toLocaleString()}**!`)],
+                        components: [] // Kết thúc ván mới xóa nút
                     }).catch(() => {});
                 }
 
-                return interaction.update({
+                // TRƯỜNG HỢP: RÚT BÀI BÌNH THƯỜNG (CHƯA KẾT THÚC)
+                // CỰC KỲ QUAN TRỌNG: Phải gửi lại components: [interaction.message.components[0]]
+                return interaction.editReply({
                     embeds: [EmbedBuilder.from(interaction.message.embeds[0]).setFields(
                         { name: `👤 Bạn (${total})`, value: formatHandWithImages(xidachSession.playerHand), inline: false },
                         { name: `🤖 Nhà cái`, value: formatHandWithImages(xidachSession.dealerHand, true), inline: false }
-                    )]
+                    )],
+                    components: [interaction.message.components[0]] // GIỮ LẠI NÚT ĐỂ BẤM DẰN BÀI
                 }).catch(() => {});
             }
 
             if (action === "stand") {
-                await interaction.deferUpdate().catch(() => {});
                 let dealerHand = xidachSession.dealerHand;
                 delete blackjackSession[interaction.channelId];
 
+                // Nhà cái rút bài
                 while (calcPoint(dealerHand) < 17) {
                     dealerHand.push(dealCard());
                     await interaction.editReply({
                         embeds: [EmbedBuilder.from(interaction.message.embeds[0]).setFields(
                             { name: `👤 Bạn (${calcPoint(xidachSession.playerHand)})`, value: formatHandWithImages(xidachSession.playerHand), inline: false },
                             { name: `🤖 Nhà cái (${calcPoint(dealerHand)})`, value: formatHandWithImages(dealerHand), inline: false }
-                        )]
+                        )],
+                        components: [] // Đã dằn bài thì xóa nút
                     }).catch(() => {});
-                    await sleep(1200);
+                    await new Promise(res => setTimeout(res, 1200));
                 }
 
                 const pP = calcPoint(xidachSession.playerHand);
@@ -1644,43 +1658,46 @@ client.on('interactionCreate', async (interaction) => {
                     embeds: [EmbedBuilder.from(interaction.message.embeds[0]).setColor(col).setFields(
                         { name: `👤 Bạn (${pP})`, value: formatHandWithImages(xidachSession.playerHand), inline: false },
                         { name: `🤖 Nhà cái (${dP})`, value: formatHandWithImages(dealerHand), inline: false }
-                    ).setDescription(`${msg}\n💰 Ví: **${u.money.toLocaleString()}**`)], components: []
+                    ).setDescription(`${msg}\n💰 Ví: **${u.money.toLocaleString()}**`)],
+                    components: [] 
                 }).catch(() => {});
             }
         }
+    } catch (error) {
+        console.error("Lỗi Interaction:", error);
+    }
 
-        // --- B. XỬ LÝ BÀI CÀO ---
+        // --- B. XỬ LÝ BÀI CÀO --- (Đã được đưa vào trong ngoặc chuẩn)
         if (['join_baicao', 'view_hand', 'flip_hand'].includes(interaction.customId)) {
-            if (!baicaoSession) return interaction.reply({ content: "⚠️ Ván không tồn tại.", ephemeral: true });
+            if (!baicaoSession) return interaction.reply({ content: "⚠️ Ván không tồn tại.", flags: [64] });
 
             if (interaction.customId === 'join_baicao') {
-                if (baicaoSession.status !== 'joining') return interaction.reply({ content: "❌ Hết giờ!", ephemeral: true });
-                if (baicaoSession.players.some(p => p.id === interaction.user.id)) return interaction.reply({ content: "Bạn đã vào rồi!", ephemeral: true });
+                if (baicaoSession.status !== 'joining') return interaction.reply({ content: "❌ Hết giờ!", flags: [64] });
+                if (baicaoSession.players.some(p => p.id === interaction.user.id)) return interaction.reply({ content: "Bạn đã vào rồi!", flags: [64] });
 
                 const pD = await getUser(interaction.user.id);
-                if (!pD || pD.money < baicaoSession.bet) return interaction.reply({ content: "💸 Hết tiền!", ephemeral: true });
+                if (!pD || pD.money < baicaoSession.bet) return interaction.reply({ content: "💸 Hết tiền!", flags: [64] });
 
                 await interaction.deferUpdate().catch(() => {});
-                pD.money -= baicaoSession.bet;
+                await subMoney(interaction.user.id, baicaoSession.bet); // Dùng hàm subMoney cho chuẩn
                 baicaoSession.players.push({ id: interaction.user.id, name: interaction.user.username, hand: [], revealed: false });
-                await db.write();
 
-                return interaction.message.edit({
+                return interaction.editReply({
                     embeds: [EmbedBuilder.from(interaction.message.embeds[0]).setDescription(`Cược: **${baicaoSession.bet.toLocaleString()}**\n\nNgười chơi:\n${baicaoSession.players.map((p, i) => `${i + 1}. **${p.name}**`).join('\n')}`)]
                 }).catch(() => {});
             }
 
             if (baicaoSession.status === 'playing') {
                 const player = baicaoSession.players.find(p => p.id === interaction.user.id);
-                if (!player) return interaction.reply({ content: "Bạn không chơi!", ephemeral: true });
+                if (!player) return interaction.reply({ content: "Bạn không chơi!", flags: [64] });
 
                 if (interaction.customId === 'view_hand') {
                     const info = getHandInfo(player.hand);
-                    return interaction.reply({ content: `👀 Bài: ${formatHand(player.hand)} (${info.isBaTay ? "🔥 BA TÂY" : `${info.score} nút`})`, ephemeral: true });
+                    return interaction.reply({ content: `👀 Bài: ${formatHand(player.hand)} (${info.isBaTay ? "🔥 BA TÂY" : `${info.score} nút`})`, flags: [64] });
                 }
 
                 if (interaction.customId === 'flip_hand') {
-                    if (player.revealed) return interaction.reply({ content: "Ngửa rồi!", ephemeral: true });
+                    if (player.revealed) return interaction.reply({ content: "Ngửa rồi!", flags: [64] });
                     await interaction.deferUpdate().catch(() => {});
                     player.revealed = true;
                     await interaction.channel.send(`🔓 **${player.name}** đã ngửa bài!`).catch(() => {});
@@ -1688,8 +1705,10 @@ client.on('interactionCreate', async (interaction) => {
                 }
             }
         }
-    } catch (e) { console.error("Lỗi Interaction:", e); }
-}); // <--- Đóng ngoặc chuẩn cho sự kiện Interaction
+    } catch (e) { 
+        console.error("Lỗi Interaction tổng:", e); 
+    }
+}); // <--- CHỈ CÓ 1 DẤU ĐÓNG DUY NHẤT Ở ĐÂY
 
 
 
