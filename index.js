@@ -1443,13 +1443,6 @@ async function handleBaiCaoCommand(message, args) {
         }
     }, 30000);
 }
-Để đồng bộ với logic "Hạ bài trước - Tính tiền sau" (để giữ bí mật bài Bot cho đến cuối ván), bạn cần sửa lại hàm handleXetBaiCommand sao cho nó không công bố kết quả ngay lập tức.
-
-Thay vào đó, nó sẽ chỉ hiện bộ bài của người bị xét, sau đó kiểm tra xem nếu là người cuối cùng thì mới tung bảng tổng kết.
-
-Dưới đây là bản code đã chỉnh sửa cho bạn:
-
-JavaScript
 
 // =====================
 // ham khoi tao xetbai    
