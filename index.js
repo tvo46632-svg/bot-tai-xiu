@@ -351,16 +351,18 @@ client.on("ready", async () => {
     }
 });
 
-// 3. Xử lý Interaction (Cả Slash Command và Nút bấm)
+// ===============================================
+//   XỬ LÝ INTERACTION (SỬA LỖI NGOẶC & CHẶN HELP)
+// ===============================================
 client.on("interactionCreate", async (interaction) => {
-    // --- PHẦN 1: XỬ LÝ SLASH COMMAND (/doi) ---
-    if (interaction.isChatInputCommand()) {
-        if (interaction.commandName === 'doi') {
-            const amount = interaction.options.getInteger('amount');
-            const type = interaction.options.getString('type');
-            await interaction.deferReply({ ephemeral: true });
+    try {
+        // 1. XỬ LÝ LỆNH SLASH (/doi)
+        if (interaction.isChatInputCommand()) {
+            if (interaction.commandName === 'doi') {
+                const amount = interaction.options.getInteger('amount');
+                const type = interaction.options.getString('type');
+                await interaction.deferReply({ ephemeral: true });
 
-            try {
                 const user = await getUser(interaction.user.id);
                 if (!user) return interaction.editReply("❌ Bạn chưa có dữ liệu!");
 
@@ -377,14 +379,9 @@ client.on("interactionCreate", async (interaction) => {
                     await addXu(interaction.user.id, amount);
                     await interaction.editReply(`✅ **ĐỔI THÀNH CÔNG**\n🪙 Nhận: **${amount.toLocaleString()} Xu**\n💰 Khấu trừ: **${amount.toLocaleString()} Tiền**`);
                 }
-            } catch (err) {
-                console.error("Lỗi /doi:", err);
-                if (interaction.deferred) await interaction.editReply("❌ Lỗi hệ thống!");
             }
+            return; // Kết thúc lệnh Slash
         }
-        return; // Thoát sau khi xử lý Slash
-    }
-};
 // =====================
 //      TUNG XU
 // =====================
