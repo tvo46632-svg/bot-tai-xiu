@@ -1259,14 +1259,27 @@ client.on("interactionCreate", async (interaction) => {
         console.error("Lỗi Xì Dách:", e);
     }
 });
+//---- LENH XOA SAU KHI HET VAN ----
 
 function finishGame(channelId) {
     const session = blackjackSession[channelId];
-    if (session) {
-        if (session.msg) setTimeout(() => session.msg.delete().catch(() => {}), 20000);
-        delete blackjackSession[channelId];
+    if (!session) return; // Nếu không có ván nào thì thoát luôn
+
+    // Lưu lại tin nhắn vào một biến tạm để xóa sau
+    const msgToDelete = session.msg;
+
+    if (msgToDelete && typeof msgToDelete.delete === 'function') {
+        setTimeout(() => {
+            msgToDelete.delete().catch(err => {
+                // Chỉ log lỗi nếu không phải lỗi "Tin nhắn không tồn tại"
+                if (err.code !== 10008) console.error("Không thể xóa mess Xì Dách:", err.message);
+            });
+        }, 20000); // 20 giây
     }
 
+    // Xóa session ngay lập tức để giải phóng bộ nhớ và cho phép ván mới bắt đầu
+    delete blackjackSession[channelId];
+}
 
 
     
@@ -1829,6 +1842,9 @@ client.on('interactionCreate', async (interaction) => {
                 msg: `🔴 **Thua** (-\`${bet.toLocaleString()}\`)`
             };
         } // KẾT THÚC HÀM solveGame
+
+
+
 
         // =====================
         //      MAIN EVENTS 
