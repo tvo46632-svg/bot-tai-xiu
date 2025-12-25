@@ -135,6 +135,12 @@ async function addXu(userId, amount) {
     user.xu += amount;
     await db.write();
 }
+async function subXu(userId, amount) {
+    const user = await getUser(userId);
+    // Trừ xu nhưng đảm bảo xu không bị âm (nhỏ nhất là 0)
+    user.xu = Math.max(0, (user.xu || 0) - amount);
+    await db.write();
+}
 
 // 4. Các hàm về Nợ (Debt)
 async function getUserDebt(userId) {
