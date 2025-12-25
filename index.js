@@ -939,88 +939,74 @@ async function cmdChuyenxu(message, args) {
         setTimeout(() => mainMsg.delete().catch(() => {}), 10000);
     });
 }
-// ====== THÊM HÀM NÀY Ở ĐẦU FILE CỦA BẠN (CÙNG VỚI `sleep` và `calcPoint`) ======
-const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-// 1. Tạo một bảng chuyển đổi từ lá bài sang Emoji
+// 1. BẢNG CHUYỂN ĐỔI (Đã sửa Key để khớp với dạng 9h, 8s, Ad...)
 const cardEmojis = {
-    'A♠️': '<:As:1453654015882821693>', '2♠️': '<:2s:1453654034467651636>', '3♠️': '<:3s:1453654192873934888>', '4♠️': '<:4s:1453654318417711105>', '5♠️': '<:5s:1453654339762651198>', 
-    '6♠️': '<:6s:1453654363883962370>', '7♠️': '<:7s:1453654387359744063>', '8♠️': '<:8s:1453654406787760201>', '9♠️': '<:9s:1453654426400329728>', '10♠️': '<:10s:1453654450395811840>', 
-    'J♠️': '<:Js:1453657192065663087>', 'Q♠️': '<:Qs:1453657012884733983>', 'K♠️': '<:Ks:1453657038360940625>',
+    // Chất Bích (s)
+    'As': '<:As:1453654015882821693>', '2s': '<:2s:1453654034467651636>', '3s': '<:3s:1453654192873934888>', '4s': '<:4s:1453654318417711105>', '5s': '<:5s:1453654339762651198>', 
+    '6s': '<:6s:1453654363883962370>', '7s': '<:7s:1453654387359744063>', '8s': '<:8s:1453654406787760201>', '9s': '<:9s:1453654426400329728>', '10s': '<:10s:1453654450395811840>', 
+    'Js': '<:Js:1453657192065663087>', 'Qs': '<:Qs:1453657012884733983>', 'Ks': '<:Ks:1453657038360940625>',
 
-    'A♥️': '<:Ah:1453651025364914270>', '2♥️': '<:2h:1453651133619896360>', '3♥️': '<:3h:1453651817488711741>', '4♥️': '<:4h:1453651882881978388>', '5♥️': '<:5h:1453651964926627882>', 
-    '6♥️': '<:6h:1453652020098764932>', '7♥️': '<:7h:1453652050670911533>', '8♥️': '<:8h:1453652088679563274>', '9♥️': '<:9h:1453652126407458970>', '10♥️': '<:10h:1453652157911011339>', 
-    'J♥️': '<:Jh:1453652343567683755>', 'Q♥️': '<:Qh:1453652372181094513>', 'K♥️': '<:Kh:1453652398441500704>',
+    // Chất Cơ (h)
+    'Ah': '<:Ah:1453651025364914270>', '2h': '<:2h:1453651133619896360>', '3h': '<:3h:1453651817488711741>', '4h': '<:4h:1453651882881978388>', '5h': '<:5h:1453651964926627882>', 
+    '6h': '<:6h:1453652020098764932>', '7h': '<:7h:1453652050670911533>', '8h': '<:8h:1453652088679563274>', '9h': '<:9h:1453652126407458970>', '10h': '<:10h:1453652157911011339>', 
+    'Jh': '<:Jh:1453652343567683755>', 'Qh': '<:Qh:1453652372181094513>', 'Kh': '<:Kh:1453652398441500704>',
 
-    'A♣️': '<:Ac:1453653137079668857>', '2♣️': '<:2c:1453653161180135464>', '3♣️': '<:3c:1453653324539625488>', '4♣️': '<:4c:1453653609202843789>', '5♣️': '<:5c:1453653672536969338>', 
-    '6♣️': '<:6c:1453653695567888406>', '7♣️': '<:7c:1453653722445119543>', '8♣️': '<:8c:1453653745136046202>', '9♣️': '<:9c:1453653769181986930>', '10♣️': '<:10c:1453653791047155763>', 
-    'J♣️': '<:Jc:1453653814866608210>', 'Q♣️': '<:Qc:1453653838484476027>', 'K♣️': '<:Kc:1453653888564461679>',
+    // Chất Nhép/Chuồn (c)
+    'Ac': '<:Ac:1453653137079668857>', '2c': '<:2c:1453653161180135464>', '3c': '<:3c:1453653324539625488>', '4c': '<:4c:1453653609202843789>', '5c': '<:5c:1453653672536969338>', 
+    '6c': '<:6c:1453653695567888406>', '7c': '<:7c:1453653722445119543>', '8c': '<:8c:1453653745136046202>', '9c': '<:9c:1453653769181986930>', '10c': '<:10c:1453653791047155763>', 
+    'Jc': '<:Jc:1453653814866608210>', 'Qc': '<:Qc:1453653838484476027>', 'Kc': '<:Kc:1453653888564461679>',
 
-    'A♦️': '<:Ad:1453652431627092082>', '2♦️': '<:2d:1453652489004912806>', '3♦️': '<:3d:1453652679665385484>', '4♦️': '<:4d:1453652758744924224>', '5♦️': '<:5d:1453652783847706655>', 
-    '6♦️': '<:6d:1453652804701782161>', '7♦️': '<:7d:1453652862998413342>', '8♦️': '<:8d:1453652890626424842>', '9♦️': '<:9d:1453652911992078469>', '10♦️': '<:10d:1453652933248811008>', 
-    'J♦️': '<:Jd:1453652955956904070>', 'Q♦️': '<:Qd:1453652979235291197>', 'K♦️': '<:Kd:1453653001029030008>',
+    // Chất Rô (d)
+    'Ad': '<:Ad:1453652431627092082>', '2d': '<:2d:1453652489004912806>', '3d': '<:3d:1453652679665385484>', '4d': '<:4d:1453652758744924224>', '5d': '<:5d:1453652783847706655>', 
+    '6d': '<:6d:1453652804701782161>', '7d': '<:7d:1453652862998413342>', '8d': '<:8d:1453652890626424842>', '9d': '<:9d:1453652911992078469>', '10d': '<:10d:1453652933248811008>', 
+    'Jd': '<:Jd:1453652955956904070>', 'Qd': '<:Qd:1453652979235291197>', 'Kd': '<:Kd:1453653001029030008>',
 
     '🂠': '<:back:1453657459507073074>'
 };
 
-// 2. Thay đổi hàm format để dùng Emoji
+// 2. Hàm Format để hiển thị Emoji
 function formatHandWithImages(hand, isHidden = false) {
     if (isHidden) { 
-        // Khi nhà cái chưa lật bài hoàn toàn
         return `${cardEmojis['🂠']} ${cardEmojis[hand[1]] || hand[1]}`;
     }
-    // Chuyển toàn bộ lá bài sang Emoji màu sắc và nối lại bằng dấu cách
     return hand.map(card => cardEmojis[card] || card).join(" ");
 }
 
-// ===================== XÌ DÁCH (BLACKJACK KIỂU MỚI) - PHIÊN BẢN HÌNH ẢNH =====================
-let blackjackSession = {};
-
-// Hàm calcPoint và dealCard giữ nguyên như bạn đã có
-// Vui lòng đảm bảo đã thêm hàm `sleep` và `cardToImageUrl` ở trên cùng
-// 2. DI CHUYỂN CÁC HÀM LOGIC RA NGOÀI ĐỂ TẤT CẢ LỆNH ĐỀU DÙNG ĐƯỢC
+// 3. Hàm tính điểm (Sửa logic để hiểu dạng 9h, 10s...)
 function calcPoint(hand) {
     let score = 0;
     let aces = 0;
     for (let card of hand) {
-        // Lấy tất cả các chữ số hoặc chữ cái (A, J, Q, K) đứng trước Emoji
-        let val = card.replace(/[♠️|♣️|♥️|♦️]/g, '').trim(); 
-        
-        if (val === 'A') { 
-            aces++; 
-            score += 11; 
-        } else if (['J', 'Q', 'K'].includes(val)) { 
-            score += 10; 
-        } else { 
-            score += parseInt(val); 
-        }
+        let val = card.slice(0, -1); // Lấy phần số (bỏ chữ s,h,c,d cuối)
+        if (val === 'A') { aces++; score += 11; }
+        else if (['J', 'Q', 'K'].includes(val)) { score += 10; }
+        else { score += parseInt(val); }
     }
-    while (score > 21 && aces > 0) { 
-        score -= 10; 
-        aces--; 
-    }
+    while (score > 21 && aces > 0) { score -= 10; aces--; }
     return score;
-    }
+}
 
+// 4. Hàm chia bài (Trả về dạng 9h, 8s để khớp bảng Emoji)
 function dealCard() {
-    const suits = ['♠️', '♣️', '♥️', '♦️'];
+    const suits = ['s', 'c', 'h', 'd'];
     const values = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
     const suit = suits[Math.floor(Math.random() * suits.length)];
     const value = values[Math.floor(Math.random() * values.length)];
     return value + suit;
 }
 
+// 5. Hàm lấy URL ảnh lá bài (Thumbnail)
 function cardToImageUrl(card) {
     if (card === '🂠') return 'https://i.imgur.com/89S9OQ3.png';
-    const mapSuit = { '♠️': 'S', '♣️': 'C', '♥️': 'H', '♦️': 'D' };
-    
-    // Lấy phần số/chữ và phần chất bài riêng biệt
-    const val = card.replace(/[♠️|♣️|♥️|♦️]/g, '').trim();
-    const suitSymbol = card.match(/[♠️|♣️|♥️|♦️]/g)[0];
-    const suit = mapSuit[suitSymbol];
-    
+    const val = card.slice(0, -1);
+    const suit = card.slice(-1).toUpperCase();
     const finalVal = val === '10' ? '0' : val;
     return `https://deckofcardsapi.com/static/img/${finalVal}${suit}.png`;
 }
+
+// ====== LỆNH CHÍNH ======
+let blackjackSession = {};
+
 async function cmdXidach(message, args) {
     if (args.length < 1) return message.reply("💡 Cách dùng: `!xidach <số tiền>`");
     const bet = parseInt(args[0]);
@@ -1030,7 +1016,7 @@ async function cmdXidach(message, args) {
     if (user.money < bet) return message.reply("💸 Bạn không đủ tiền!");
     
     await subMoney(message.author.id, bet);
-    const currentUser = await getUser(message.author.id); // Lấy số dư sau khi trừ
+    const currentUser = await getUser(message.author.id);
 
     const session = {
         userId: message.author.id,
@@ -1042,11 +1028,11 @@ async function cmdXidach(message, args) {
 
     const embed = new EmbedBuilder()
         .setTitle("🃏 SÒNG BÀI XÌ DÁCH")
-        .setColor("#2f3136") // Màu nền Embed (có thể thay đổi)
-        .setThumbnail(cardToImageUrl(session.playerHand[0])) // Hiện lá bài đầu tiên của người chơi làm thumbnail
+        .setColor("#2f3136")
+        .setThumbnail(cardToImageUrl(session.playerHand[0]))
         .addFields(
-            { name: `👤 Bạn (${calcPoint(session.playerHand)})`, value: `${formatHandWithImages(session.playerHand)}`, inline: false }, // Đặt inline false để ảnh không bị bóp
-            { name: `🤖 Nhà cái`, value: `${formatHandWithImages(session.dealerHand, true)}`, inline: false } // Ẩn 1 lá của nhà cái
+            { name: `👤 Bạn (${calcPoint(session.playerHand)})`, value: `${formatHandWithImages(session.playerHand)}`, inline: false },
+            { name: `🤖 Nhà cái`, value: `${formatHandWithImages(session.dealerHand, true)}`, inline: false }
         )
         .setDescription(`💵 Tiền cược: **${bet.toLocaleString()}**`)
         .setFooter({ text: `💰 Số dư: ${currentUser.money.toLocaleString()} | Đang chờ bạn...` });
@@ -1060,21 +1046,17 @@ async function cmdXidach(message, args) {
     blackjackSession[message.channel.id] = session;
 }
 
+// ====== XỬ LÝ NÚT BẤM ======
 client.on("interactionCreate", async (interaction) => {
     if (!interaction.isButton()) return;
     const [action, userId] = interaction.customId.split("_");
-    const channelId = interaction.channel.id;
-    const session = blackjackSession[channelId];
+    const session = blackjackSession[interaction.channel.id];
 
-    // Thêm điều kiện: Nếu ID nút bấm bắt đầu bằng "h_" (của Help) thì bỏ qua không kiểm tra session
-if (!interaction.customId.startsWith('h_')) { 
+    if (interaction.customId.startsWith('h_')) return; 
     if (!session || session.userId !== interaction.user.id) {
         return interaction.reply({ content: "❌ Không phải phiên của bạn!", ephemeral: true });
     }
-}
-   
 
-    // --- NÚT RÚT BÀI ---
     if (action === "hit") {
         session.playerHand.push(dealCard());
         const total = calcPoint(session.playerHand);
@@ -1082,44 +1064,41 @@ if (!interaction.customId.startsWith('h_')) {
 
         if (total > 21) {
             const failEmbed = EmbedBuilder.from(interaction.message.embeds[0])
-                .setColor("#ff4d4d") // Đỏ khi thua
+                .setColor("#ff4d4d")
                 .setFields(
                     { name: `👤 Bạn (${total}) - QUẮC!`, value: `${formatHandWithImages(session.playerHand)}`, inline: false },
-                    { name: `🤖 Nhà cái (${calcPoint(session.dealerHand)})`, value: `${formatHandWithImages(session.dealerHand)}`, inline: false } // Hiện bài nhà cái
+                    { name: `🤖 Nhà cái (${calcPoint(session.dealerHand)})`, value: `${formatHandWithImages(session.dealerHand)}`, inline: false }
                 )
                 .setDescription(`❌ **QUẮC!** Bạn thua **${session.bet.toLocaleString()}**!`)
-                .setFooter({ text: `💰 Số dư: ${userData.money.toLocaleString()} | Tự xóa sau 20s` });
+                .setFooter({ text: `💰 Số dư: ${userData.money.toLocaleString()}` });
 
             await interaction.update({ embeds: [failEmbed], components: [] });
-            return finishGame(channelId);
+            return finishGame(interaction.channel.id);
         } else {
             const updateEmbed = EmbedBuilder.from(interaction.message.embeds[0])
                 .setFields(
                     { name: `👤 Bạn (${total})`, value: `${formatHandWithImages(session.playerHand)}`, inline: false },
                     { name: `🤖 Nhà cái`, value: `${formatHandWithImages(session.dealerHand, true)}`, inline: false }
-                )
-                .setFooter({ text: `💰 Số dư: ${userData.money.toLocaleString()} | Đang đợi bạn...` });
+                );
             await interaction.update({ embeds: [updateEmbed] });
         }
     }
 
-    // --- NÚT DẰN BÀI (CÓ HOẠT ẢNH RÚT TỪNG LÁ VÀ HÌNH ẢNH) ---
     if (action === "stand") {
-        await interaction.deferUpdate(); // Giữ bot đang xử lý
+        await interaction.deferUpdate();
         let dealerHand = session.dealerHand;
         
-        // Hoạt ảnh rút bài từng lá cho Nhà cái
         while (calcPoint(dealerHand) < 17) {
             dealerHand.push(dealCard());
             const drawEmbed = EmbedBuilder.from(interaction.message.embeds[0])
                 .setFields(
                     { name: `👤 Bạn (${calcPoint(session.playerHand)})`, value: `${formatHandWithImages(session.playerHand)}`, inline: false },
-                    { name: `🤖 Nhà cái (${calcPoint(dealerHand)})`, value: `${formatHandWithImages(dealerHand)}`, inline: false } // Hiện bài nhà cái
+                    { name: `🤖 Nhà cái (${calcPoint(dealerHand)})`, value: `${formatHandWithImages(dealerHand)}`, inline: false }
                 )
                 .setFooter({ text: "🤖 Nhà cái đang rút bài... 🃏" });
 
             await interaction.editReply({ embeds: [drawEmbed], components: [] });
-            await sleep(1500); // Chờ 1.5 giây mỗi lá bài
+            await sleep(1500);
         }
 
         const playerTotal = calcPoint(session.playerHand);
@@ -1130,14 +1109,14 @@ if (!interaction.customId.startsWith('h_')) {
         if (dealerTotal > 21 || playerTotal > dealerTotal) {
             await addMoney(userId, session.bet * 2);
             resultText = `🎉 **THẮNG!** Bạn nhận \`+${session.bet.toLocaleString()}\``;
-            finalColor = "#2ecc71"; // Xanh lá
+            finalColor = "#2ecc71";
         } else if (playerTotal === dealerTotal) {
             await addMoney(userId, session.bet);
             resultText = `⚖️ **HÒA!** Hoàn lại \`${session.bet.toLocaleString()}\``;
-            finalColor = "#f1c40f"; // Vàng
+            finalColor = "#f1c40f";
         } else {
             resultText = `❌ **THUA!** Bạn mất \`${session.bet.toLocaleString()}\``;
-            finalColor = "#e74c3c"; // Đỏ
+            finalColor = "#e74c3c";
         }
 
         const userData = await getUser(userId);
@@ -1147,13 +1126,24 @@ if (!interaction.customId.startsWith('h_')) {
                 { name: `👤 Bạn (${playerTotal})`, value: `${formatHandWithImages(session.playerHand)}`, inline: false },
                 { name: `🤖 Nhà cái (${dealerTotal})`, value: `${formatHandWithImages(dealerHand)}`, inline: false }
             )
-            .setDescription(`${resultText}\n💵 Số dư hiện tại: **${userData.money.toLocaleString()}**`)
-            .setFooter({ text: "Ván đấu kết thúc - Tự xóa sau 20s" });
+            .setDescription(`${resultText}\n💵 Số dư hiện tại: **${userData.money.toLocaleString()}**`);
 
         await interaction.editReply({ embeds: [finalEmbed], components: [] });
-        finishGame(channelId);
+        finishGame(interaction.channel.id);
     }
 });
+
+function finishGame(channelId) {
+    const session = blackjackSession[channelId];
+    if (session && session.msg) {
+        setTimeout(() => {
+            session.msg.delete().catch(() => {});
+            delete blackjackSession[channelId];
+        }, 20000);
+    } else {
+        delete blackjackSession[channelId];
+    }
+}
 
 function finishGame(channelId) {
     const session = blackjackSession[channelId];
