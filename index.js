@@ -1160,7 +1160,7 @@ async function cmdHelp(message) {
         
         else if (i.customId === 'h_eco') {
             embed.setTitle('💰 HỆ THỐNG TÀI CHÍNH')
-                 .setThumbnail('https://cdn-icons-png.flaticon.com/512/2485/2485519.png')
+                 .setThumbnail('https://media1.tenor.com/m/0juOI5VQircAAAAd/money-flying-money-maker.gif')
                  .setDescription(
                     `**Lệnh Cơ Bản:**\n` +
                     `\`!tien\` : Kiểm tra số dư.\n` +
@@ -1174,7 +1174,7 @@ async function cmdHelp(message) {
         
         else if (i.customId === 'h_game') {
             embed.setTitle('🎲 SẢNH TRÒ CHƠI CASINO')
-                 .setThumbnail('https://cdn-icons-png.flaticon.com/512/1067/1067357.png')
+                 .setThumbnail('https://media1.tenor.com/m/0mPNSNKXUr8AAAAC/poker.gif')
                  .addFields(
                     { 
                         name: '🃏 BÀI CÀO (3 Cây)', 
@@ -1189,7 +1189,7 @@ async function cmdHelp(message) {
         
         else if (i.customId === 'h_bank') {
             embed.setTitle('🏦 NGÂN HÀNG & TÍN DỤNG')
-                 .setThumbnail('https://cdn-icons-png.flaticon.com/512/2830/2830284.png')
+                 .setThumbnail('https://media1.tenor.com/m/13H8kTVxtWgAAAAC/black-money.gif')
                  .addFields(
                   {
                     name: '💸 VAY VỐN', 
