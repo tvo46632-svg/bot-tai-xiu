@@ -948,10 +948,11 @@ const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 // TÔI SẼ DÙNG CÁCH DÁN CÁC LINK ẢNH VÀO DESCRIPTION/FIELDS.
 function formatHandWithImages(hand, isHidden = false) {
     if (isHidden) { 
-        // Dùng ký tự tàng hình \u200b để "ép" Discord bung ảnh nhúng
-        return `[\u200b](${cardToImageUrl('🂠')}) [\u200b](${cardToImageUrl(hand[1])})`;
+        // Thêm dấu chấm vào giữa [] để Discord chắc chắn phải hiện ảnh bài nhà cái
+        return `[.](${cardToImageUrl('🂠')}) [.](${cardToImageUrl(hand[1])})`;
     }
-    return hand.map(card => `[\u200b](${cardToImageUrl(card)})`).join(" ");
+    // Thêm dấu chấm vào giữa [.] cho tất cả các lá bài của người chơi
+    return hand.map(card => `[.](${cardToImageUrl(card)})`).join(" ");
 }
 
 // Nếu bạn muốn dùng Emoji (cần phải upload lên server và có ID)
