@@ -88,6 +88,19 @@ async function cmdAdmin(message, args) {
         }
     }
 }
+// Hàm lấy toàn bộ danh sách user để làm bảng xếp hạng
+async function getAllUsers() {
+    await db.read();
+    // Chuyển Object users thành một mảng các User kèm theo ID để dễ xử lý
+    return Object.entries(db.data.users).map(([id, data]) => {
+        return {
+            id: id,
+            money: data.money || 0,
+            xu: data.xu || 0,
+            debt: data.debt || 0
+        };
+    });
+}
 
 // Get or create user
 async function getUser(userId) {
