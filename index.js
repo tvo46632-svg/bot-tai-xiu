@@ -439,6 +439,7 @@ client.on("interactionCreate", async (interaction) => {
 const activeTungXu = new Set();
 
 async function cmdTungxu(message, args) {
+    // Hàm xóa lỗi tự động
     const xoaTinNhanLoi = async (msgGui, noiDung) => {
         const reply = await msgGui.reply(noiDung);
         setTimeout(async () => {
@@ -467,32 +468,57 @@ async function cmdTungxu(message, args) {
         activeTungXu.add(userId);
         await subXu(userId, betXu);
 
-        const EMOTE_NGUA = "<:ngua:1454109465564414128>"; 
-        const EMOTE_SAP = "<:sap:1454109488314585139>";
-        const GIF_SPIN = "https://media1.tenor.com/m/u0PubumsAUkAAAAC/eminem-eminem-taern.gif"; 
+        // --- CẤU HÌNH LINK ẢNH & EMOTE ---
+        // 1. Hãy thay URL ảnh tĩnh của 2 mặt xu vào đây để nó hiện lên bảng kết quả
+        const IMG_NGUA_URL = "https://i.imgur.com/P1Z123.png"; // Link ảnh mặt Ngửa (đuôi .png/.jpg)
+        const IMG_SAP_URL = "https://i.imgur.com/AbC456.png";  // Link ảnh mặt Sấp (đuôi .png/.jpg)
+        
+        // 2. Emote nhỏ trong dòng text (Lấy bằng cách gõ \:emote: trong Discord)
+        const EMOTE_NGUA = "🔴"; // Tạm để icon đỏ, bạn thay lại ID chuẩn: <:ngua:ID_CUA_BAN>
+        const EMOTE_SAP = "🔵";  // Tạm để icon xanh, bạn thay lại ID chuẩn: <:sap:ID_CUA_BAN>
+        
+        // 3. GIF xoay
+        const GIF_SPIN = "https://media1.tenor.com/m/u0PubumsAUkAAAAC/eminem-eminem-taern.gif";
+        // ----------------------------------
 
-        // 1. Tạo bảng (Embed) lúc đang chờ
+        // TẠO BẢNG XOAY (GIF)
         const embedSpin = new EmbedBuilder()
-            .setColor("#FFFF00")
+            .setColor("#FFFF00") // Màu vàng
             .setTitle("🪙 ĐANG TUNG XU...")
-            .setDescription(`**${message.author.username}** đã đặt **${betXu.toLocaleString()} xu** vào cửa **${userChoice.toUpperCase()}**`)
-            .setImage(GIF_SPIN); // GIF sẽ hiện to trong bảng này
+            .setDescription(`**${message.author.username}** cược **${betXu.toLocaleString()}** vào **${userChoice.toUpperCase()}**`)
+            .setImage(GIF_SPIN) // Hiện GIF to đùng
+            .setFooter({ text: "Chờ xíu..." });
 
         const msg = await message.reply({ embeds: [embedSpin] });
 
+        // Chờ 3 giây
         await new Promise(res => setTimeout(res, 3000));
 
+        // TÍNH KẾT QUẢ
         const result = Math.random() < 0.5 ? "ngửa" : "sấp";
-        const resultEmote = (result === "ngửa") ? EMOTE_NGUA : EMOTE_SAP;
         const isWin = (result === userChoice);
+        
+        const resultText = isWin 
+            ? `🎉 **THẮNG:** +${(betXu * 2).toLocaleString()} xu` 
+            : `💸 **THUA:** -${betXu.toLocaleString()} xu`;
+        
+        const resultColor = isWin ? "#00FF00" : "#FF0000"; // Thắng Xanh, Thua Đỏ
+        const resultImage = (result === "ngửa") ? IMG_NGUA_URL : IMG_SAP_URL;
+        const resultIcon = (result === "ngửa") ? EMOTE_NGUA : EMOTE_SAP;
 
-        // 2. Cập nhật bảng kết quả
+        // CỘNG TIỀN NẾU THẮNG
+        if (isWin) await addXu(userId, betXu * 2);
+        const newUser = await getUser(userId);
+
+        // TẠO BẢNG KẾT QUẢ (THAY GIF BẰNG ẢNH TĨNH)
         const embedResult = new EmbedBuilder()
-            .setColor(isWin ? "#00FF00" : "#FF0000")
-            .setTitle(`🪙 KẾT QUẢ: ${result.toUpperCase()}`)
-            .setDescription(`${resultEmote}\n\n${isWin ? `🎉 **Thắng:** +${(betXu * 2).toLocaleString()} xu` : `💸 **Thua:** -${betXu.toLocaleString()} xu`}\n\n> 💰 Ví hiện tại: **${(await getUser(userId)).xu.toLocaleString()}** xu`)
-            .setFooter({ text: `Người chơi: ${message.author.username}` });
+            .setColor(resultColor)
+            .setTitle(`🪙 KẾT QUẢ: ${result.toUpperCase()} ${resultIcon}`)
+            .setDescription(`${resultText}\n\n> 💰 Ví hiện tại: **${newUser.xu.toLocaleString()}** xu`)
+            .setThumbnail(resultImage) // Hiện ảnh mặt xu nhỏ bên góc phải
+            .setFooter({ text: `Người chơi: ${message.author.username}`, iconURL: message.author.displayAvatarURL() });
 
+        // Sửa tin nhắn cũ thành bảng kết quả
         await msg.edit({ embeds: [embedResult] }).catch(() => null);
 
     } catch (e) {
