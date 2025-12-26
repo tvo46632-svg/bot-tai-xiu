@@ -1336,13 +1336,23 @@ function dealCard() {
     return `:${value}${suit}:`; 
 }
 
-function formatHand(hand, isHidden = false) {
-    if (!hand || hand.length === 0) return "🎴";
-    if (isHidden) { 
-        // Nếu là Xì Dách (thường có 2 lá lúc đầu), úp lá 1 hiện lá 2
-        // Nếu là Bài Cào, tốt nhất là úp hết: hand.map(() => cardEmojis[':back:']).join(" ")
-        return `${cardEmojis[':back:']} ${cardEmojis[hand[1]] || hand[1]}`;
+function formatHand(hand, hide = false) {
+    if (!hand || hand.length === 0) return "🎴 (Đang chia...)";
+    
+    // 1. Chế độ NHÀ CÁI XÌ DÁCH (Úp lá đầu, hiện các lá còn lại)
+    if (hide === 'dealer') {
+        // Lấy tất cả các lá từ vị trí thứ 2 trở đi để hiển thị
+        const visibleCards = hand.slice(1).map(card => cardEmojis[card] || card).join(" ");
+        // Trả về lá bài úp đầu tiên + các lá còn lại
+        return `${cardEmojis[':back:']} ${visibleCards}`;
     }
+    
+    // 2. Chế độ BÀI CÀO (Úp toàn bộ 3 lá)
+    if (hide === true) {
+        return `${cardEmojis[':back:']} ${cardEmojis[':back:']} ${cardEmojis[':back:']}`;
+    }
+
+    // 3. Chế độ HIỆN TOÀN BỘ (Dành cho người chơi hoặc khi kết thúc ván)
     return hand.map(card => cardEmojis[card] || card).join(" ");
 }
 
