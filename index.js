@@ -1861,7 +1861,7 @@ async function finishBaicao(channel, game) {
     const finalEmbed = new EmbedBuilder()
         .setTitle("🏁 KẾT QUẢ VÁN BÀI CÀO")
         .setColor("#FFD700")
-        .setThumbnail("https://i.imgur.com/89S9OQ3.png")
+        .setImage("https://media1.tenor.com/m/FTb3MhMBWfUAAAAC/poker-reveal.gif")
         .addFields(
             {
                 name: "🏰 NHÀ CÁI (BOT)",
