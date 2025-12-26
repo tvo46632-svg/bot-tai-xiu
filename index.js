@@ -1874,7 +1874,7 @@ async function finishBaicao(channel, game) {
                 inline: false
             }
         )
-        .setFooter({ text: `💵 Mức cược: ${game.bet.toLocaleString()} | Sòng bài sạch sẽ 100%` })
+        .setFooter({ text: `💵 Mức cược: ${game.bet.toLocaleString()} | Sòng bài MACAO GOLD` })
         .setTimestamp();
 
     await channel.send({ embeds: [finalEmbed] }).catch(() => {});
