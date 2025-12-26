@@ -1555,56 +1555,68 @@ client.on('interactionCreate', async (interaction) => {
         const xidachSession = blackjackSession[interaction.channelId];
         const baicaoSession = activeGames.get(interaction.channelId);
 
-        // --- A. XỬ LÝ XÌ DÁCH ---
+       // --- A. XỬ LÝ XÌ DÁCH ---
         if (interaction.customId.startsWith('hit_') || interaction.customId.startsWith('stand_')) {
-            const [action, userId] = interaction.customId.split("_");
+            let [action, userId] = interaction.customId.split("_");
             if (!xidachSession) return interaction.reply({ content: "❌ Ván đã kết thúc.", flags: [64] }).catch(() => {});
             if (interaction.user.id !== userId) return interaction.reply({ content: "🚫 Không phải bài của bạn!", flags: [64] }).catch(() => {});
 
+            // Biến kiểm tra xem có cần kết thúc game luôn không (do dằn hoặc do quắc)
+            let isEndGame = false;
+
             // 1. XỬ LÝ NÚT RÚT BÀI
             if (action === "hit") {
-                // SỬA: Dùng drawCard(xidachSession.deck) nếu bạn đã thêm bộ bài xáo
-                const newCard = drawCard ? drawCard(xidachSession.deck) : dealCard(); 
+                const newCard = drawCard ? drawCard(xidachSession.deck) : dealCard();
                 xidachSession.playerHand.push(newCard);
                 const total = calcPoint(xidachSession.playerHand);
 
-                if ((xidachSession.playerHand.length === 5 && total <= 21) || total > 21) {
+                // TRƯỜNG HỢP 1: NGŨ LINH (5 lá <= 21) -> Thắng ngay, không cần chờ cái
+                if (xidachSession.playerHand.length === 5 && total <= 21) {
                     delete blackjackSession[interaction.channelId];
-                    
-                    let desc = total > 21 ? `❌ **QUẮC!** (${total} điểm).` : `🔥 **NGŨ LINH!** Bạn thắng lớn.`;
-                    if (total <= 21) await addMoney(userId, xidachSession.bet * 3);
+                    await addMoney(userId, xidachSession.bet * 3); // Thưởng lớn
 
                     const finalEmbed = EmbedBuilder.from(interaction.message.embeds[0])
-                        .setColor(total > 21 ? "#ff4d4d" : "#9b59b6")
+                        .setColor("#9b59b6")
                         .setFields(
                             { name: `👤 Bạn (${total})`, value: formatHand(xidachSession.playerHand), inline: false },
                             { name: `🤖 Nhà cái`, value: formatHand(xidachSession.dealerHand), inline: false }
-                        ).setDescription(desc);
-
+                        ).setDescription(`🔥 **NGŨ LINH!** Bạn rút 5 lá thành công và chiến thắng.`);
+                    
                     await interaction.message.delete().catch(() => {});
                     return interaction.channel.send({ embeds: [finalEmbed] });
                 }
 
-                return interaction.update({
-                    embeds: [EmbedBuilder.from(interaction.message.embeds[0]).setFields(
-                        { name: `👤 Bạn (${total})`, value: formatHand(xidachSession.playerHand), inline: false },
-                        { name: `🤖 Nhà cái`, value: formatHand(xidachSession.dealerHand, 'dealer'), inline: false }
-                    )]
-                }).catch(() => {});
+                // TRƯỜNG HỢP 2: QUẮC (> 21) -> Chuyển sang lượt nhà cái (không xử thua ngay)
+                if (total > 21) {
+                    action = "stand"; // Ép chuyển sang trạng thái "stand" để cái bốc bài
+                    isEndGame = true; // Đánh dấu là game sẽ kết thúc ở block dưới
+                } else {
+                    // Nếu chưa quắc và chưa đủ 5 lá -> Cập nhật tin nhắn để rút tiếp
+                    return interaction.update({
+                        embeds: [EmbedBuilder.from(interaction.message.embeds[0]).setFields(
+                            { name: `👤 Bạn (${total})`, value: formatHand(xidachSession.playerHand), inline: false },
+                            { name: `🤖 Nhà cái`, value: formatHand(xidachSession.dealerHand, 'dealer'), inline: false }
+                        )]
+                    }).catch(() => {});
+                }
             }
 
-            // 2. XỬ LÝ NÚT DẰN BÀI
+            // 2. XỬ LÝ DẰN BÀI (HOẶC BỊ QUẮC Ở TRÊN CHUYỂN XUỐNG)
             if (action === "stand") {
-                await interaction.deferUpdate().catch(() => {});
+                // Nếu không phải do Quắc chuyển xuống thì defer update
+                if (!isEndGame) await interaction.deferUpdate().catch(() => {});
+                
                 let dealerHand = xidachSession.dealerHand;
                 let deck = xidachSession.deck;
+                
+                // Xóa session trước để tránh spam
                 delete blackjackSession[interaction.channelId];
 
-                // Lưu lại Embed cũ trước khi xóa tin nhắn
                 const baseEmbed = EmbedBuilder.from(interaction.message.embeds[0]);
                 await interaction.message.delete().catch(() => {});
 
-                // Bot tự động rút bài
+                // --- BOT RÚT BÀI (MẤU CHỐT Ở ĐÂY) ---
+                // Bot phải rút cho đủ 16 điểm, hoặc rút tiếp nếu điểm thấp (tuỳ logic, thường là < 17 phải rút)
                 while (calcPoint(dealerHand) < 17) {
                     dealerHand.push(drawCard ? drawCard(deck) : dealCard());
                 }
@@ -1612,17 +1624,45 @@ client.on('interactionCreate', async (interaction) => {
                 const pP = calcPoint(xidachSession.playerHand);
                 const dP = calcPoint(dealerHand);
                 let msg = "", col = "#f1c40f";
+                let winAmount = 0;
 
-                if (dP > 21 || pP > dP) {
-                    await addMoney(userId, xidachSession.bet * 2);
-                    msg = `🎉 **THẮNG!** Nhận được **${(xidachSession.bet * 2).toLocaleString()}**`; col = "#2ecc71";
-                } else if (pP === dP) {
-                    await addMoney(userId, xidachSession.bet);
-                    msg = `⚖️ **HÒA!** Hoàn lại cược.`;
-                } else {
-                    msg = `❌ **THUA!** Hẹn lần sau.`; col = "#e74c3c";
+                // --- LOGIC SO SÁNH ĐIỂM (ĐÃ SỬA CÔNG BẰNG) ---
+                
+                // 1. Cả hai cùng Quắc (>21) -> HÒA (Cùng đường)
+                if (pP > 21 && dP > 21) {
+                    winAmount = xidachSession.bet; // Hoàn tiền
+                    msg = `⚖️ **HÒA!** Cả hai cùng quắc (Bạn: ${pP}, Cái: ${dP}).`;
+                }
+                // 2. Bạn Quắc (>21) mà Cái không Quắc -> THUA
+                else if (pP > 21 && dP <= 21) {
+                    winAmount = 0;
+                    msg = `❌ **QUẮC!** Bạn (${pP}) đã thua nhà cái (${dP}).`;
+                    col = "#e74c3c";
+                }
+                // 3. Cái Quắc (>21) mà bạn không Quắc -> THẮNG
+                else if (pP <= 21 && dP > 21) {
+                    winAmount = xidachSession.bet * 2;
+                    msg = `🎉 **THẮNG!** Nhà cái bị quắc (${dP}).`;
+                    col = "#2ecc71";
+                }
+                // 4. Cả hai <= 21 -> So điểm
+                else {
+                    if (pP > dP) {
+                        winAmount = xidachSession.bet * 2;
+                        msg = `🎉 **THẮNG!** Điểm cao hơn (${pP} vs ${dP}).`;
+                        col = "#2ecc71";
+                    } else if (pP < dP) {
+                        winAmount = 0;
+                        msg = `❌ **THUA!** Điểm thấp hơn (${pP} vs ${dP}).`;
+                        col = "#e74c3c";
+                    } else {
+                        winAmount = xidachSession.bet;
+                        msg = `⚖️ **HÒA!** Ngang tài ngang sức (${pP}).`;
+                    }
                 }
 
+                // Cộng tiền và hiển thị
+                if (winAmount > 0) await addMoney(userId, winAmount);
                 const userFinal = await getUser(userId);
                 
                 return interaction.channel.send({
@@ -1632,7 +1672,7 @@ client.on('interactionCreate', async (interaction) => {
                     ).setDescription(`${msg}\n💰 Ví: **${userFinal.money.toLocaleString()}**`)]
                 }).catch(() => {});
             }
-        } // <--- ĐÓNG KHỐI XÌ DÁCH (QUAN TRỌNG)
+        }
         
 
   // --- B. XỬ LÝ BÀI CÀO ---
@@ -1816,48 +1856,52 @@ async function startDealing(channel, game) {
 
 
 // =====================
-// ham khoi tao xetbai    
+// HÀM KẾT THÚC BÀI CÀO (Đã sửa để hiện bài người chơi)
 // ======================
 async function finishBaicao(channel, game) {
-    if (game.isFinishing) return; 
+    if (game.isFinishing) return;
     game.isFinishing = true;
 
     if (game.autoFlipTimer) clearTimeout(game.autoFlipTimer);
 
-    // --- 1. DỌN DẸP TIN NHẮN (MỚI THÊM) ---
-    // Xóa tin nhắn mời chơi (joinMsg) và tin nhắn bàn chơi (tableMsg)
+    // --- 1. DỌN DẸP TIN NHẮN ---
     if (game.joinMsg) await game.joinMsg.delete().catch(() => {});
     if (game.tableMsg) await game.tableMsg.delete().catch(() => {});
-
-    // Dọn dẹp các tin nhắn phụ (revealMsgs) nếu có
     if (game.revealMsgs && game.revealMsgs.length > 0) {
-        for (const m of game.revealMsgs) {
-            await m.delete().catch(() => {});
-        }
+        for (const m of game.revealMsgs) await m.delete().catch(() => {});
     }
 
-    // --- 2. TÍNH TOÁN KẾT QUẢ (GIỮ NGUYÊN) ---
+    // --- 2. TÍNH TOÁN KẾT QUẢ ---
     const bInfo = getHandInfo(game.botHand);
-    const botHandVisual = formatHand(game.botHand, false);
+    const botHandVisual = formatHand(game.botHand, false); // Hiện bài Bot
     const bScoreText = bInfo.isBaTay ? "🔥 **BA TÂY**" : `**${bInfo.score}** nút`;
 
     let summaryList = "";
-    for (let p of game.players) {
-        const result = solveGame(p, game.botHand, game.bet);
-        const pDB = await getUser(p.id);
 
+    for (let p of game.players) {
+        // 1. Tính thắng thua
+        const result = solveGame(p, game.botHand, game.bet);
+        
+        // 2. Lấy thông tin bài của người chơi (ĐÂY LÀ PHẦN MỚI THÊM)
+        const pInfo = getHandInfo(p.hand);
+        const pHandVisual = formatHand(p.hand, false); // false = hiện hết bài
+        const pScoreText = pInfo.isBaTay ? "🔥 BA TÂY" : `${pInfo.score} nút`;
+
+        // 3. Cộng trừ tiền DB
+        const pDB = await getUser(p.id);
         if (pDB) {
-            pDB.money += result.receive; 
-            summaryList += `👤 **${p.name}**\n└ Kết quả: ${result.msg}\n💰 Ví: **${pDB.money.toLocaleString()}**\n\n`;
+            pDB.money += result.receive;
+            // 4. Tạo chuỗi hiển thị chi tiết
+            summaryList += `👤 **${p.name}**\n` + 
+                           `🎴 ${pHandVisual} (${pScoreText})\n` + 
+                           `└ ${result.msg}\n\n`;
         }
     }
     
     await db.write();
-    
-    // Xóa ván đấu khỏi Map
     activeGames.delete(channel.id);
 
-    // --- 3. GỬI KẾT QUẢ CUỐI CÙNG (Duy nhất 1 Embed này tồn tại) ---
+    // --- 3. GỬI KẾT QUẢ CUỐI CÙNG ---
     const finalEmbed = new EmbedBuilder()
         .setTitle("🏁 KẾT QUẢ VÁN BÀI CÀO")
         .setColor("#FFD700")
@@ -1865,17 +1909,26 @@ async function finishBaicao(channel, game) {
         .addFields(
             {
                 name: "🏰 NHÀ CÁI (BOT)",
-                value: `🃏 Bài: ${botHandVisual}\n📊 Điểm: ${bScoreText}`,
-                inline: false
-            },
-            {
-                name: "📝 CHI TIẾT TỪNG TỤ",
-                value: summaryList || "Không có người chơi",
+                value: `🃏 ${botHandVisual}\n📊 Điểm: ${bScoreText}`,
                 inline: false
             }
-        )
-        .setFooter({ text: `💵 Mức cược: ${game.bet.toLocaleString()} | Sòng bài MACAO GOLD` })
-        .setTimestamp();
+            // Field "CHI TIẾT" có giới hạn 1024 ký tự. 
+            // Nếu > 10 người chơi nên chuyển summaryList vào setDescription
+        );
+
+    // Xử lý hiển thị danh sách người chơi (Tránh lỗi nếu quá dài)
+    if (summaryList.length > 1000) {
+        finalEmbed.setDescription(`**📝 CHI TIẾT TỪNG TỤ:**\n\n${summaryList}`);
+    } else {
+        finalEmbed.addFields({
+            name: "📝 CHI TIẾT TỪNG TỤ",
+            value: summaryList || "Không có người chơi",
+            inline: false
+        });
+    }
+    
+    finalEmbed.setFooter({ text: `💵 Mức cược: ${game.bet.toLocaleString()} | Sòng bài MACAO GOLD` })
+              .setTimestamp();
 
     await channel.send({ embeds: [finalEmbed] }).catch(() => {});
 }
