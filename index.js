@@ -439,21 +439,14 @@ client.on("interactionCreate", async (interaction) => {
 const activeTungXu = new Set();
 
 async function cmdTungxu(message, args) {
-    // Hàm phụ để xóa tin nhắn khi có lỗi nhập liệu
     const xoaTinNhanLoi = async (msgGui, noiDung) => {
         const reply = await msgGui.reply(noiDung);
         setTimeout(async () => {
-            try {
-                await msgGui.delete(); // Xóa tin nhắn người dùng gõ sai
-                await reply.delete();  // Xóa tin nhắn bot báo lỗi
-            } catch (err) { /* Bỏ qua lỗi nếu tin nhắn đã bị xóa trước đó */ }
-        }, 5000); // Đợi 5 giây rồi xóa
+            try { await msgGui.delete(); await reply.delete(); } catch (err) {}
+        }, 5000);
     };
 
-    // 1. Kiểm tra đầu vào (Nếu sai thì tự xóa)
-    if (args.length < 2) {
-        return xoaTinNhanLoi(message, "### ❗ Cách dùng: `!tungxu <số_xu/all> <n/s>`");
-    }
+    if (args.length < 2) return xoaTinNhanLoi(message, "### ❗ Cách dùng: `!tungxu <số_xu/all> <n/s>`");
 
     const userId = message.author.id;
     if (activeTungXu.has(userId)) return message.reply("> ⚠️ Đang búng rồi, chờ kết quả đã nào!");
@@ -462,63 +455,49 @@ async function cmdTungxu(message, args) {
         const user = await getUser(userId);
         let betInput = args[0].toLowerCase();
         let userChoice = args[1].toLowerCase();
-
-        // 2. Xử lý cược All hoặc số tiền
         let betXu = (betInput === "all") ? user.xu : parseInt(betInput);
 
-        if (isNaN(betXu) || betXu <= 0) {
-            return xoaTinNhanLoi(message, "> ❌ Số xu không hợp lệ!");
-        }
-        if (user.xu < betXu) {
-            return xoaTinNhanLoi(message, "> ❌ Bạn không đủ xu để đặt cược!");
-        }
+        if (isNaN(betXu) || betXu <= 0) return xoaTinNhanLoi(message, "> ❌ Số xu không hợp lệ!");
+        if (user.xu < betXu) return xoaTinNhanLoi(message, "> ❌ Bạn không đủ xu!");
 
-        // Chuẩn hóa lựa chọn
         if (["n", "ngửa", "ngua"].includes(userChoice)) userChoice = "ngửa";
         else if (["s", "sấp", "sap"].includes(userChoice)) userChoice = "sấp";
-        else {
-            return xoaTinNhanLoi(message, "> ❌ Chọn: `ngửa` (n) hoặc `sấp` (s)!");
-        }
+        else return xoaTinNhanLoi(message, "> ❌ Chọn: `ngửa` (n) hoặc `sấp` (s)!");
 
-        // 3. Khóa chống spam và trừ tiền
         activeTungXu.add(userId);
         await subXu(userId, betXu);
 
-        // --- CẤU HÌNH CỦA BẠN ---
         const EMOTE_NGUA = "<:ngua:1454109465564414128>"; 
         const EMOTE_SAP = "<:sap:1454109488314585139>";
         const GIF_SPIN = "https://media1.tenor.com/m/u0PubumsAUkAAAAC/eminem-eminem-taern.gif"; 
-        // -------------------------
 
-        // 4. Gửi trạng thái đang búng (Dùng GIF của bạn)
-        const msg = await message.reply(`### **${message.author.username}** đang búng xu...\n${GIF_SPIN}`);
+        // 1. Tạo bảng (Embed) lúc đang chờ
+        const embedSpin = new EmbedBuilder()
+            .setColor("#FFFF00")
+            .setTitle("🪙 ĐANG TUNG XU...")
+            .setDescription(`**${message.author.username}** đã đặt **${betXu.toLocaleString()} xu** vào cửa **${userChoice.toUpperCase()}**`)
+            .setImage(GIF_SPIN); // GIF sẽ hiện to trong bảng này
 
-        // Đợi 3 giây tạo hiệu ứng
+        const msg = await message.reply({ embeds: [embedSpin] });
+
         await new Promise(res => setTimeout(res, 3000));
 
         const result = Math.random() < 0.5 ? "ngửa" : "sấp";
         const resultEmote = (result === "ngửa") ? EMOTE_NGUA : EMOTE_SAP;
         const isWin = (result === userChoice);
 
-        let finalMsg = `### 🪙 KẾT QUẢ: ${resultEmote} (**${result.toUpperCase()}**)\n`;
+        // 2. Cập nhật bảng kết quả
+        const embedResult = new EmbedBuilder()
+            .setColor(isWin ? "#00FF00" : "#FF0000")
+            .setTitle(`🪙 KẾT QUẢ: ${result.toUpperCase()}`)
+            .setDescription(`${resultEmote}\n\n${isWin ? `🎉 **Thắng:** +${(betXu * 2).toLocaleString()} xu` : `💸 **Thua:** -${betXu.toLocaleString()} xu`}\n\n> 💰 Ví hiện tại: **${(await getUser(userId)).xu.toLocaleString()}** xu`)
+            .setFooter({ text: `Người chơi: ${message.author.username}` });
 
-        if (isWin) {
-            const reward = betXu * 2;
-            await addXu(userId, reward);
-            finalMsg += `> 🎉 **Thắng:** +${reward.toLocaleString()} xu`;
-        } else {
-            finalMsg += `> 💸 **Thua:** -${betXu.toLocaleString()} xu`;
-        }
-
-        const newUser = await getUser(userId);
-        finalMsg += `\n> 💰 Ví hiện tại: **${newUser.xu.toLocaleString()}** xu`;
-
-        // 5. Cập nhật kết quả cuối cùng (Xóa GIF cũ, hiện kết quả)
-        await msg.edit(finalMsg).catch(() => null);
+        await msg.edit({ embeds: [embedResult] }).catch(() => null);
 
     } catch (e) {
         console.error(e);
-        message.reply("❌ Lỗi hệ thống khi tung xu!");
+        message.reply("❌ Lỗi hệ thống!");
     } finally {
         activeTungXu.delete(userId);
     }
