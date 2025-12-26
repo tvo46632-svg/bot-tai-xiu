@@ -1336,8 +1336,11 @@ function dealCard() {
     return `:${value}${suit}:`; 
 }
 
-function formatHandWithImages(hand, isHidden = false) {
+function formatHand(hand, isHidden = false) {
+    if (!hand || hand.length === 0) return "🎴";
     if (isHidden) { 
+        // Nếu là Xì Dách (thường có 2 lá lúc đầu), úp lá 1 hiện lá 2
+        // Nếu là Bài Cào, tốt nhất là úp hết: hand.map(() => cardEmojis[':back:']).join(" ")
         return `${cardEmojis[':back:']} ${cardEmojis[hand[1]] || hand[1]}`;
     }
     return hand.map(card => cardEmojis[card] || card).join(" ");
@@ -1516,12 +1519,15 @@ client.on('interactionCreate', async (interaction) => {
                     }).catch(() => {});
                 }
 
-                return interaction.update({
-                    embeds: [EmbedBuilder.from(interaction.message.embeds[0]).setFields(
-                        { name: `👤 Bạn (${total})`, value: formatHand(xidachSession.playerHand), inline: false },
-                        { name: `🤖 Nhà cái`, value: formatHand(xidachSession.dealerHand, true), inline: false }
-                    )]
-                }).catch(() => {});
+               return interaction.update({
+    embeds: [EmbedBuilder.from(interaction.message.embeds[0]).setFields(
+        // 1. Dòng của BẠN: Phải hiện toàn bộ bài bạn đang có (không ẩn)
+        { name: `👤 Bạn (${total})`, value: formatHand(xidachSession.playerHand), inline: false },
+        
+        // 2. Dòng của NHÀ CÁI: Dùng 'dealer' để úp 1 lá đầu, hiện các lá sau
+        { name: `🤖 Nhà cái`, value: formatHand(xidachSession.dealerHand, 'dealer'), inline: false }
+    )]
+}).catch(() => {});
             }
 
             if (action === "stand") {
@@ -1610,7 +1616,7 @@ if (['join_baicao', 'view_hand', 'flip_hand', 'start_now'].includes(interaction.
         }).catch(() => {});
     }
 
-    // 4. Xử lý LẬT BÀI
+   // 4. Xử lý LẬT BÀI
     if (interaction.customId === 'flip_hand') {
         if (baicaoSession.status !== 'playing' || player.revealed) return interaction.deferUpdate();
         
@@ -1625,7 +1631,16 @@ if (['join_baicao', 'view_hand', 'flip_hand', 'start_now'].includes(interaction.
             await finishBaicao(interaction.channel, baicaoSession);
         }
     }
-}
+} // <--- ĐÓNG cái if (['join_baicao', ...].includes)
+
+    } catch (error) {
+        console.error("Lỗi Interaction:", error);
+    }
+}); // <--- ĐÓNG cái client.on('interactionCreate')
+
+
+
+
 
 
 // =============================================================================
@@ -1682,6 +1697,10 @@ async function handleBaiCaoCommand(message, args) {
         }
     }, 30000);
 }
+
+
+
+
 
 // ==========================================
 // HÀM CHIA BÀI (startDealing) - ĐÃ FIX DẤU NGOẶC
