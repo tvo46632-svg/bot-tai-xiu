@@ -1311,7 +1311,7 @@ async function cmdHelp(message) {
                  .addFields(
                     { 
                         name: '🃏 BÀI CÀO (3 Cây)', 
-                        value: `> \`!baicao <cược>\`: Tham gia ván bài.\n> \`!nguabai\`: Xem bài.\n> \`!xetbai\`: Buộc xét bài.`
+                        value: `> \`!baicao <tiền>\`: Khởi tạo sòng.\n> 📥 **Bấm "Tham gia"** để vào sòng.\n> 👀 **Bấm "Xem bài"** để xem riêng (chỉ bạn thấy).\n> 🔓 **Bấm "Lật bài"** để công khai bài cho cả sòng.`
                     },
                     { 
                         name: '🎲 CÁC GAME KHÁC', 
