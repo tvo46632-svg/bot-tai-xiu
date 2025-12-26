@@ -475,7 +475,7 @@ async function cmdTungxu(message, args) {
         // -------------------------
 
         // 3. Gửi tin nhắn trạng thái chờ
-        const msg = await message.reply(`### ${EMOTE_LOADING} **${message.author.username}** đang búng xu... (Cược ${betXu.toLocaleString()} xu vào **${userChoice}**)`);
+        const msg = await message.reply(`### ${GIF_SPIN} **${message.author.username}** đang búng xu... (Cược ${betXu.toLocaleString()} xu vào **${userChoice}**)`);
 
         // Đợi 2 giây tạo hiệu ứng hồi hộp
         await new Promise(res => setTimeout(res, 2000));
