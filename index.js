@@ -432,58 +432,83 @@ client.on("interactionCreate", async (interaction) => {
 
 
 
-// =====================
-//      TUNG XU
-// =====================
+//---- TUNG XU VIP PRO GIF ------
+//-------------------------------
+
+// Biến chặn spam (để ngoài hàm)
+const activeTungXu = new Set();
 
 async function cmdTungxu(message, args) {
     if (args.length < 2) {
-        return message.reply("### ❗ Cách dùng: `!tungxu <số_xu> <n/s>`");
+        return message.reply("### ❗ Cách dùng: `!tungxu <số_xu/all> <n/s>`");
     }
 
-    const betXu = parseInt(args[0]);
-    let userChoice = args[1].toLowerCase();
+    const userId = message.author.id;
+    if (activeTungXu.has(userId)) return message.reply("> ⚠️ Đang búng rồi, chờ kết quả đã nào!");
 
-    if (userChoice === "n" || userChoice === "ngửa") userChoice = "ngửa";
-    if (userChoice === "s" || userChoice === "sấp") userChoice = "sấp";
+    try {
+        const user = await getUser(userId);
+        let betInput = args[0].toLowerCase();
+        let userChoice = args[1].toLowerCase();
 
-    if (isNaN(betXu) || betXu <= 0) return message.reply("> ❌ Số xu không hợp lệ!");
-    if (!["ngửa", "sấp"].includes(userChoice)) return message.reply("> ❌ Chọn: `ngửa` (n) hoặc `sấp` (s)!");
+        // 1. Xử lý cược All hoặc số tiền cụ thể
+        let betXu = (betInput === "all") ? user.xu : parseInt(betInput);
 
-    const user = await getUser(message.author.id);
-    if (user.xu < betXu) return message.reply("> ❌ Bạn không đủ xu để cược!");
+        if (isNaN(betXu) || betXu <= 0) return message.reply("> ❌ Số xu không hợp lệ!");
+        if (user.xu < betXu) return message.reply("> ❌ Bạn không đủ xu!");
 
-    await subXu(message.author.id, betXu);
+        // Chuẩn hóa lựa chọn
+        if (["n", "ngửa", "ngua"].includes(userChoice)) userChoice = "ngửa";
+        else if (["s", "sấp", "sap"].includes(userChoice)) userChoice = "sấp";
+        else return message.reply("> ❌ Chọn: `ngửa` (n) hoặc `sấp` (s)!");
 
-    const EMOTE_NGUA = "🏛️"; 
-    const EMOTE_SAP = "🟡";  
+        // 2. Khóa và trừ tiền
+        activeTungXu.add(userId);
+        await subXu(userId, betXu);
 
-    // Tin nhắn ban đầu nhỏ gọn
-    const msg = await message.reply(`> 🪙 **${message.author.username}** đang búng xu...`);
+        // --- CẤU HÌNH EMOTE ID ---
+        // Định dạng Emote trong Discord là <:name:ID>. 
+        // Nếu là emoji động (GIF) thì thêm chữ 'a' phía trước: <a:name:ID>
+        const EMOTE_NGUA = "<:ngua:1454109465564414128>"; 
+        const EMOTE_SAP = "<:sap:1454109488314585139>";
+        const GIF_SPIN = "https://media1.tenor.com/m/u0PubumsAUkAAAAC/eminem-eminem-taern.gif"; // gif tung xu
+        // -------------------------
 
-    const spinFrames = [EMOTE_SAP, "➖", EMOTE_NGUA, "➖", EMOTE_SAP, "✨"]; 
-    
-    for (let i = 0; i < spinFrames.length; i++) {
-        await new Promise(res => setTimeout(res, 300)); 
-        // Dùng định dạng nhỏ gọn
-        await msg.edit(`### ✨ Đang xoay... ${spinFrames[i]}`);
-    }
+        // 3. Gửi tin nhắn trạng thái chờ
+        const msg = await message.reply(`### ${EMOTE_LOADING} **${message.author.username}** đang búng xu... (Cược ${betXu.toLocaleString()} xu vào **${userChoice}**)`);
 
-    const result = Math.random() < 0.5 ? "ngửa" : "sấp";
-    const resultEmoji = (result === "ngửa") ? EMOTE_NGUA : EMOTE_SAP;
+        // Đợi 2 giây tạo hiệu ứng hồi hộp
+        await new Promise(res => setTimeout(res, 2000));
 
-    await new Promise(res => setTimeout(res, 500));
+        const result = Math.random() < 0.5 ? "ngửa" : "sấp";
+        const resultEmote = (result === "ngửa") ? EMOTE_NGUA : EMOTE_SAP;
+        const isWin = (result === userChoice);
 
-    if (result === userChoice) {
-        const rewardXu = betXu * 2;
-        await addXu(message.author.id, rewardXu);
-        
-        // Kết quả trình bày gọn gàng trong Blockquote
-        return await msg.edit(`### 🪙 KẾT QUẢ: ${resultEmoji}\n> 🎉 **Thắng:** +${rewardXu.toLocaleString()} xu`);
-    } else {
-        return await msg.edit(`### 🪙 KẾT QUẢ: ${resultEmoji}\n> 💸 **Thua:** -${betXu.toLocaleString()} xu`);
+        let finalMsg = `### 🪙 KẾT QUẢ: ${resultEmote} (**${result.toUpperCase()}**)\n`;
+
+        if (isWin) {
+            const reward = betXu * 2;
+            await addXu(userId, reward);
+            finalMsg += `> 🎉 **Thắng:** +${reward.toLocaleString()} xu`;
+        } else {
+            finalMsg += `> 💸 **Thua:** -${betXu.toLocaleString()} xu`;
+        }
+
+        const newUser = await getUser(userId);
+        finalMsg += `\n> 💰 Ví hiện tại: **${newUser.xu.toLocaleString()}** xu`;
+
+        // 4. Cập nhật kết quả cuối cùng
+        await msg.edit(finalMsg).catch(() => null);
+
+    } catch (e) {
+        console.error(e);
+        message.reply("❌ Lỗi hệ thống khi tung xu!");
+    } finally {
+        activeTungXu.delete(userId);
     }
 }
+
+//----- TAI XIU -----
 async function cmdTaixiu(message) {
     const userId = message.author.id;
     const mainMsg = await message.reply({
