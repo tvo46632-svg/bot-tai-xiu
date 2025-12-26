@@ -1751,22 +1751,30 @@ async function startDealing(channel, game) {
     }
 }
 
-        // =====================
-        // ham khoi tao xetbai    
-        // ======================
-      async function finishBaicao(channel, game) {
+
+
+// =====================
+// ham khoi tao xetbai    
+// ======================
+async function finishBaicao(channel, game) {
     if (game.isFinishing) return; 
     game.isFinishing = true;
 
     if (game.autoFlipTimer) clearTimeout(game.autoFlipTimer);
 
-    // 1. Dọn dẹp tin nhắn cũ (Thêm .catch để tránh lỗi nếu tin nhắn đã mất)
-    if (game.revealMsgs && game.revealMsgs.length > 0) {
-    for (const m of game.revealMsgs) {
-        await m.delete().catch(() => {});
-    }
-}
+    // --- 1. DỌN DẸP TIN NHẮN (MỚI THÊM) ---
+    // Xóa tin nhắn mời chơi (joinMsg) và tin nhắn bàn chơi (tableMsg)
+    if (game.joinMsg) await game.joinMsg.delete().catch(() => {});
+    if (game.tableMsg) await game.tableMsg.delete().catch(() => {});
 
+    // Dọn dẹp các tin nhắn phụ (revealMsgs) nếu có
+    if (game.revealMsgs && game.revealMsgs.length > 0) {
+        for (const m of game.revealMsgs) {
+            await m.delete().catch(() => {});
+        }
+    }
+
+    // --- 2. TÍNH TOÁN KẾT QUẢ (GIỮ NGUYÊN) ---
     const bInfo = getHandInfo(game.botHand);
     const botHandVisual = formatHand(game.botHand, false);
     const bScoreText = bInfo.isBaTay ? "🔥 **BA TÂY**" : `**${bInfo.score}** nút`;
@@ -1777,16 +1785,17 @@ async function startDealing(channel, game) {
         const pDB = await getUser(p.id);
 
         if (pDB) {
-            pDB.money += result.receive; // Cộng lại tiền (vốn + thắng nếu có)
+            pDB.money += result.receive; 
             summaryList += `👤 **${p.name}**\n└ Kết quả: ${result.msg}\n💰 Ví: **${pDB.money.toLocaleString()}**\n\n`;
         }
     }
     
     await db.write();
     
-    // QUAN TRỌNG: Phải xóa game khỏi Map để có thể chơi ván mới ở channel này
+    // Xóa ván đấu khỏi Map
     activeGames.delete(channel.id);
 
+    // --- 3. GỬI KẾT QUẢ CUỐI CÙNG (Duy nhất 1 Embed này tồn tại) ---
     const finalEmbed = new EmbedBuilder()
         .setTitle("🏁 KẾT QUẢ VÁN BÀI CÀO")
         .setColor("#FFD700")
@@ -1803,11 +1812,14 @@ async function startDealing(channel, game) {
                 inline: false
             }
         )
-        .setFooter({ text: `💵 Mức cược: ${game.bet.toLocaleString()} | Sòng bài uy tín 100%` })
+        .setFooter({ text: `💵 Mức cược: ${game.bet.toLocaleString()} | Sòng bài sạch sẽ 100%` })
         .setTimestamp();
 
     await channel.send({ embeds: [finalEmbed] }).catch(() => {});
 }
+
+
+
 
 
 // ==========================================
@@ -1840,25 +1852,31 @@ function getHandInfo(hand) {
     };
 }
 
+
+
+
 // ==========================================
 // HÀM HIỂN THỊ BÀI (Đã tối ưu để không mất bài)
 // ==========================================
 function formatHand(hand, hide = false) {
     if (!hand || hand.length === 0) return "🎴 (Đang chia...)";
     
-    // Nếu hide = true, hiển thị toàn bộ là bài úp (dành cho Bài Cào)
-    if (hide === true) {
-        return `${cardEmojis[':back:']} ${cardEmojis[':back:']} ${cardEmojis[':back:']}`;
+    // 1. Chế độ NHÀ CÁI XÌ DÁCH (Úp lá đầu, hiện các lá còn lại)
+    if (hide === 'dealer') {
+        const visibleCards = hand.slice(1).map(card => cardEmojis[card] || card).join(" ");
+        return `${cardEmojis[':back:']} ${visibleCards}`;
     }
     
-    // Nếu hide = 'dealer' (dành cho Xì Dách: Úp lá đầu, hiện lá sau)
-    if (hide === 'dealer') {
-        return `${cardEmojis[':back:']} ${cardEmojis[hand[1]] || hand[1]}`;
+    // 2. Chế độ BÀI CÀO hoặc ÚP HẾT (Hiện số lá úp = số lá đang có trên tay)
+    if (hide === true) {
+        return hand.map(() => cardEmojis[':back:']).join(" ");
     }
 
-    // Hiển thị bài bình thường
+    // 3. Chế độ HIỆN TOÀN BỘ
     return hand.map(card => cardEmojis[card] || card).join(" ");
 }
+
+
 
 //=====================
 // Hàm tính kết quả
