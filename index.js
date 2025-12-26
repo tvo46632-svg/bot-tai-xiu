@@ -1641,9 +1641,9 @@ if (['join_baicao', 'view_hand', 'flip_hand', 'start_now'].includes(interaction.
     }
 
     if (interaction.customId === 'flip_hand') {
-        if (baicaoSession.status !== 'playing' || player.revealed) return interaction.deferUpdate();
-        
-        player.revealed = true;
+    if (baicaoSession.status !== 'playing' || player.revealed || baicaoSession.isFinishing) return interaction.deferUpdate();
+    
+    player.revealed = true;
         const updatedDesc = `**Danh sách người chơi:**\n${baicaoSession.players.map(p => p.revealed ? `✅ **${p.name}** (Đã lật)` : `• **${p.name}** (Chờ...)`).join('\n')}`;
 
         await interaction.update({
