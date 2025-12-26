@@ -435,7 +435,7 @@ client.on("interactionCreate", async (interaction) => {
 //---- TUNG XU VIP PRO GIF ------
 //-------------------------------
 
-// Biến chặn spam (đặt ngoài hàm)
+// Biến chặn spam (đặt ngoài cùng)
 const activeTungXu = new Set();
 
 async function cmdTungxu(message, args) {
@@ -468,25 +468,26 @@ async function cmdTungxu(message, args) {
         activeTungXu.add(userId);
         await subXu(userId, betXu);
 
-        // --- CẤU HÌNH LINK ẢNH & EMOTE ---
-        // 1. Hãy thay URL ảnh tĩnh của 2 mặt xu vào đây để nó hiện lên bảng kết quả
-        const IMG_NGUA_URL = "https://i.imgur.com/P1Z123.png"; // Link ảnh mặt Ngửa (đuôi .png/.jpg)
-        const IMG_SAP_URL = "https://i.imgur.com/AbC456.png";  // Link ảnh mặt Sấp (đuôi .png/.jpg)
+        // --- PHẦN BẠN CẦN ĐIỀN LINK ẢNH VÀO ĐÂY ---
+        // B1: Gửi ảnh xu n.png và xu s.png lên Discord hoặc Imgur
+        // B2: Chuột phải vào ảnh -> Chọn "Copy Link" (Sao chép liên kết)
+        // B3: Dán vào 2 dòng dưới đây:
+        const IMG_NGUA_URL = "https://cdn.discordapp.com/attachments/1429700413002747978/1454117021355606271/xu_n.png?ex=694feb82&is=694e9a02&hm=869a1736e9bcabb188c26f604de27b81da4256a77ed8ff94da6305c400eb4aa0&"; 
+        const IMG_SAP_URL = "https://cdn.discordapp.com/attachments/1429700413002747978/1454117021854859406/xu_s.png?ex=694feb82&is=694e9a02&hm=c5fac4b51de13e55bb86b7117b7390822d03e1a950f94b198d176612efae19e2&";   
         
-        // 2. Emote nhỏ trong dòng text (Lấy bằng cách gõ \:emote: trong Discord)
-        const EMOTE_NGUA = "1454113655460462675"; //   thay lại ID chuẩn: <:ngua:ID_CUA_BAN>
-        const EMOTE_SAP = "1454113634266517661";  //   thay lại ID chuẩn: <:sap:ID_CUA_BAN>
+        // Đã sửa lỗi hiển thị Emote (Thêm <:tên:ID>)
+        const EMOTE_NGUA = "<:ngua:1454113655460462675>"; 
+        const EMOTE_SAP = "<:sap:1454113634266517661>";   
         
-        // 3. GIF xoay
         const GIF_SPIN = "https://media1.tenor.com/m/u0PubumsAUkAAAAC/eminem-eminem-taern.gif";
         // ----------------------------------
 
         // TẠO BẢNG XOAY (GIF)
         const embedSpin = new EmbedBuilder()
-            .setColor("#FFFF00") // Màu vàng
+            .setColor("#FFFF00") 
             .setTitle("🪙 ĐANG TUNG XU...")
             .setDescription(`**${message.author.username}** cược **${betXu.toLocaleString()}** vào **${userChoice.toUpperCase()}**`)
-            .setImage(GIF_SPIN) // Hiện GIF to đùng
+            .setImage(GIF_SPIN) // Hiện GIF to
             .setFooter({ text: "Chờ xíu..." });
 
         const msg = await message.reply({ embeds: [embedSpin] });
@@ -502,7 +503,7 @@ async function cmdTungxu(message, args) {
             ? `🎉 **THẮNG:** +${(betXu * 2).toLocaleString()} xu` 
             : `💸 **THUA:** -${betXu.toLocaleString()} xu`;
         
-        const resultColor = isWin ? "#00FF00" : "#FF0000"; // Thắng Xanh, Thua Đỏ
+        const resultColor = isWin ? "#00FF00" : "#FF0000"; 
         const resultImage = (result === "ngửa") ? IMG_NGUA_URL : IMG_SAP_URL;
         const resultIcon = (result === "ngửa") ? EMOTE_NGUA : EMOTE_SAP;
 
@@ -513,9 +514,9 @@ async function cmdTungxu(message, args) {
         // TẠO BẢNG KẾT QUẢ (THAY GIF BẰNG ẢNH TĨNH)
         const embedResult = new EmbedBuilder()
             .setColor(resultColor)
-            .setTitle(`🪙 KẾT QUẢ: ${result.toUpperCase()} ${resultIcon}`)
+            .setTitle(`🪙 KẾT QUẢ: ${result.toUpperCase()} ${resultIcon}`) // Emote sẽ hiện ở đây
             .setDescription(`${resultText}\n\n> 💰 Ví hiện tại: **${newUser.xu.toLocaleString()}** xu`)
-            .setThumbnail(resultImage) // Hiện ảnh mặt xu nhỏ bên góc phải
+            .setThumbnail(resultImage) // Ảnh Xu Ngửa/Sấp hiện góc phải
             .setFooter({ text: `Người chơi: ${message.author.username}`, iconURL: message.author.displayAvatarURL() });
 
         // Sửa tin nhắn cũ thành bảng kết quả
