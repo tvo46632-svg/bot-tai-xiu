@@ -468,10 +468,7 @@ async function cmdTungxu(message, args) {
         activeTungXu.add(userId);
         await subXu(userId, betXu);
 
-        // --- PHẦN BẠN CẦN ĐIỀN LINK ẢNH VÀO ĐÂY ---
-        // B1: Gửi ảnh xu n.png và xu s.png lên Discord hoặc Imgur
-        // B2: Chuột phải vào ảnh -> Chọn "Copy Link" (Sao chép liên kết)
-        // B3: Dán vào 2 dòng dưới đây:
+        // --- PHẦN CẦN ĐIỀN LINK ẢNH VÀO ĐÂY ---
         const IMG_NGUA_URL = "https://cdn.discordapp.com/attachments/1429700413002747978/1454117021355606271/xu_n.png?ex=694feb82&is=694e9a02&hm=869a1736e9bcabb188c26f604de27b81da4256a77ed8ff94da6305c400eb4aa0&"; 
         const IMG_SAP_URL = "https://cdn.discordapp.com/attachments/1429700413002747978/1454117021854859406/xu_s.png?ex=694feb82&is=694e9a02&hm=c5fac4b51de13e55bb86b7117b7390822d03e1a950f94b198d176612efae19e2&";   
         
@@ -479,9 +476,8 @@ async function cmdTungxu(message, args) {
         const EMOTE_NGUA = "<:ngua:1454113655460462675>"; 
         const EMOTE_SAP = "<:sap:1454113634266517661>";   
         
-        const GIF_SPIN = "https://media1.tenor.com/m/u0PubumsAUkAAAAC/eminem-eminem-taern.gif";
+        const GIF_SPIN = "https://c.tenor.com/u0PubumsAUkAAAAC/tenor.gif";
         // ----------------------------------
-
         // TẠO BẢNG XOAY (GIF)
         const embedSpin = new EmbedBuilder()
             .setColor("#FFFF00") 
