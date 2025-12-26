@@ -1409,6 +1409,8 @@ function checkSpecialHand(hand) {
 //  2. LỆNH KHỞI TẠO !XIDACH (CÓ CHECK ĂN NGAY)
 // =============================================================================
 async function cmdXidach(message, args) {
+    // THÊM DÒNG NÀY: Xóa tin nhắn lệnh của người chơi
+    await message.delete().catch(() => {});
     const bet = parseInt(args[0]);
     if (isNaN(bet) || bet <= 0) return message.reply("❌ Số tiền không hợp lệ!");
 
@@ -1466,7 +1468,7 @@ async function cmdXidach(message, args) {
         .setColor("#2f3136")
         .addFields(
             { name: `👤 Bạn (${calcPoint(session.playerHand)})`, value: formatHand(session.playerHand), inline: false },
-            { name: `🤖 Nhà cái`, value: formatHand(session.dealerHand, true), inline: false }
+            { name: '🤖 Nhà cái', value: formatHand(session.dealerHand, 'dealer'), inline: false }
         )
         .setFooter({ text: "Sử dụng các nút bên dưới để chơi" });
 
@@ -1503,83 +1505,84 @@ client.on('interactionCreate', async (interaction) => {
         const baicaoSession = activeGames.get(interaction.channelId);
 
         // --- A. XỬ LÝ XÌ DÁCH ---
-        if (interaction.customId.startsWith('hit_') || interaction.customId.startsWith('stand_')) {
-            const [action, userId] = interaction.customId.split("_");
-            if (!xidachSession) return interaction.reply({ content: "❌ Ván đã kết thúc.", flags: [64] }).catch(() => {});
-            if (interaction.user.id !== userId) return interaction.reply({ content: "🚫 Không phải bài của bạn!", flags: [64] }).catch(() => {});
+if (interaction.customId.startsWith('hit_') || interaction.customId.startsWith('stand_')) {
+    const [action, userId] = interaction.customId.split("_");
+    if (!xidachSession) return interaction.reply({ content: "❌ Ván đã kết thúc.", flags: [64] }).catch(() => {});
+    if (interaction.user.id !== userId) return interaction.reply({ content: "🚫 Không phải bài của bạn!", flags: [64] }).catch(() => {});
 
-            if (action === "hit") {
-                const newCard = dealCard();
-                xidachSession.playerHand.push(newCard);
-                const total = calcPoint(xidachSession.playerHand);
+    // 1. XỬ LÝ NÚT RÚT BÀI
+    if (action === "hit") {
+        const newCard = dealCard();
+        xidachSession.playerHand.push(newCard);
+        const total = calcPoint(xidachSession.playerHand);
 
-                if ((xidachSession.playerHand.length === 5 && total <= 21) || total > 21) {
-                    delete blackjackSession[interaction.channelId];
-                    let desc = total > 21 ? `❌ **QUẮC!** (${total} điểm).` : `🔥 **NGŨ LINH!** Bạn thắng lớn.`;
-                    if (total <= 21) await addMoney(userId, xidachSession.bet * 3);
+        // Kiểm tra Quắc hoặc Ngũ Linh (Kết thúc ngay)
+        if ((xidachSession.playerHand.length === 5 && total <= 21) || total > 21) {
+            delete blackjackSession[interaction.channelId];
+            
+            let desc = total > 21 ? `❌ **QUẮC!** (${total} điểm).` : `🔥 **NGŨ LINH!** Bạn thắng lớn.`;
+            if (total <= 21) await addMoney(userId, xidachSession.bet * 3);
 
-                    return interaction.update({
-                        embeds: [EmbedBuilder.from(interaction.message.embeds[0])
-                            .setColor(total > 21 ? "#ff4d4d" : "#9b59b6")
-                            .setFields(
-                                { name: `👤 Bạn (${total})`, value: formatHand(xidachSession.playerHand), inline: false },
-                                { name: `🤖 Nhà cái`, value: formatHand(xidachSession.dealerHand), inline: false }
-                            ).setDescription(desc)],
-                        components: []
-                    }).catch(() => {});
-                }
-
-               return interaction.update({
-    embeds: [EmbedBuilder.from(interaction.message.embeds[0]).setFields(
-        // 1. Dòng của BẠN: Phải hiện toàn bộ bài bạn đang có (không ẩn)
-        { name: `👤 Bạn (${total})`, value: formatHand(xidachSession.playerHand), inline: false },
-        
-        // 2. Dòng của NHÀ CÁI: Dùng 'dealer' để úp 1 lá đầu, hiện các lá sau
-        { name: `🤖 Nhà cái`, value: formatHand(xidachSession.dealerHand, 'dealer'), inline: false }
-    )]
-}).catch(() => {});
-            }
-
-            if (action === "stand") {
-                await interaction.deferUpdate().catch(() => {});
-                let dealerHand = xidachSession.dealerHand;
-                delete blackjackSession[interaction.channelId];
-
-                while (calcPoint(dealerHand) < 17) {
-                    dealerHand.push(dealCard());
-                    await interaction.editReply({
-                        embeds: [EmbedBuilder.from(interaction.message.embeds[0]).setFields(
-                            { name: `👤 Bạn (${calcPoint(xidachSession.playerHand)})`, value: formatHand(xidachSession.playerHand), inline: false },
-                            { name: `🤖 Nhà cái (${calcPoint(dealerHand)})`, value: formatHand(dealerHand), inline: false }
-                        )]
-                    }).catch(() => {});
-                    await new Promise(res => setTimeout(res, 800));
-                }
-                
-                const pP = calcPoint(xidachSession.playerHand);
-                const dP = calcPoint(dealerHand);
-                let msg = "", col = "#f1c40f";
-
-                if (dP > 21 || pP > dP) {
-                    await addMoney(userId, xidachSession.bet * 2);
-                    msg = `🎉 **THẮNG!** Nhận được **${(xidachSession.bet * 2).toLocaleString()}**`; col = "#2ecc71";
-                } else if (pP === dP) {
-                    await addMoney(userId, xidachSession.bet);
-                    msg = `⚖️ **HÒA!** Hoàn lại cược.`;
-                } else {
-                    msg = `❌ **THUA!** Hẹn lần sau.`; col = "#e74c3c";
-                }
-
-                const userFinal = await getUser(userId);
-                return interaction.editReply({
-                    embeds: [EmbedBuilder.from(interaction.message.embeds[0]).setColor(col).setFields(
-                            { name: `👤 Bạn (${pP})`, value: formatHand(xidachSession.playerHand), inline: false },
-                            { name: `🤖 Nhà cái (${dP})`, value: formatHand(dealerHand), inline: false }
-                        ).setDescription(`${msg}\n💰 Ví: **${userFinal.money.toLocaleString()}**`)],
-                    components: []
-                }).catch(() => {});
-            }
+            // XÓA BẢNG CŨ VÀ GỬI KẾT QUẢ MỚI
+            await interaction.message.delete().catch(() => {});
+            return interaction.channel.send({
+                embeds: [EmbedBuilder.from(interaction.message.embeds[0])
+                    .setColor(total > 21 ? "#ff4d4d" : "#9b59b6")
+                    .setFields(
+                        { name: `👤 Bạn (${total})`, value: formatHand(xidachSession.playerHand), inline: false },
+                        { name: `🤖 Nhà cái`, value: formatHand(xidachSession.dealerHand), inline: false }
+                    ).setDescription(desc)]
+            });
         }
+
+        // Nếu chưa kết thúc, chỉ update bài hiện tại (vẫn giữ nút bấm)
+        return interaction.update({
+            embeds: [EmbedBuilder.from(interaction.message.embeds[0]).setFields(
+                { name: `👤 Bạn (${total})`, value: formatHand(xidachSession.playerHand), inline: false },
+                { name: `🤖 Nhà cái`, value: formatHand(xidachSession.dealerHand, 'dealer'), inline: false }
+            )]
+        }).catch(() => {});
+    }
+
+    // 2. XỬ LÝ NÚT DẰN BÀI
+    if (action === "stand") {
+        await interaction.deferUpdate().catch(() => {});
+        let dealerHand = xidachSession.dealerHand;
+        delete blackjackSession[interaction.channelId];
+
+        // XÓA BẢNG CÓ NÚT BẤM NGAY
+        await interaction.message.delete().catch(() => {});
+
+        // Bot tự động rút bài cho đến khi >= 17 điểm
+        while (calcPoint(dealerHand) < 17) {
+            dealerHand.push(dealCard());
+        }
+        
+        const pP = calcPoint(xidachSession.playerHand);
+        const dP = calcPoint(dealerHand);
+        let msg = "", col = "#f1c40f";
+
+        if (dP > 21 || pP > dP) {
+            await addMoney(userId, xidachSession.bet * 2);
+            msg = `🎉 **THẮNG!** Nhận được **${(xidachSession.bet * 2).toLocaleString()}**`; col = "#2ecc71";
+        } else if (pP === dP) {
+            await addMoney(userId, xidachSession.bet);
+            msg = `⚖️ **HÒA!** Hoàn lại cược.`;
+        } else {
+            msg = `❌ **THUA!** Hẹn lần sau.`; col = "#e74c3c";
+        }
+
+        const userFinal = await getUser(userId);
+        
+        // GỬI BẢNG KẾT QUẢ CUỐI CÙNG VÀO KÊNH CHAT
+        return interaction.channel.send({
+            embeds: [EmbedBuilder.from(interaction.message.embeds[0]).setColor(col).setFields(
+                    { name: `👤 Bạn (${pP})`, value: formatHand(xidachSession.playerHand), inline: false },
+                    { name: `🤖 Nhà cái (${dP})`, value: formatHand(dealerHand), inline: false }
+                ).setDescription(`${msg}\n💰 Ví: **${userFinal.money.toLocaleString()}**`)]
+        }).catch(() => {});
+    }
+}
 
         // --- B. XỬ LÝ BÀI CÀO ---
 if (['join_baicao', 'view_hand', 'flip_hand', 'start_now'].includes(interaction.customId)) {
@@ -1588,9 +1591,16 @@ if (['join_baicao', 'view_hand', 'flip_hand', 'start_now'].includes(interaction.
     // 1. Xử lý THAM GIA
     if (interaction.customId === 'join_baicao') {
         if (baicaoSession.status !== 'joining') return;
+
+        // --- SỬA TẠI ĐÂY: Check giới hạn 10 người ---
+        if (baicaoSession.players.length >= 10) {
+            return interaction.reply({ content: "❌ Sòng đã đầy (tối đa 10 người)!", flags: [64] }).catch(() => {});
+        }
+
         if (baicaoSession.players.some(p => p.id === interaction.user.id)) {
             return interaction.reply({ content: "⚠️ Bạn đã tham gia rồi!", flags: [64] }).catch(() => {});
         }
+
         const pD = await getUser(interaction.user.id);
         if (!pD || pD.money < baicaoSession.bet) return interaction.reply({ content: "💸 Không đủ tiền cược!", flags: [64] }).catch(() => {});
 
@@ -1598,26 +1608,30 @@ if (['join_baicao', 'view_hand', 'flip_hand', 'start_now'].includes(interaction.
         baicaoSession.players.push({ id: interaction.user.id, name: interaction.user.username, hand: [], revealed: false });
 
         return interaction.update({
-            embeds: [EmbedBuilder.from(interaction.message.embeds[0]).setDescription(`Cược: **${baicaoSession.bet.toLocaleString()}**\n\nNgười chơi:\n${baicaoSession.players.map((p, i) => `${i + 1}. **${p.name}**`).join('\n')}`)]
+            embeds: [EmbedBuilder.from(interaction.message.embeds[0]).setDescription(`Cược: **${baicaoSession.bet.toLocaleString()}**\n\nNgười chơi (${baicaoSession.players.length}/10):\n${baicaoSession.players.map((p, i) => `${i + 1}. **${p.name}**`).join('\n')}`)]
         }).catch(() => {});
     }
 
-    // 2. Xử lý BẮT ĐẦU NGAY (Chỉ chủ bàn)
+    // 2. Xử lý BẮT ĐẦU NGAY
     if (interaction.customId === 'start_now') {
         if (interaction.user.id !== baicaoSession.host) {
             return interaction.reply({ content: "🚫 Chỉ chủ bàn mới có quyền bắt đầu ngay!", flags: [64] });
         }
         if (baicaoSession.status !== 'joining') return;
 
+        // --- SỬA TẠI ĐÂY: Nếu chỉ có 1 mình chủ bàn thì không cho chơi ---
+        if (baicaoSession.players.length < 2) {
+            return interaction.reply({ content: "⚠️ Cần ít nhất 2 người để bắt đầu!", flags: [64] });
+        }
+
         await interaction.deferUpdate();
         return startDealing(interaction.channel, baicaoSession);
     }
 
-    // Kiểm tra xem user có trong danh sách chơi không (cho nút xem bài và lật bài)
+    // Các phần Xem bài và Lật bài giữ nguyên logic 
     const player = baicaoSession.players.find(p => p.id === interaction.user.id);
     if (!player) return interaction.reply({ content: "🚫 Bạn không có trong ván!", flags: [64] }).catch(() => {});
 
-    // 3. Xử lý XEM BÀI
     if (interaction.customId === 'view_hand') {
         const info = getHandInfo(player.hand);
         return interaction.reply({ 
@@ -1626,7 +1640,6 @@ if (['join_baicao', 'view_hand', 'flip_hand', 'start_now'].includes(interaction.
         }).catch(() => {});
     }
 
-   // 4. Xử lý LẬT BÀI
     if (interaction.customId === 'flip_hand') {
         if (baicaoSession.status !== 'playing' || player.revealed) return interaction.deferUpdate();
         
@@ -1641,13 +1654,7 @@ if (['join_baicao', 'view_hand', 'flip_hand', 'start_now'].includes(interaction.
             await finishBaicao(interaction.channel, baicaoSession);
         }
     }
-} // <--- ĐÓNG cái if (['join_baicao', ...].includes)
-
-    } catch (error) {
-        console.error("Lỗi Interaction:", error);
-    }
-}); // <--- ĐÓNG cái client.on('interactionCreate')
-
+}
 
 
 
