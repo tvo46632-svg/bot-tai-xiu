@@ -474,8 +474,8 @@ async function cmdTungxu(message, args) {
         const IMG_SAP_URL = "https://i.imgur.com/AbC456.png";  // Link ảnh mặt Sấp (đuôi .png/.jpg)
         
         // 2. Emote nhỏ trong dòng text (Lấy bằng cách gõ \:emote: trong Discord)
-        const EMOTE_NGUA = "🔴"; // Tạm để icon đỏ, bạn thay lại ID chuẩn: <:ngua:ID_CUA_BAN>
-        const EMOTE_SAP = "🔵";  // Tạm để icon xanh, bạn thay lại ID chuẩn: <:sap:ID_CUA_BAN>
+        const EMOTE_NGUA = "1454113655460462675"; //   thay lại ID chuẩn: <:ngua:ID_CUA_BAN>
+        const EMOTE_SAP = "1454113634266517661";  //   thay lại ID chuẩn: <:sap:ID_CUA_BAN>
         
         // 3. GIF xoay
         const GIF_SPIN = "https://media1.tenor.com/m/u0PubumsAUkAAAAC/eminem-eminem-taern.gif";
