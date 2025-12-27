@@ -536,83 +536,105 @@ async function cmdTungxu(message, args) {
 
 
 
-//----- TAI XIU -----
+// =====================
+//      TAI XIU MULTIPLAYER
+// =====================
 async function cmdTaixiu(message) {
-    const userId = message.author.id;
-    const mainMsg = await message.reply({
-        content: "### 🎲 TRÒ CHƠI TÀI XỈU\n> Chọn cửa bạn muốn đặt cược phía dưới:",
+    const gifWaiting = "https://i.get-pic.me/image/taixiu_waiting.gif";
+    const gifRolling = "https://i.get-pic.me/image/dice_rolling.gif";
+
+    // 1. Khởi tạo danh sách người chơi trong phiên này
+    let players = []; 
+    // Cấu trúc mỗi player: { id: string, name: string, choice: string, bet: number }
+
+    const mainMsg = await message.channel.send({
+        content: `### 🎲 PHIÊN TÀI XỈU ĐA NGƯỜI CHƠI\n${gifWaiting}\n> ⏳ Thời gian đặt cược: **30 giây**\n> Nhấn nút phía dưới rồi **nhập số tiền cược** vào chat!`,
         components: [
             new ActionRowBuilder().addComponents(
-                new ButtonBuilder().setCustomId('tx_tai').setLabel('TÀI').setStyle(ButtonStyle.Danger),
-                new ButtonBuilder().setCustomId('tx_xiu').setLabel('XỈU').setStyle(ButtonStyle.Primary),
-                new ButtonBuilder().setCustomId('tx_chan').setLabel('CHẴN').setStyle(ButtonStyle.Secondary),
-                new ButtonBuilder().setCustomId('tx_le').setLabel('LẺ').setStyle(ButtonStyle.Secondary)
+                new ButtonBuilder().setCustomId('mtx_tai').setLabel('TÀI').setStyle(ButtonStyle.Danger),
+                new ButtonBuilder().setCustomId('mtx_xiu').setLabel('XỈU').setStyle(ButtonStyle.Primary),
+                new ButtonBuilder().setCustomId('mtx_chan').setLabel('CHẴN').setStyle(ButtonStyle.Secondary),
+                new ButtonBuilder().setCustomId('mtx_le').setLabel('LẺ').setStyle(ButtonStyle.Secondary)
             )
         ]
     });
 
-    const filter = i => i.user.id === userId;
-    const collector = mainMsg.createMessageComponentCollector({ filter, time: 30000 });
+    // 2. Bộ thu thập nút bấm (Cho phép nhiều người bấm)
+    const buttonCollector = mainMsg.createMessageComponentCollector({ time: 30000 });
 
-    collector.on('collect', async i => {
-        const choiceMap = { 'tx_tai': 'tài', 'tx_xiu': 'xỉu', 'tx_chan': 'chẵn', 'tx_le': 'lẻ' };
-        const userChoice = choiceMap[i.customId];
+    buttonCollector.on('collect', async i => {
+        const choiceMap = { 'mtx_tai': 'tài', 'mtx_xiu': 'xỉu', 'mtx_chan': 'chẵn', 'mtx_le': 'lẻ' };
+        const choice = choiceMap[i.customId];
 
-        await i.update({ content: `### 💸 ĐẶT CƯỢC: ${userChoice.toUpperCase()}\n> Vui lòng nhập số tiền muốn cược (300 - 10,000):`, components: [] });
+        // Gửi tin nhắn ẩn (Ephemeral) để yêu cầu nhập tiền
+        await i.reply({ content: `✅ Bạn chọn **${choice.toUpperCase()}**. Hãy nhập số tiền muốn cược vào kênh chat (300 - 10,000)!`, ephemeral: true });
 
-        const moneyFilter = m => m.author.id === userId && !isNaN(m.content);
-        const moneyCollector = message.channel.createMessageCollector({ filter: moneyFilter, time: 20000, max: 1 });
+        // Chờ người đó nhập tiền vào channel
+        const moneyFilter = m => m.author.id === i.user.id && !isNaN(m.content);
+        const mCollector = message.channel.createMessageCollector({ filter: moneyFilter, time: 15000, max: 1 });
 
-        moneyCollector.on('collect', async m => {
-            const betMoney = parseInt(m.content);
+        mCollector.on('collect', async m => {
+            const bet = parseInt(m.content);
             if (m.deletable) m.delete().catch(() => {});
 
-            if (betMoney < 300 || betMoney > 10000) 
-                return mainMsg.edit(`> ❌ Tiền cược không hợp lệ (300 - 10,000). Vui lòng thử lại lệnh!`);
+            if (bet < 300 || bet > 10000) return i.followUp({ content: "❌ Tiền cược không hợp lệ (300 - 10,000)!", ephemeral: true });
 
-            const user = await getUser(userId);
-            if (user.money < betMoney) 
-                return mainMsg.edit(`> ❌ Bạn không đủ tiền! Bạn chỉ còn **${user.money.toLocaleString()}** tiền.`);
+            const user = await getUser(i.user.id);
+            if (user.money < bet) return i.followUp({ content: `❌ Bạn không đủ tiền! (Còn ${user.money})`, ephemeral: true });
 
-            await subMoney(userId, betMoney);
+            // Kiểm tra xem người này đã cược chưa
+            if (players.find(p => p.id === i.user.id)) return i.followUp({ content: "❌ Bạn đã đặt cược trong phiên này rồi!", ephemeral: true });
+
+            // Trừ tiền và thêm vào danh sách
+            await subMoney(i.user.id, bet);
+            players.push({ id: i.user.id, name: i.user.username, choice, bet });
+
+            i.followUp({ content: `💰 Đã nhận cược: **${bet.toLocaleString()} xu** vào cửa **${choice.toUpperCase()}**!`, ephemeral: true });
             
-            const xocFrames = ["🎲 ▬ ▬ ▬", "▬ 🎲 ▬ ▬", "▬ ▬ 🎲 ▬", "▬ ▬ ▬ 🎲"];
-            for (let j = 0; j < 6; j++) {
-                await mainMsg.edit(`### 🎲 ĐANG XÓC ĐĨA...\n> **[ ${xocFrames[j % 4]} ]**`);
-                await new Promise(res => setTimeout(res, 400));
-            }
+            // Cập nhật danh sách hiển thị trên tin nhắn chính
+            const list = players.map(p => `• **${p.name}**: ${p.choice} (${p.bet.toLocaleString()})`).join("\n");
+            await mainMsg.edit({ content: `### 🎲 PHIÊN TÀI XỈU ĐA NGƯỜI CHƠI\n${gifWaiting}\n> ⏳ Còn lại: **${Math.round((buttonCollector.endTime - Date.now())/1000)}s**\n\n**Danh sách đã cược:**\n${list}` });
+        });
+    });
 
-            const d1 = Math.floor(Math.random() * 6) + 1;
-            const d2 = Math.floor(Math.random() * 6) + 1;
-            const d3 = Math.floor(Math.random() * 6) + 1;
-            const sum = d1 + d2 + d3;
-            const diceEmojis = ["", "⚀", "⚁", "⚂", "⚃", "⚄", "⚅"];
+    buttonCollector.on('end', async () => {
+        if (players.length === 0) return mainMsg.edit({ content: "### 🎲 PHIÊN TÀI XỈU\n> ❌ Không có ai tham gia đặt cược.", components: [] });
 
+        // 3. Animation xóc đĩa
+        await mainMsg.edit({ content: `### 🎲 ĐANG XÓC ĐĨA...\n${gifRolling}`, components: [] });
+        await new Promise(res => setTimeout(res, 3000));
+
+        // 4. Tính toán kết quả
+        const d1 = Math.floor(Math.random() * 6) + 1;
+        const d2 = Math.floor(Math.random() * 6) + 1;
+        const d3 = Math.floor(Math.random() * 6) + 1;
+        const sum = d1 + d2 + d3;
+        const diceEmojis = ["", "⚀", "⚁", "⚂", "⚃", "⚄", "⚅"];
+        const resultText = `### 🎲 KẾT QUẢ: ${diceEmojis[d1]} ${diceEmojis[d2]} ${diceEmojis[d3]} (${sum})`;
+
+        // 5. Tạo bảng kết quả
+        let tableHeader = "━━━━━━━━━━━━━━━━━━\n**BẢNG VÀNG KẾT QUẢ**\n━━━━━━━━━━━━━━━━━━\n";
+        let tableBody = "";
+
+        for (const p of players) {
             let win = false;
-            if (userChoice === "tài" && sum >= 11) win = true;
-            if (userChoice === "xỉu" && sum <= 10) win = true;
-            if (userChoice === "chẵn" && sum % 2 === 0) win = true;
-            if (userChoice === "lẻ" && sum % 2 === 1) win = true;
+            if (p.choice === "tài" && sum >= 11) win = true;
+            else if (p.choice === "xỉu" && sum <= 10) win = true;
+            else if (p.choice === "chẵn" && sum % 2 === 0) win = true;
+            else if (p.choice === "lẻ" && sum % 2 === 1) win = true;
 
-            const resultMsg = `### 🎲 KẾT QUẢ: ${diceEmojis[d1]} ${diceEmojis[d2]} ${diceEmojis[d3]} (${sum})`;
             if (win) {
-                const gain = betMoney * 2;
-                await addMoney(userId, gain);
-                await mainMsg.edit(`${resultMsg}\n> ✅ Chúc mừng! Bạn chọn **${userChoice}** và thắng **+${gain.toLocaleString()}** tiền.`);
+                const gain = p.bet * 2;
+                await addMoney(p.id, gain);
+                tableBody += `✅ **${p.name}**: +${gain.toLocaleString()} xu (${p.choice.toUpperCase()})\n`;
             } else {
-                await mainMsg.edit(`${resultMsg}\n> ❌ Rất tiếc! Bạn chọn **${userChoice}** và đã mất **-${betMoney.toLocaleString()}** tiền.`);
+                tableBody += `❌ **${p.name}**: -${p.bet.toLocaleString()} xu (${p.choice.toUpperCase()})\n`;
             }
-        });
+        }
 
-        moneyCollector.on('end', collected => {
-            if (collected.size === 0) mainMsg.edit("> ⏳ Đã hết thời gian nhập tiền cược.").catch(() => {});
-        });
+        await mainMsg.edit(`${resultText}\n${tableHeader}${tableBody}━━━━━━━━━━━━━━━━━━`);
     });
-
-    collector.on('end', collected => {
-        if (collected.size === 0) mainMsg.edit({ content: "> ⏳ Đã hết thời gian lựa chọn.", components: [] }).catch(() => {});
-    });
-} // <--- Dấu này đóng hàm cmdTaixiu
+}
 
 
 
