@@ -806,32 +806,29 @@ let isBocthamRunning = false;
 // =====================
 
 async function cmdBoctham(message) {
-    // 1. Kiểm tra máy bận ngay lập tức
     if (isBocthamRunning) {
-        return message.channel.send(`> ⏳ **${message.author.username}**, máy bốc thăm đang bận. Đợi tí nhé!`)
-            .then(m => setTimeout(() => {
-                m.delete().catch(() => {});
-                message.delete().catch(() => {});
-            }, 3000));
+        return message.channel.send(`> ⏳ **${message.author.username}**, máy bốc thăm đang bận!`)
+            .then(m => setTimeout(() => { m.delete().catch(() => {}); message.delete().catch(() => {}); }, 3000));
     }
 
     await db.read();
     const userId = message.author.id;
-
-    if (!db.data.boctham) db.data.boctham = {}; 
-    db.data.boctham[userId] ||= { lastDate: 0, count: 0 };
-    const info = db.data.boctham[userId];
-
     const today = new Date().toISOString().slice(0, 10);
-    
-    // Reset lượt nếu sang ngày mới
-    if (info.lastDate !== today) { 
-        info.lastDate = today; 
-        info.count = 3; 
+
+    // 1. Khởi tạo dữ liệu nếu chưa có (Gán trực tiếp vào db.data)
+    if (!db.data.boctham) db.data.boctham = {};
+    if (!db.data.boctham[userId]) {
+        db.data.boctham[userId] = { lastDate: today, count: 3 };
     }
 
-    // 2. Kiểm tra lượt TRƯỚC khi khóa máy
-    if (info.count <= 0) {
+    // 2. Kiểm tra ngày để reset lượt (Gán trực tiếp)
+    if (db.data.boctham[userId].lastDate !== today) {
+        db.data.boctham[userId].lastDate = today;
+        db.data.boctham[userId].count = 3;
+    }
+
+    // 3. Kiểm tra điều kiện lượt chơi
+    if (db.data.boctham[userId].count <= 0) {
         return message.channel.send(`> ❌ **${message.author.username}**, bạn đã hết lượt bốc thăm hôm nay!`)
             .then(m => setTimeout(() => m.delete(), 5000));
     }
@@ -842,21 +839,22 @@ async function cmdBoctham(message) {
             .then(m => setTimeout(() => m.delete(), 5000));
     }
 
-    // --- BẮT ĐẦU CHẠY: KHÓA MÁY VÀ TRỪ LƯỢT NGAY TỨ THÌ ---
-    isBocthamRunning = true; 
-    
-    // Trừ lượt và lưu vào DB ngay lập tức để dù có crash Bot cũng không bị hồi lượt
-    info.count--; 
+    // --- BẮT ĐẦU QUY TRÌNH KHÓA VÀ TRỪ TIỀN ---
+    isBocthamRunning = true;
+
+    // TRỪ LƯỢT TRỰC TIẾP VÀO DATABASE
+    db.data.boctham[userId].count -= 1; 
     await subMoney(userId, 200);
+    
+    // Ghi vào file ngay lập tức
     await db.write(); 
 
-    // Xóa tin nhắn lệnh của người chơi
     await message.delete().catch(() => {});
 
-    // 3. Tính toán phần thưởng
+    // 4. Tính toán phần thưởng (Giữ nguyên logic của bạn)
     const rand = Math.random() * 100;
     let reward = 0;
-    if (rand <= 40) reward = Math.floor(Math.random() * 51) + 50; 
+    if (rand <= 40) reward = Math.floor(Math.random() * 51) + 50;
     else if (rand <= 70) reward = Math.floor(Math.random() * 501) + 100;
     else if (rand <= 90) reward = Math.floor(Math.random() * 501) + 500;
     else if (rand <= 98) reward = Math.floor(Math.random() * 1501) - 1000;
@@ -878,17 +876,16 @@ async function cmdBoctham(message) {
             await msg.edit(`### 🎁 Đang bốc thăm...\n> ✨ Đang tìm thấy: **${allTiers[Math.floor(Math.random() * allTiers.length)]}**`).catch(() => {});
         }
 
-        // 4. Cộng tiền thưởng
         await addMoney(userId, reward);
 
         const statusText = reward >= 0 ? `Nhận: **+${reward.toLocaleString()}**` : `Mất: **${reward.toLocaleString()}**`;
-        await msg.edit(`### ${tier.emoji} HỘP QUÀ ${tier.name} ${tier.emoji}\n> 👤 Người chơi: **${message.author.username}**\n> ${tier.color} ${statusText} tiền\n> 🎫 Còn lại: \`${info.count}\` lượt`).catch(() => {});
+        // Hiển thị số lượt lấy trực tiếp từ database để đảm bảo chính xác
+        await msg.edit(`### ${tier.emoji} HỘP QUÀ ${tier.name} ${tier.emoji}\n> 👤 Người chơi: **${message.author.username}**\n> ${tier.color} ${statusText} tiền\n> 🎫 Còn lại: \`${db.data.boctham[userId].count}\` lượt`).catch(() => {});
 
     } catch (err) {
-        console.error("Lỗi bốc thăm:", err);
+        console.error("Lỗi:", err);
     } finally {
-        // LUÔN LUÔN mở khóa kể cả có lỗi
-        isBocthamRunning = false; 
+        isBocthamRunning = false;
     }
 }
 
