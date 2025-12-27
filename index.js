@@ -1833,15 +1833,17 @@ function createDeck() {
 
 // Hàm rút lá bài từ bộ bài
 function drawCard(deck) {
-    // Nếu bộ bài không tồn tại hoặc đã hết sạch bài (0 lá)
-    if (!deck || deck.length === 0) {
+    // Nếu deck không tồn tại (undefined/null), tạo một mảng tạm để tránh lỗi .push
+    if (!deck) {
+        console.log("❌ Lỗi: Deck bị undefined! Đang tạo bộ bài khẩn cấp...");
+        return dealCard(); // Trả về 1 lá ngẫu nhiên từ hàm cũ để game tiếp tục
+    }
+
+    if (deck.length === 0) {
         console.log("⚠️ Hết bài! Đang xào bộ mới...");
-        // Ở đây chúng ta không return luôn mà tạo deck mới
         const newDeck = createDeck();
-        // Cập nhật lại các lá bài vào deck hiện tại
         deck.push(...newDeck); 
     }
-    // Rút lá cuối cùng ra
     return deck.pop(); 
 }
 
