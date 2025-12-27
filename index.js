@@ -1672,7 +1672,7 @@ client.on('interactionCreate', async (interaction) => {
                     components: [] // Xóa nút Rút/Dằn
                 }).catch(() => {});
             }
-        });
+        }
         
 
   // --- B. XỬ LÝ BÀI CÀO ---
