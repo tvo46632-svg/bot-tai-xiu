@@ -798,19 +798,29 @@ for (const userId in allBets) {
 
 
 
+// 1. Khai báo biến khóa bên ngoài hàm để nó không bị reset khi chạy lại hàm
+let isBocthamRunning = false;
+
 // =====================
-//      BỐC THĂM MAY MẮN
+//      BỐC THĂM MAY MẮN (CHỐNG SPAM HÀNG CHỜ)
 // =====================
 async function cmdBoctham(message) {
-    // Xóa tin nhắn lệnh của người chơi ngay lập tức
+    // 2. Kiểm tra nếu có người đang bốc thăm
+    if (isBocthamRunning) {
+        return message.channel.send(`> ⏳ **${message.author.username}**, máy bốc thăm đang bận. Vui lòng đợi người trước bốc xong!`)
+            .then(m => setTimeout(() => {
+                m.delete().catch(() => {});
+                message.delete().catch(() => {});
+            }, 3000));
+    }
+
+    // Xóa tin nhắn lệnh của người chơi
     await message.delete().catch(() => {});
 
     await db.read();
     const userId = message.author.id;
 
-    // PHẢI CÓ DÒNG NÀY ĐỂ TRÁNH LỖI "undefined"
     if (!db.data.boctham) db.data.boctham = {}; 
-    
     db.data.boctham[userId] ||= { lastDate: 0, count: 0 };
     const info = db.data.boctham[userId];
 
@@ -820,12 +830,16 @@ async function cmdBoctham(message) {
         info.count = 3; 
     }
 
+    // Kiểm tra lượt và tiền
     if (info.count <= 0) return message.channel.send(`> ❌ **${message.author.username}**, bạn đã hết lượt bốc thăm hôm nay!`).then(m => setTimeout(() => m.delete(), 5000));
 
     const user = await getUser(userId);
     if (user.money < 200) return message.channel.send(`> ❌ **${message.author.username}**, cần **200 tiền** để bốc thăm!`).then(m => setTimeout(() => m.delete(), 5000));
 
-    // --- FIX CHỐNG SPAM: TRỪ LƯỢT VÀ LƯU LUÔN TẠI ĐÂY ---
+    // --- BẮT ĐẦU CHẠY: KHÓA MÁY ---
+    isBocthamRunning = true;
+
+    // Trừ lượt và tiền ngay lập tức
     info.count--;
     await subMoney(userId, 200);
     await db.write(); 
@@ -839,7 +853,6 @@ async function cmdBoctham(message) {
     else if (rand <= 98) reward = Math.floor(Math.random() * 1501) - 1000;
     else reward = 4000;
 
-    // 2. Phân loại Tier
     let tier = { name: "GỖ", emoji: "🪵", color: "🟫" };
     if (reward < 0) tier = { name: "RÁC", emoji: "🗑️", color: "🥀" };
     else if (reward === 4000) tier = { name: "THẦN THOẠI", emoji: "🌟", color: "👑" };
@@ -847,19 +860,28 @@ async function cmdBoctham(message) {
     else if (reward >= 500) tier = { name: "VÀNG", emoji: "🟡", color: "🥇" };
     else if (reward >= 200) tier = { name: "SẮT", emoji: "⚪", color: "🥈" };
 
-    // 3. Animation
-    const msg = await message.channel.send(`### 🎁 **${message.author.username}** đang mở hộp quà may mắn...`);
-    const allTiers = ["⚪ SẮT", "🟡 VÀNG", "💎 KIM CƯƠNG", "👑 THẦN THOẠI"];
-    for (let i = 0; i < 3; i++) {
-        await new Promise(res => setTimeout(res, 800)); // Tăng lên 800ms để tránh bị Discord chặn do edit nhanh
-        await msg.edit(`### 🎁 Đang bốc thăm...\n> ✨ Đang tìm thấy: **${allTiers[Math.floor(Math.random() * allTiers.length)]}**`).catch(() => {});
+    try {
+        // 3. Animation
+        const msg = await message.channel.send(`### 🎁 **${message.author.username}** đang mở hộp quà may mắn...`);
+        const allTiers = ["⚪ SẮT", "🟡 VÀNG", "💎 KIM CƯƠNG", "👑 THẦN THOẠI"];
+        
+        for (let i = 0; i < 3; i++) {
+            await new Promise(res => setTimeout(res, 800));
+            await msg.edit(`### 🎁 Đang bốc thăm...\n> ✨ Đang tìm thấy: **${allTiers[Math.floor(Math.random() * allTiers.length)]}**`).catch(() => {});
+        }
+
+        // 4. Cộng tiền thưởng
+        await addMoney(userId, reward);
+
+        const statusText = reward >= 0 ? `Nhận: **+${reward.toLocaleString()}**` : `Mất: **${reward.toLocaleString()}**`;
+        await msg.edit(`### ${tier.emoji} HỘP QUÀ ${tier.name} ${tier.emoji}\n> 👤 Người chơi: **${message.author.username}**\n> ${tier.color} ${statusText} tiền\n> 🎫 Còn lại: \`${info.count}\` lượt`).catch(() => {});
+
+    } catch (err) {
+        console.log("Lỗi bốc thăm:", err);
+    } finally {
+        // --- KẾT THÚC: MỞ KHÓA MÁY CHO NGƯỜI TIẾP THEO ---
+        isBocthamRunning = false;
     }
-
-    // Cộng tiền thưởng (hàm addMoney thường đã có db.write bên trong nên không cần gọi lại)
-    await addMoney(userId, reward);
-
-    const statusText = reward >= 0 ? `Nhận: **+${reward.toLocaleString()}**` : `Mất: **${reward.toLocaleString()}**`;
-    return await msg.edit(`### ${tier.emoji} HỘP QUÀ ${tier.name} ${tier.emoji}\n> 👤 Người chơi: **${message.author.username}**\n> ${tier.color} ${statusText} tiền\n> 🎫 Còn lại: \`${info.count}\` lượt`).catch(() => {});
 }
 
 
