@@ -781,6 +781,9 @@ for (const userId in allBets) {
 //      BỐC THĂM MAY MẮN
 // =====================
 async function cmdBoctham(message) {
+    // Xóa tin nhắn lệnh của người chơi ngay lập tức
+    await message.delete().catch(() => {});
+
     await db.read();
     const userId = message.author.id;
 
@@ -796,13 +799,15 @@ async function cmdBoctham(message) {
         info.count = 3; 
     }
 
-    if (info.count <= 0) return message.reply("> ❌ Bạn đã hết lượt bốc thăm hôm nay!");
+    if (info.count <= 0) return message.channel.send(`> ❌ **${message.author.username}**, bạn đã hết lượt bốc thăm hôm nay!`).then(m => setTimeout(() => m.delete(), 5000));
 
     const user = await getUser(userId);
-    if (user.money < 200) return message.reply("> ❌ Cần **200 tiền** để bốc thăm!");
+    if (user.money < 200) return message.channel.send(`> ❌ **${message.author.username}**, cần **200 tiền** để bốc thăm!`).then(m => setTimeout(() => m.delete(), 5000));
 
-    await subMoney(userId, 200);
+    // --- FIX CHỐNG SPAM: TRỪ LƯỢT VÀ LƯU LUÔN TẠI ĐÂY ---
     info.count--;
+    await subMoney(userId, 200);
+    await db.write(); 
 
     // 1. Tính toán phần thưởng
     const rand = Math.random() * 100;
@@ -822,19 +827,19 @@ async function cmdBoctham(message) {
     else if (reward >= 200) tier = { name: "SẮT", emoji: "⚪", color: "🥈" };
 
     // 3. Animation
-    const msg = await message.reply("### 🎁 Đang mở hộp quà may mắn...");
+    const msg = await message.channel.send(`### 🎁 **${message.author.username}** đang mở hộp quà may mắn...`);
     const allTiers = ["⚪ SẮT", "🟡 VÀNG", "💎 KIM CƯƠNG", "👑 THẦN THOẠI"];
     for (let i = 0; i < 3; i++) {
-        await new Promise(res => setTimeout(res, 500));
-        await msg.edit(`### 🎁 Đang bốc thăm...\n> ✨ Đang tìm thấy: **${allTiers[Math.floor(Math.random() * allTiers.length)]}**`);
+        await new Promise(res => setTimeout(res, 800)); // Tăng lên 800ms để tránh bị Discord chặn do edit nhanh
+        await msg.edit(`### 🎁 Đang bốc thăm...\n> ✨ Đang tìm thấy: **${allTiers[Math.floor(Math.random() * allTiers.length)]}**`).catch(() => {});
     }
 
+    // Cộng tiền thưởng (hàm addMoney thường đã có db.write bên trong nên không cần gọi lại)
     await addMoney(userId, reward);
-    await db.write();
 
     const statusText = reward >= 0 ? `Nhận: **+${reward.toLocaleString()}**` : `Mất: **${reward.toLocaleString()}**`;
-    return await msg.edit(`### ${tier.emoji} HỘP QUÀ ${tier.name} ${tier.emoji}\n> ${tier.color} ${statusText} tiền\n> 🎫 Còn lại: \`${info.count}\` lượt`);
-} // <--- CHỈ CÓ 1 DẤU NGOẶC DUY NHẤT Ở CUỐI NÀY THÔI!
+    return await msg.edit(`### ${tier.emoji} HỘP QUÀ ${tier.name} ${tier.emoji}\n> 👤 Người chơi: **${message.author.username}**\n> ${tier.color} ${statusText} tiền\n> 🎫 Còn lại: \`${info.count}\` lượt`).catch(() => {});
+}
 
 
 
@@ -1074,7 +1079,7 @@ async function cmdChuyenxu(message, args) {
 
     
 // =====================
-//      ĂN XIN (BỐC TÚI MÙ)
+//      ĂN XIN (BỐC TÚI MÙ) - CHỐNG SPAM 
 // =====================
 async function cmdAnxin(message) {
     const userId = message.author.id;
@@ -1091,12 +1096,18 @@ async function cmdAnxin(message) {
         info.count = 2;
     }
 
+    // Kiểm tra lượt trước
     if (info.count <= 0) {
-        const reply = await message.reply("> ❌ Bạn đã dùng hết 2 lượt ăn xin hôm nay!");
-        // Tự xóa thông báo hết lượt sau 5s
+        // Xóa tin nhắn lệnh của người chơi cho gọn
+        await message.delete().catch(() => {});
+        const reply = await message.channel.send(`> ❌ **${message.author.username}**, bạn đã dùng hết 2 lượt ăn xin hôm nay!`);
         setTimeout(() => reply.delete().catch(() => {}), 5000);
         return;
     }
+
+    // --- FIX QUAN TRỌNG: TRỪ LƯỢT VÀ LƯU NGAY LẬP TỨC ĐỂ KHÓA SPAM ---
+    info.count--;
+    await db.write(); 
 
     // 1. Tính toán phần thưởng trước
     const rand = Math.random();
@@ -1109,27 +1120,24 @@ async function cmdAnxin(message) {
         ? { name: "NGỌC LỤC BẢO", emoji: "💚", box: "🎁" } 
         : { name: "MẢNH SẮT VỤN", emoji: "⚪", box: "📦" };
 
-    // 2. Animation bốc túi mù
+    // 2. Animation bốc túi mù (Dùng channel.send để an toàn sau khi xóa tin nhắn gốc)
     const msg = await message.reply("### 🛍️ Đang bốc túi mù...");
     
     const frames = ["📦", "🎁", "📦", "✨"];
     for (let f of frames) {
-        await new Promise(res => setTimeout(res, 400));
-        await msg.edit(`### 🛍️ Đang xé túi mù... ${f}`);
+        await new Promise(res => setTimeout(res, 600)); // Tăng lên 600ms để an toàn Rate Limit
+        await msg.edit(`### 🛍️ Đang xé túi mù... ${f}`).catch(() => {});
     }
 
-    // 3. Cập nhật Database
+    // 3. Cộng tiền thưởng
     await addXu(userId, reward);
-    info.count--;
-    await db.write();
 
     // 4. Kết quả cuối cùng
-    const finalMsg = await msg.edit(`### ${item.box} TÚI MÙ: ${item.name} ${item.emoji}\n> 💰 Bạn xin được: **${reward.toLocaleString()} xu**\n> 🎫 Lượt còn lại: \`${info.count}\``);
+    const finalMsg = await msg.edit(`### ${item.box} TÚI MÙ: ${item.name} ${item.emoji}\n> 👤 Người xin: **${message.author.username}**\n> 💰 Bạn xin được: **${reward.toLocaleString()} xu**\n> 🎫 Lượt còn lại: \`${info.count}\``).catch(() => {});
 
-    // 5. Tự động xóa tin nhắn sau 5 giây (5000ms)
+    // 5. Tự động dọn dẹp tin nhắn sau 5 giây
     setTimeout(() => {
         finalMsg.delete().catch(() => {});
-        // Nếu muốn xóa cả tin nhắn lệnh của người dùng (!anxin)
         message.delete().catch(() => {});
     }, 5000);
 }
