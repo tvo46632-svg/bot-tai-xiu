@@ -189,7 +189,7 @@ async function getAllUsers() {
 
 
 // =====================
-//      ĐIỂM DANH JACKPOT (ANIMATION MƯỢT)
+//      ĐIỂM DANH JACKPOT (ĐÃ FIX BUG SPAM)
 // =====================
 async function cmdDiemdanh(message) {
     const userId = message.author.id;
@@ -202,6 +202,11 @@ async function cmdDiemdanh(message) {
         return message.reply("❌ Bạn đã điểm danh hôm nay rồi!");
     }
 
+    // --- SỬA TẠI ĐÂY: KHÓA NGAY LẬP TỨC ---
+    // Phải gán ngày và lưu vào DB TRƯỚC khi chạy animation để chống người chơi spam nút
+    db.data.daily[userId] = today;
+    await db.write(); 
+
     // 2. Tính toán kết quả trước (nhưng chưa hiện)
     const rand = Math.random() * 100;
     let xuReward = 0;
@@ -211,35 +216,32 @@ async function cmdDiemdanh(message) {
     else if (rand <= 98) xuReward = 3000;
     else xuReward = 3200;
 
-    // Danh sách các số ảo để nhảy
     const fakeNumbers = ["1,000", "2,500", "3,200", "500", "1,200", "2,000", "3,000", "800"];
 
     // 3. Gửi tin nhắn bắt đầu
     const msg = await message.reply("🎰 **MÁY QUAY THƯỞNG ĐANG CHẠY...** 🎰");
 
     // 4. Vòng lặp nhảy số liên tục (Animation)
-    for (let i = 0; i < 6; i++) {
-        // Lấy ngẫu nhiên một số trong mảng fakeNumbers để hiển thị ảo
+    for (let i = 0; i < 5; i++) { // Giảm xuống 5 lần để an toàn cho Bot
         const randomFake = fakeNumbers[Math.floor(Math.random() * fakeNumbers.length)];
+        const progress = "▓".repeat(i + 1) + "░".repeat(4 - i);
         
-        // Tạo thanh progress bar chạy ảo
-        const progress = "▓".repeat(i + 1) + "░".repeat(5 - i);
+        // Dùng .catch để tránh crash bot nếu người chơi xóa tin nhắn khi đang quay
+        await msg.edit(`🎰 **JACKPOT SPINNING** 🎰\n━━━━━━━━━━━━━━━━━━\n> **[ 🎰 ${randomFake} 🎰 ]**\n━━━━━━━━━━━━━━━━━━\n\`${progress}\` *Đang khớp số...*`).catch(() => {});
         
-        await msg.edit(`🎰 **JACKPOT SPINNING** 🎰\n━━━━━━━━━━━━━━━━━━\n> **[ 🎰 ${randomFake} 🎰 ]**\n━━━━━━━━━━━━━━━━━━\n\`${progress}\` *Đang khớp số...*`);
-        
-        // Tốc độ nhảy (400ms là mức an toàn nhất để không bị Discord chặn)
-        await new Promise(res => setTimeout(res, 400));
+        // Tăng lên 700ms để Discord không chặn (Rate Limit)
+        await new Promise(res => setTimeout(res, 700));
     }
 
-    // 5. Lưu dữ liệu
-    db.data.daily[userId] = today;
+    // 5. Lưu tiền vào DB
+    // Vì ngày đã lưu ở bước 1, bước này chỉ cần cộng tiền
     await addXu(userId, xuReward);
 
     // 6. Hiển thị kết quả cuối cùng
     const isJackpot = xuReward >= 3000;
     const finalHeader = isJackpot ? "🎊 🔥 **SIÊU CẤP JACKPOT** 🔥 🎊" : "✅ **ĐIỂM DANH THÀNH CÔNG**";
     
-    await msg.edit(`${finalHeader}\n━━━━━━━━━━━━━━━━━━\n👤 Người chơi: **${message.author.username}**\n💰 Nhận được: **${xuReward.toLocaleString()} xu**\n━━━━━━━━━━━━━━━━━━\n*Số dư mới của bạn đã được cập nhật!*`);
+    await msg.edit(`${finalHeader}\n━━━━━━━━━━━━━━━━━━\n👤 Người chơi: **${message.author.username}**\n💰 Nhận được: **${xuReward.toLocaleString()} xu**\n━━━━━━━━━━━━━━━━━━\n*Số dư mới của bạn đã được cập nhật!*`).catch(() => {});
 }
 
 
@@ -1470,13 +1472,14 @@ async function cmdXidach(message, args) {
     
     await subMoney(message.author.id, bet);
 
-    const session = {
-        userId: message.author.id,
-        playerHand: [dealCard(), dealCard()],
-        dealerHand: [dealCard(), dealCard()],
-        bet: bet,
-        msg: null
-    };
+  const session = {
+    userId: message.author.id,
+    playerHand: [dealCard(), dealCard()], // Lưu ý: Nên dùng drawCard(deck) ở đây luôn cho đồng bộ
+    dealerHand: [dealCard(), dealCard()],
+    deck: createDeck(), // THÊM DÒNG NÀY
+    bet: bet,
+    msg: null
+};
 
     // --- CHECK ĂN NGAY ---
     const special = checkSpecialHand(session.playerHand);
