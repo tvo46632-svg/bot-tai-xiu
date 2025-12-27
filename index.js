@@ -1354,6 +1354,7 @@ async function cmdHelp(message) {
                     `\`!tien\` : Kiểm tra số dư hiện có.\n` +
                     `\`!diemdanh\` : Nhận lương mỗi ngày.\n` +
                     `\`!top\` : Bảng xếp hạng đại gia.\n\n` +
+                     `\`!doi\` : Đổi tiền hoặc xu lệnh !doi (tien or xu ).\n\n` +
                     `**Giao Dịch:**\n` +
                     `\`!chuyentien <@user> <số>\` : Phí 5%.\n` +
                     `\`!chuyenxu\` : Quy đổi tiền tệ.`
