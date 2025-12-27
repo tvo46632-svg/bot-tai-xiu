@@ -1556,7 +1556,7 @@ client.on('interactionCreate', async (interaction) => {
        // --- A. XỬ LÝ XÌ DÁCH ---
         if (interaction.customId.startsWith('hit_') || interaction.customId.startsWith('stand_')) {
             // 1. TÁCH LẤY ID TRƯỚC
-            const [action, targetId] = interaction.customId.split("_"); 
+            let [action, targetId] = interaction.customId.split("_"); 
             
             // 2. RỒI MỚI TÌM SESSION THEO ID ĐÓ
             const xidachSession = blackjackSession[targetId]; 
