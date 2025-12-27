@@ -1533,7 +1533,7 @@ async function cmdXidach(message, args) {
 
     // Tự động hủy sau 1 phút nếu treo máy
     setTimeout(() => {
-        if (blackjackSession[message.channel.id]) {
+        if (blackjackSession[message.author.id]) {
             delete blackjackSession[message.channel.id];
             session.msg.edit({ components: [] }).catch(() => {});
         }
@@ -1551,15 +1551,18 @@ async function cmdXidach(message, args) {
 client.on('interactionCreate', async (interaction) => {
     try {
         if (!interaction.isButton()) return;
-
-        const xidachSession = blackjackSession[userId];
         const baicaoSession = activeGames.get(interaction.channelId);
 
        // --- A. XỬ LÝ XÌ DÁCH ---
         if (interaction.customId.startsWith('hit_') || interaction.customId.startsWith('stand_')) {
-            let [action, userId] = interaction.customId.split("_");
+            // 1. TÁCH LẤY ID TRƯỚC
+            const [action, targetId] = interaction.customId.split("_"); 
+            
+            // 2. RỒI MỚI TÌM SESSION THEO ID ĐÓ
+            const xidachSession = blackjackSession[targetId]; 
+
             if (!xidachSession) return interaction.reply({ content: "❌ Ván đã kết thúc.", flags: [64] }).catch(() => {});
-            if (interaction.user.id !== userId) return interaction.reply({ content: "🚫 Không phải bài của bạn!", flags: [64] }).catch(() => {});
+            if (interaction.user.id !== targetId) return interaction.reply({ content: "🚫 Không phải bài của bạn!", flags: [64] }).catch(() => {});
 
             // Biến kiểm tra xem có cần kết thúc game luôn không (do dằn hoặc do quắc)
             let isEndGame = false;
@@ -1812,12 +1815,12 @@ async function handleBaiCaoCommand(message, args) {
 
 // Hàm tạo bộ bài mới và trộn đều
 function createDeck() {
-    const suits = ['s', 'c', 'h', 'd'];
+    const suits = ['s', 'c', 'h', 'd']; // Đã khớp với key :As:, :Ah:, :Ac:, :Ad:
     const values = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
     let deck = [];
     for (let s of suits) {
         for (let v of values) {
-            deck.push(`:${v}${s}:`);
+            deck.push(`:${v}${s}:`); // Tạo ra key đúng dạng trong bảng cardEmojis
         }
     }
     // Trộn bài (Fisher-Yates Shuffle)
@@ -1830,10 +1833,17 @@ function createDeck() {
 
 // Hàm rút lá bài từ bộ bài
 function drawCard(deck) {
-    if (!deck || deck.length === 0) return dealCard(); // Nếu hết bài hoặc lỗi deck thì dùng hàm random cũ
+    // Nếu bộ bài không tồn tại hoặc đã hết sạch bài (0 lá)
+    if (!deck || deck.length === 0) {
+        console.log("⚠️ Hết bài! Đang xào bộ mới...");
+        // Ở đây chúng ta không return luôn mà tạo deck mới
+        const newDeck = createDeck();
+        // Cập nhật lại các lá bài vào deck hiện tại
+        deck.push(...newDeck); 
+    }
+    // Rút lá cuối cùng ra
     return deck.pop(); 
 }
-
 
 
 
