@@ -539,7 +539,7 @@ async function cmdTungxu(message, args) {
 //      TAI XIU MULTIPLAYER
 // =====================
 async function cmdTaixiu(message) {
-    const gifWaiting = "https://media1.tenor.com/m/5PepR8rD4U0AAAAC/throwing-dice-quavo.gif";
+    const gifWaiting = "https://media.tenor.com/5PepR8rD4U0AAAAC/throwing-dice-quavo.gif";
     const gifRolling = "https://media.tenor.com/acXyDcloqNoAAAAi/dice-1-dice.gif";
 
     // 1. Khởi tạo danh sách người chơi trong phiên này
