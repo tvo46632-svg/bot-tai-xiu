@@ -811,72 +811,77 @@ let isBocthamRunning = false;
 // =====================
 
 async function cmdBoctham(message) {
+    // 1. Chống spam
     if (isBocthamRunning) {
-        return message.channel.send(`> ⏳ Máy đang bận, vui lòng đợi!`).then(m => setTimeout(() => { m.delete().catch(() => {}); message.delete().catch(() => {}); }, 3000));
+        return message.channel.send(`> ⏳ Máy đang bận, đợi tí bạn ơi!`)
+            .then(m => setTimeout(() => { m.delete().catch(() => {}); message.delete().catch(() => {}); }, 3000));
     }
 
     try {
-        await db.read();
         const userId = message.author.id;
-        const today = new Date().toISOString().slice(0, 10);
-
-        // Khởi tạo database nếu chưa có
-        if (!db.data.boctham) db.data.boctham = {};
-
-        // KIỂM TRA LƯỢT: Nếu đã bốc hôm nay rồi thì chặn luôn
-        if (db.data.boctham[userId] && db.data.boctham[userId].lastDate === today) {
-            return message.channel.send(`> ❌ **${message.author.username}**, mỗi ngày chỉ được bốc thăm **1 lần** duy nhất!`);
-        }
-
-        // Kiểm tra tiền (Phải có trên 200)
         const user = await getUser(userId);
+
+        // 2. Kiểm tra tiền (Giá mỗi lần bốc là 200)
         if (!user || user.money < 200) {
-            return message.channel.send(`> ❌ Bạn cần **200 tiền** để bốc thăm!`);
+            return message.channel.send(`> ❌ **${message.author.username}**, bạn cần ít nhất **200 tiền** để bốc thăm!`);
         }
 
-        // --- BẮT ĐẦU CHẠY ---
         isBocthamRunning = true;
 
-        // CẬP NHẬT NGÀY VÀ TRỪ TIỀN NGAY LẬP TỨC (Chặn người dùng bốc lần 2)
-        db.data.boctham[userId] = { lastDate: today }; 
+        // 3. Trừ tiền ngay lập tức
         await subMoney(userId, 200);
-        await db.write();
 
-        await message.delete().catch(() => {});
-
-        // Logic phần thưởng
-        const rand = Math.random() * 100;
+        // 4. Tính toán phần thưởng theo tỷ lệ mới
+        // 20% (300 -> 4000) | 80% (Sắt hoặc Rác)
+        const tỷLệ = Math.random() * 100;
         let reward = 0;
-        if (rand <= 40) reward = Math.floor(Math.random() * 51) + 50; 
-        else if (rand <= 70) reward = Math.floor(Math.random() * 501) + 100;
-        else if (rand <= 90) reward = Math.floor(Math.random() * 501) + 500;
-        else if (rand <= 98) reward = Math.floor(Math.random() * 1501) - 1000;
-        else reward = 4000;
+        let tier = { name: "SẮT", emoji: "⚪", color: "🥈" };
 
-        let tier = { name: "GỖ", emoji: "🪵", color: "🟫" };
-        if (reward < 0) tier = { name: "RÁC", emoji: "🗑️", color: "🥀" };
-        else if (reward === 4000) tier = { name: "THẦN THOẠI", emoji: "🌟", color: "👑" };
-        else if (reward >= 1000) tier = { name: "KIM CƯƠNG", emoji: "💎", color: "🔹" };
-        else if (reward >= 500) tier = { name: "VÀNG", emoji: "🟡", color: "🥇" };
-        else if (reward >= 200) tier = { name: "SẮT", emoji: "⚪", color: "🥈" };
-
-        const msg = await message.channel.send(`### 🎁 **${message.author.username}** đang mở hộp quà duy nhất trong ngày...`);
-        
-        // Animation ngắn gọn
-        for (let i = 0; i < 2; i++) {
-            await new Promise(res => setTimeout(res, 1000));
-            await msg.edit(`### 🎁 Đang tìm quà may mắn...`).catch(() => {});
+        if (tỷLệ <= 20) {
+            // NHÓM TRÚNG LỚN (20%)
+            const mayMan = Math.random() * 100;
+            if (mayMan <= 10) {
+                reward = 4000;
+                tier = { name: "THẦN THOẠI", emoji: "🌟", color: "👑" };
+            } else if (mayMan <= 40) {
+                reward = Math.floor(Math.random() * 1001) + 1000; // 1000 - 2000
+                tier = { name: "KIM CƯƠNG", emoji: "💎", color: "🔹" };
+            } else {
+                reward = Math.floor(Math.random() * 501) + 300; // 300 - 800
+                tier = { name: "VÀNG", emoji: "🟡", color: "🥇" };
+            }
+        } else {
+            // NHÓM THẤP (80%)
+            const đenủi = Math.random() * 100;
+            if (đenủi <= 30) {
+                reward = -Math.floor(Math.random() * 501) - 100; // Mất 100 - 600 (Rác)
+                tier = { name: "RÁC", emoji: "🗑️", color: "🥀" };
+            } else {
+                reward = Math.floor(Math.random() * 151) + 50; // Nhận 50 - 200 (Sắt)
+                tier = { name: "SẮT", emoji: "⚪", color: "🥈" };
+            }
         }
 
+        // 5. Hiển thị hiệu ứng
+        const msg = await message.channel.send(`### 🎁 **${message.author.username}** đang bốc thăm liên tục...`);
+        await message.delete().catch(() => {});
+
+        const hiệuỨng = ["✨ Đang tìm quà...", "🧧 Đang lắc hộp...", "🎊 Sắp có kết quả..."];
+        for (const text of hiệuỨng) {
+            await new Promise(res => setTimeout(res, 700));
+            await msg.edit(`### 🎁 **BỐC THĂM MAY MẮN**\n> ${text}`).catch(() => {});
+        }
+
+        // 6. Cộng tiền và hiển thị kết quả
         await addMoney(userId, reward);
         const statusText = reward >= 0 ? `Nhận: **+${reward.toLocaleString()}**` : `Mất: **${reward.toLocaleString()}**`;
-        
-        await msg.edit(`### ${tier.emoji} HỘP QUÀ ${tier.name} ${tier.emoji}\n> 👤 Người chơi: **${message.author.username}**\n> ${tier.color} ${statusText} tiền\n> 🎫 Trạng thái: **Đã hết lượt hôm nay**`).catch(() => {});
+
+        await msg.edit(`### ${tier.emoji} HỘP QUÀ ${tier.name} ${tier.emoji}\n> 👤 Người chơi: **${message.author.username}**\n> ${tier.color} Kết quả: ${statusText} tiền\n> 💰 Số dư hiện tại: **${(user.money - 200 + reward).toLocaleString()}**`).catch(() => {});
 
     } catch (err) {
-        console.error("LỖI:", err);
+        console.error("LỖI BOCTHAM:", err);
     } finally {
-        isBocthamRunning = false; 
+        isBocthamRunning = false;
     }
 }
 
