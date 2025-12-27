@@ -1529,7 +1529,7 @@ async function cmdXidach(message, args) {
     );
 
     session.msg = await message.channel.send({ embeds: [embed], components: [row] });
-    blackjackSession[message.channel.id] = session;
+    blackjackSession[message.author.id] = session;
 
     // Tự động hủy sau 1 phút nếu treo máy
     setTimeout(() => {
@@ -1552,7 +1552,7 @@ client.on('interactionCreate', async (interaction) => {
     try {
         if (!interaction.isButton()) return;
 
-        const xidachSession = blackjackSession[interaction.channelId];
+        const xidachSession = blackjackSession[userId];
         const baicaoSession = activeGames.get(interaction.channelId);
 
        // --- A. XỬ LÝ XÌ DÁCH ---
@@ -1808,6 +1808,30 @@ async function handleBaiCaoCommand(message, args) {
             startDealing(message.channel, currentGame);
         }
     }, 30000);
+}
+
+// Hàm tạo bộ bài mới và trộn đều
+function createDeck() {
+    const suits = ['s', 'c', 'h', 'd'];
+    const values = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+    let deck = [];
+    for (let s of suits) {
+        for (let v of values) {
+            deck.push(`:${v}${s}:`);
+        }
+    }
+    // Trộn bài (Fisher-Yates Shuffle)
+    for (let i = deck.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [deck[i], deck[j]] = [deck[j], deck[i]];
+    }
+    return deck;
+}
+
+// Hàm rút lá bài từ bộ bài
+function drawCard(deck) {
+    if (!deck || deck.length === 0) return dealCard(); // Nếu hết bài hoặc lỗi deck thì dùng hàm random cũ
+    return deck.pop(); 
 }
 
 
