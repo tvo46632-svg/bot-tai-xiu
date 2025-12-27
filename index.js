@@ -804,18 +804,16 @@ let isBocthamRunning = false;
 // =====================
 //      BỐC THĂM MAY MẮN (CHỐNG SPAM HÀNG CHỜ)
 // =====================
+
 async function cmdBoctham(message) {
-    // 2. Kiểm tra nếu có người đang bốc thăm
+    // 1. Kiểm tra máy bận ngay lập tức
     if (isBocthamRunning) {
-        return message.channel.send(`> ⏳ **${message.author.username}**, máy bốc thăm đang bận. Vui lòng đợi người trước bốc xong!`)
+        return message.channel.send(`> ⏳ **${message.author.username}**, máy bốc thăm đang bận. Đợi tí nhé!`)
             .then(m => setTimeout(() => {
                 m.delete().catch(() => {});
                 message.delete().catch(() => {});
             }, 3000));
     }
-
-    // Xóa tin nhắn lệnh của người chơi
-    await message.delete().catch(() => {});
 
     await db.read();
     const userId = message.author.id;
@@ -825,26 +823,37 @@ async function cmdBoctham(message) {
     const info = db.data.boctham[userId];
 
     const today = new Date().toISOString().slice(0, 10);
+    
+    // Reset lượt nếu sang ngày mới
     if (info.lastDate !== today) { 
         info.lastDate = today; 
         info.count = 3; 
     }
 
-    // Kiểm tra lượt và tiền
-    if (info.count <= 0) return message.channel.send(`> ❌ **${message.author.username}**, bạn đã hết lượt bốc thăm hôm nay!`).then(m => setTimeout(() => m.delete(), 5000));
+    // 2. Kiểm tra lượt TRƯỚC khi khóa máy
+    if (info.count <= 0) {
+        return message.channel.send(`> ❌ **${message.author.username}**, bạn đã hết lượt bốc thăm hôm nay!`)
+            .then(m => setTimeout(() => m.delete(), 5000));
+    }
 
     const user = await getUser(userId);
-    if (user.money < 200) return message.channel.send(`> ❌ **${message.author.username}**, cần **200 tiền** để bốc thăm!`).then(m => setTimeout(() => m.delete(), 5000));
+    if (user.money < 200) {
+        return message.channel.send(`> ❌ **${message.author.username}**, cần **200 tiền** để bốc thăm!`)
+            .then(m => setTimeout(() => m.delete(), 5000));
+    }
 
-    // --- BẮT ĐẦU CHẠY: KHÓA MÁY ---
-    isBocthamRunning = true;
-
-    // Trừ lượt và tiền ngay lập tức
-    info.count--;
+    // --- BẮT ĐẦU CHẠY: KHÓA MÁY VÀ TRỪ LƯỢT NGAY TỨ THÌ ---
+    isBocthamRunning = true; 
+    
+    // Trừ lượt và lưu vào DB ngay lập tức để dù có crash Bot cũng không bị hồi lượt
+    info.count--; 
     await subMoney(userId, 200);
     await db.write(); 
 
-    // 1. Tính toán phần thưởng
+    // Xóa tin nhắn lệnh của người chơi
+    await message.delete().catch(() => {});
+
+    // 3. Tính toán phần thưởng
     const rand = Math.random() * 100;
     let reward = 0;
     if (rand <= 40) reward = Math.floor(Math.random() * 51) + 50; 
@@ -861,7 +870,6 @@ async function cmdBoctham(message) {
     else if (reward >= 200) tier = { name: "SẮT", emoji: "⚪", color: "🥈" };
 
     try {
-        // 3. Animation
         const msg = await message.channel.send(`### 🎁 **${message.author.username}** đang mở hộp quà may mắn...`);
         const allTiers = ["⚪ SẮT", "🟡 VÀNG", "💎 KIM CƯƠNG", "👑 THẦN THOẠI"];
         
@@ -877,10 +885,10 @@ async function cmdBoctham(message) {
         await msg.edit(`### ${tier.emoji} HỘP QUÀ ${tier.name} ${tier.emoji}\n> 👤 Người chơi: **${message.author.username}**\n> ${tier.color} ${statusText} tiền\n> 🎫 Còn lại: \`${info.count}\` lượt`).catch(() => {});
 
     } catch (err) {
-        console.log("Lỗi bốc thăm:", err);
+        console.error("Lỗi bốc thăm:", err);
     } finally {
-        // --- KẾT THÚC: MỞ KHÓA MÁY CHO NGƯỜI TIẾP THEO ---
-        isBocthamRunning = false;
+        // LUÔN LUÔN mở khóa kể cả có lỗi
+        isBocthamRunning = false; 
     }
 }
 
