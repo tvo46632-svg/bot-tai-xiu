@@ -1604,24 +1604,20 @@ client.on('interactionCreate', async (interaction) => {
                 }
             }
 
-            // 2. XỬ LÝ DẰN BÀI (HOẶC BỊ QUẮC Ở TRÊN CHUYỂN XUỐNG)
+          // 2. XỬ LÝ DẰN BÀI (HOẶC BỊ QUẮC Ở TRÊN CHUYỂN XUỐNG)
             if (action === "stand") {
-                // Nếu không phải do Quắc chuyển xuống thì defer update
-                if (!isEndGame) await interaction.deferUpdate().catch(() => {});
+                // Luôn deferUpdate để báo cho Discord biết Bot đang xử lý, tránh lỗi 3s
+                if (!interaction.deferred && !interaction.replied) {
+                    await interaction.deferUpdate().catch(() => {});
+                }
                 
                 let dealerHand = xidachSession.dealerHand;
                 let deck = xidachSession.deck;
                 
-                // Xóa session trước để tránh spam
-                delete blackjackSession[interaction.channelId];
-
-                const baseEmbed = EmbedBuilder.from(interaction.message.embeds[0]);
-                await interaction.message.delete().catch(() => {});
-
-                // --- BOT RÚT BÀI (MẤU CHỐT Ở ĐÂY) ---
-                // Bot phải rút cho đủ 16 điểm, hoặc rút tiếp nếu điểm thấp (tuỳ logic, thường là < 17 phải rút)
-                while (calcPoint(dealerHand) < 17) {
-                    dealerHand.push(drawCard ? drawCard(deck) : dealCard());
+                // --- BOT RÚT BÀI ---
+                // Dùng xidachSession.deck để tránh lỗi undefined deck
+                while (calcPoint(dealerHand) < 17 && dealerHand.length < 5) {
+                    dealerHand.push(drawCard(deck));
                 }
                 
                 const pP = calcPoint(xidachSession.playerHand);
@@ -1629,27 +1625,19 @@ client.on('interactionCreate', async (interaction) => {
                 let msg = "", col = "#f1c40f";
                 let winAmount = 0;
 
-                // --- LOGIC SO SÁNH ĐIỂM (ĐÃ SỬA CÔNG BẰNG) ---
-                
-                // 1. Cả hai cùng Quắc (>21) -> HÒA (Cùng đường)
+                // --- LOGIC SO SÁNH ---
                 if (pP > 21 && dP > 21) {
-                    winAmount = xidachSession.bet; // Hoàn tiền
+                    winAmount = xidachSession.bet; 
                     msg = `⚖️ **HÒA!** Cả hai cùng quắc (Bạn: ${pP}, Cái: ${dP}).`;
-                }
-                // 2. Bạn Quắc (>21) mà Cái không Quắc -> THUA
-                else if (pP > 21 && dP <= 21) {
+                } else if (pP > 21) {
                     winAmount = 0;
                     msg = `❌ **QUẮC!** Bạn (${pP}) đã thua nhà cái (${dP}).`;
                     col = "#e74c3c";
-                }
-                // 3. Cái Quắc (>21) mà bạn không Quắc -> THẮNG
-                else if (pP <= 21 && dP > 21) {
+                } else if (dP > 21) {
                     winAmount = xidachSession.bet * 2;
                     msg = `🎉 **THẮNG!** Nhà cái bị quắc (${dP}).`;
                     col = "#2ecc71";
-                }
-                // 4. Cả hai <= 21 -> So điểm
-                else {
+                } else {
                     if (pP > dP) {
                         winAmount = xidachSession.bet * 2;
                         msg = `🎉 **THẮNG!** Điểm cao hơn (${pP} vs ${dP}).`;
@@ -1664,18 +1652,26 @@ client.on('interactionCreate', async (interaction) => {
                     }
                 }
 
-                // Cộng tiền và hiển thị
-                if (winAmount > 0) await addMoney(userId, winAmount);
-                const userFinal = await getUser(userId);
+                if (winAmount > 0) await addMoney(targetId, winAmount);
+                const userFinal = await getUser(targetId);
                 
-                return interaction.channel.send({
-                    embeds: [baseEmbed.setColor(col).setFields(
-                        { name: `👤 Bạn (${pP})`, value: formatHand(xidachSession.playerHand), inline: false },
-                        { name: `🤖 Nhà cái (${dP})`, value: formatHand(dealerHand), inline: false }
-                    ).setDescription(`${msg}\n💰 Ví: **${userFinal.money.toLocaleString()}**`)]
+                // Xóa session SAU KHI tính toán xong
+                delete blackjackSession[targetId];
+
+                // Cập nhật trực tiếp lên tin nhắn cũ, xóa các nút bấm
+                return interaction.editReply({
+                    embeds: [new EmbedBuilder()
+                        .setTitle("🏁 KẾT QUẢ XÌ DÁCH")
+                        .setColor(col)
+                        .setFields(
+                            { name: `👤 Bạn (${pP})`, value: formatHand(xidachSession.playerHand), inline: false },
+                            { name: `🤖 Nhà cái (${dP})`, value: formatHand(dealerHand), inline: false }
+                        )
+                        .setDescription(`${msg}\n💰 Ví: **${userFinal.money.toLocaleString()}**`)
+                    ],
+                    components: [] // Xóa nút Rút/Dằn
                 }).catch(() => {});
             }
-        }
         
 
   // --- B. XỬ LÝ BÀI CÀO ---
