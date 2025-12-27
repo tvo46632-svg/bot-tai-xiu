@@ -821,19 +821,22 @@ async function cmdBoctham(message) {
         const userId = message.author.id;
         const today = new Date().toISOString().slice(0, 10);
 
-        // --- KHỞI TẠO DỮ LIỆU CỰC KỲ AN TOÀN ---
+        // --- KHỞI TẠO VÀ KIỂM TRA LƯỢT CHẶT CHẼ ---
         if (!db.data.boctham) db.data.boctham = {};
         
-        // Nếu chưa có user hoặc sai ngày, tạo mới/reset ngay lập tức
-        if (!db.data.boctham[userId] || db.data.boctham[userId].lastDate !== today) {
+        // Nếu user chưa có dữ liệu, khởi tạo ngay
+        if (!db.data.boctham[userId]) {
             db.data.boctham[userId] = { lastDate: today, count: 3 };
-            await db.write(); 
         }
 
-        // --- KIỂM TRA LƯỢT (Dùng optional chaining ?. để không bao giờ lỗi) ---
-        const currentCount = db.data.boctham[userId]?.count || 0;
+        // Nếu sang ngày mới, reset lượt
+        if (db.data.boctham[userId].lastDate !== today) {
+            db.data.boctham[userId].lastDate = today;
+            db.data.boctham[userId].count = 3;
+        }
 
-        if (currentCount <= 0) {
+        // Kiểm tra số lượt trước khi cho phép chạy
+        if (db.data.boctham[userId].count <= 0) {
             return message.channel.send(`> ❌ **${message.author.username}**, bạn đã hết lượt bốc thăm hôm nay!`)
                 .then(m => setTimeout(() => m.delete().catch(() => {}), 5000));
         }
@@ -844,17 +847,17 @@ async function cmdBoctham(message) {
                 .then(m => setTimeout(() => m.delete().catch(() => {}), 5000));
         }
 
-        // --- KHÓA MÁY VÀ THỰC HIỆN TRỪ LƯỢT ---
+        // --- KHÓA MÁY VÀ THỰC HIỆN TRỪ LƯỢT NGAY ---
         isBocthamRunning = true;
         
-        // Trừ trực tiếp vào đường dẫn chắc chắn tồn tại
+        // Giảm lượt và trừ tiền trước khi chạy hiệu ứng để chống lỗi hồi lượt
         db.data.boctham[userId].count -= 1;
         await subMoney(userId, 200);
-        await db.write();
+        await db.write(); // Lưu trạng thái đã trừ lượt vào file ngay lập tức
 
         await message.delete().catch(() => {});
 
-        // --- PHẦN THƯỞNG (Giữ nguyên tier của bạn) ---
+        // --- LOGIC PHẦN THƯỞNG ---
         const rand = Math.random() * 100;
         let reward = 0;
         if (rand <= 40) reward = Math.floor(Math.random() * 51) + 50; 
@@ -881,16 +884,19 @@ async function cmdBoctham(message) {
         await addMoney(userId, reward);
         const statusText = reward >= 0 ? `Nhận: **+${reward.toLocaleString()}**` : `Mất: **${reward.toLocaleString()}**`;
         
-        // Hiển thị số lượt mới nhất
-        const finalCount = db.data.boctham[userId]?.count ?? 0;
-        await msg.edit(`### ${tier.emoji} HỘP QUÀ ${tier.name} ${tier.emoji}\n> 👤 Người chơi: **${message.author.username}**\n> ${tier.color} ${statusText} tiền\n> 🎫 Còn lại: \`${finalCount}\` lượt`).catch(() => {});
+        // Lấy số lượt trực tiếp từ database sau khi đã trừ để hiển thị chính xác
+        const remainingCount = db.data.boctham[userId].count;
+        await msg.edit(`### ${tier.emoji} HỘP QUÀ ${tier.name} ${tier.emoji}\n> 👤 Người chơi: **${message.author.username}**\n> ${tier.color} ${statusText} tiền\n> 🎫 Còn lại: \`${remainingCount}\` lượt`).catch(() => {});
 
     } catch (err) {
         console.error("LỖI BOCTHAM CHI TIẾT:", err);
+        // Nếu có lỗi nghiêm trọng xảy ra, giải phóng khóa máy
+        isBocthamRunning = false;
     } finally {
         isBocthamRunning = false; 
     }
 }
+
 
 
 
