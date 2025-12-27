@@ -1,6 +1,6 @@
 // ================================================
 //                  DISCORD CASINO BOT
-//        FULL VERSION — ~960+ LINES OF CODE
+//        FULL VERSION — ~1500+ LINES OF CODE
 // ================================================
 
 // ---------------- IMPORT MODULES ----------------
